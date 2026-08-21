@@ -1,11 +1,11 @@
 /**
  * Run the CRM syncs from a terminal:
  *
- *   npm run sync:crm                  both, in order
- *   npm run sync:crm -- crm-clients   just one
+ *   npm run sync:crm                      all four, in dependency order
+ *   npm run sync:crm -- crm-appointments  just one
  *
- * Deliberately the same functions the cron route calls. When a sync breaks at
- * 3am this is how you re-run it and watch what it does.
+ * The same functions the cron route and the settings buttons call. When a sync
+ * breaks at 3am this is how you re-run it and watch what it does.
  *
  * Relative imports rather than @/ aliases: this runs under tsx, outside the
  * Next resolver.
@@ -13,13 +13,17 @@
 import 'dotenv/config';
 
 import { syncCrmAppointments } from '../src/lib/sync/crm-appointments';
+import { syncCrmCalls } from '../src/lib/sync/crm-calls';
 import { syncCrmClients } from '../src/lib/sync/crm-clients';
+import { syncCrmDeals } from '../src/lib/sync/crm-deals';
 import { runSync, type SyncFn } from '../src/lib/sync/runner';
 
 const ORDER: Array<{ name: string; run: SyncFn }> = [
-  // Clients first: appointments hang off them.
+  // Clients first: appointments and calls hang off their sub-accounts.
   { name: 'crm-clients', run: syncCrmClients },
   { name: 'crm-appointments', run: syncCrmAppointments },
+  { name: 'crm-deals', run: syncCrmDeals },
+  { name: 'crm-calls', run: syncCrmCalls },
 ];
 
 async function main(): Promise<void> {

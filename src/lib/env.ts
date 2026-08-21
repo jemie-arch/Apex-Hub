@@ -45,6 +45,19 @@ const serverSchema = z.object({
    */
   SERVICE_API_KEY: z.string().min(32, 'use at least 32 characters').optional(),
 
+  /**
+   * Slack incoming webhook for sync failure alerts. Optional: without it the
+   * syncs still record everything to sync_runs, they just stay quiet.
+   */
+  SLACK_WEBHOOK_URL: z
+    .string()
+    .url()
+    .startsWith('https://hooks.slack.com/', 'must be a Slack webhook URL')
+    .optional(),
+
+  /** Public origin, used to link back from an alert. Vercel sets VERCEL_URL. */
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),

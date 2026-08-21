@@ -9,6 +9,7 @@
  */
 import type { SyncTrigger } from '@/types/database';
 
+import { alertSyncFailure } from '@/lib/notify/slack';
 import { serviceClient } from '@/lib/supabase/service';
 
 export interface SyncCounts {
@@ -159,6 +160,18 @@ export async function runSync(
       errors: errors.slice(0, 50),
     })
     .eq('id', runId);
+
+  // Awaited, not fire-and-forget: on a serverless platform the function can be
+  // frozen the moment the response is returned, which would drop the alert.
+  // alertSyncFailure never throws and stays silent on success.
+  await alertSyncFailure({
+    name,
+    status,
+    counts,
+    errors,
+    durationMs,
+    triggeredBy: trigger,
+  });
 
   return { runId, name, status, counts, errors, durationMs };
 }

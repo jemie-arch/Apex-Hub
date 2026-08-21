@@ -43,7 +43,7 @@ export async function GET(
 
   const { name } = params;
 
-  if (PLANNED_SYNCS.includes(name as (typeof PLANNED_SYNCS)[number])) {
+  if (PLANNED_SYNCS.includes(name)) {
     // Answer honestly rather than 404ing or writing a misleading sync_runs row.
     return NextResponse.json(
       { name, status: 'not_implemented' },

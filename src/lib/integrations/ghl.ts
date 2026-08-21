@@ -343,6 +343,201 @@ export async function listAppointments(
   });
 }
 
+export interface GhlOpportunity {
+  id: string;
+  contactId: string | null;
+  name: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  /** 'open' | 'won' | 'lost' | 'abandoned' in GoHighLevel's vocabulary. */
+  status: string | null;
+  /** Pipeline stage id; names are per-pipeline and resolved by the sync. */
+  stageId: string | null;
+  stageName: string | null;
+  monetaryValue: number | null;
+  assignedUserId: string | null;
+  source: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * Opportunities for one location — Apex's own sales pipeline, not a practice's.
+ * Which location that is comes from app_settings.b2b_location_id, because the
+ * agency's pipeline is just another sub-account and only a human knows which.
+ */
+export async function listOpportunities(
+  clientId: string | null,
+  locationId: string,
+): Promise<GhlOpportunity[]> {
+  const { accessToken } = await getToken(clientId);
+
+  const payload = await request<{ opportunities?: unknown[] }>(
+    accessToken,
+    '/opportunities/search',
+    { location_id: locationId, limit: '100' },
+  );
+
+  const rows = Array.isArray(payload.opportunities) ? payload.opportunities : [];
+
+  return rows.flatMap((row) => {
+    if (typeof row !== 'object' || row === null) return [];
+    const record = row as Record<string, unknown>;
+
+    const id = asString(record['id']);
+    if (!id) return [];
+
+    const contact =
+      typeof record['contact'] === 'object' && record['contact'] !== null
+        ? (record['contact'] as Record<string, unknown>)
+        : {};
+
+    const monetary = record['monetaryValue'];
+
+    return [
+      {
+        id,
+        contactId: asString(record['contactId']) ?? asString(contact['id']),
+        // GoHighLevel names an opportunity, not a company. Falling back to the
+        // contact name keeps the row identifiable either way.
+        name:
+          asString(record['name']) ??
+          asString(contact['name']) ??
+          'Unnamed opportunity',
+        contactName: asString(contact['name']),
+        contactEmail: asString(contact['email']),
+        contactPhone: asString(contact['phone']),
+        status: asString(record['status']),
+        stageId: asString(record['pipelineStageId']),
+        stageName: asString(record['pipelineStageName']),
+        monetaryValue:
+          typeof monetary === 'number'
+            ? monetary
+            : typeof monetary === 'string' && monetary.trim() !== ''
+              ? Number.parseFloat(monetary)
+              : null,
+        assignedUserId: asString(record['assignedTo']),
+        source: asString(record['source']),
+        createdAt: asString(record['createdAt']) ?? asString(record['dateAdded']),
+        updatedAt: asString(record['updatedAt']),
+      },
+    ];
+  });
+}
+
+export interface GhlCall {
+  id: string;
+  contactId: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  userId: string | null;
+  /** 'inbound' | 'outbound' */
+  direction: string | null;
+  /** GoHighLevel's call status: completed, no-answer, busy, voicemail… */
+  status: string | null;
+  durationSeconds: number;
+  startedAt: string;
+  recordingUrl: string | null;
+}
+
+/**
+ * Call logs for one location.
+ *
+ * NOTE: GoHighLevel exposes calls as messages inside conversations rather than
+ * as a call log, so this walks conversations and keeps the call-type messages.
+ * That is two requests per conversation, hence the caps in the sync. It is also
+ * the least verified mapping in this codebase — check it against one real
+ * location before trusting the leaderboard.
+ */
+export async function listConversationCalls(
+  clientId: string,
+  locationId: string,
+  maxConversations: number,
+): Promise<GhlCall[]> {
+  const { accessToken } = await getToken(clientId);
+
+  const search = await request<{ conversations?: unknown[] }>(
+    accessToken,
+    '/conversations/search',
+    { locationId, limit: String(maxConversations) },
+  );
+
+  const conversations = Array.isArray(search.conversations)
+    ? search.conversations
+    : [];
+
+  const calls: GhlCall[] = [];
+
+  for (const conversation of conversations) {
+    if (typeof conversation !== 'object' || conversation === null) continue;
+    const conv = conversation as Record<string, unknown>;
+
+    const conversationId = asString(conv['id']);
+    if (!conversationId) continue;
+
+    const contactId = asString(conv['contactId']);
+    const contactName = asString(conv['fullName']) ?? asString(conv['contactName']);
+
+    const messages = await request<{ messages?: { messages?: unknown[] } }>(
+      accessToken,
+      `/conversations/${conversationId}/messages`,
+      { limit: '100' },
+    );
+
+    const list = Array.isArray(messages.messages?.messages)
+      ? messages.messages.messages
+      : [];
+
+    for (const message of list) {
+      if (typeof message !== 'object' || message === null) continue;
+      const msg = message as Record<string, unknown>;
+
+      const type = (asString(msg['messageType']) ?? asString(msg['type']) ?? '')
+        .toUpperCase();
+      if (!type.includes('CALL')) continue;
+
+      const id = asString(msg['id']);
+      const startedRaw = asString(msg['dateAdded']) ?? asString(msg['createdAt']);
+      if (!id || !startedRaw) continue;
+
+      const started = new Date(startedRaw);
+      if (Number.isNaN(started.getTime())) continue;
+
+      const meta =
+        typeof msg['meta'] === 'object' && msg['meta'] !== null
+          ? (msg['meta'] as Record<string, unknown>)
+          : {};
+      const call =
+        typeof meta['call'] === 'object' && meta['call'] !== null
+          ? (meta['call'] as Record<string, unknown>)
+          : {};
+
+      const duration = call['duration'] ?? msg['duration'];
+
+      calls.push({
+        id,
+        contactId,
+        contactName,
+        contactPhone: asString(conv['phone']),
+        userId: asString(msg['userId']),
+        direction: asString(msg['direction']),
+        status: asString(call['status']) ?? asString(msg['status']),
+        durationSeconds:
+          typeof duration === 'number'
+            ? Math.max(0, Math.trunc(duration))
+            : typeof duration === 'string' && duration.trim() !== ''
+              ? Math.max(0, Number.parseInt(duration, 10) || 0)
+              : 0,
+        startedAt: started.toISOString(),
+        recordingUrl: asString(msg['recordingUrl']) ?? asString(call['recordingUrl']),
+      });
+    }
+  }
+
+  return calls;
+}
+
 export interface GhlContact {
   id: string;
   name: string | null;

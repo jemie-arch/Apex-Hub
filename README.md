@@ -63,6 +63,29 @@ Rules that hold throughout:
 
 Vercel cron is the only scheduler. Do not add CI jobs against the same database.
 
+### Cron schedule and the Hobby plan
+
+`vercel.json` declares **two** daily crons, because Vercel's Hobby plan allows a
+maximum of two cron jobs and only daily schedules. Declaring more fails the
+deployment. On Pro, the schedule this app actually wants is:
+
+| Sync | Schedule |
+| --- | --- |
+| `crm-clients` | hourly |
+| `crm-appointments` | every 30 minutes |
+| `crm-deals` | hourly |
+| `crm-calls` | every 6 hours |
+| `windsor-ads` | daily, early morning |
+
+Until then, the remaining syncs are run from the **Run now** buttons in
+`/settings`, which call the identical functions.
+
+### Alerts
+
+Set `SLACK_WEBHOOK_URL` and any sync ending `error` or `partial` posts to
+`#tech-team`. Successes stay silent on purpose: a channel that fires on every
+green run gets muted, and then the red ones are missed too.
+
 ## Roles
 
 `admin` sees everything. `isr` and `csr` see only their own performance page.
