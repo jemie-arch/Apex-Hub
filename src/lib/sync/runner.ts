@@ -25,6 +25,15 @@ export interface SyncContext {
   /** Non-fatal problems. One bad record must not lose the other 500. */
   recordError(message: string, context?: Record<string, unknown>): void;
   log(message: string): void;
+  /**
+   * A finding worth keeping: written to sync_runs.meta rather than the console.
+   *
+   * The difference matters. `log` goes to the platform's log viewer, so the
+   * one person who could act on a diagnostic has to go hunting for it; a note
+   * lands in a table they already read. Use it for shapes and counts, never
+   * for a patient's details — this column is read by anybody with admin.
+   */
+  note(key: string, value: unknown): void;
 }
 
 export type SyncFn = (ctx: SyncContext) => Promise<void>;
@@ -164,6 +173,9 @@ export async function runSync(
 
   const runId = opened.data.id;
 
+  /** Findings the sync wants to survive the run. See ctx.note. */
+  const notes: Record<string, unknown> = {};
+
   const ctx: SyncContext = {
     runId,
     counts,
@@ -173,6 +185,9 @@ export async function runSync(
     },
     log(message) {
       console.log(`[${name}] ${message}`);
+    },
+    note(key, value) {
+      notes[key] = value;
     },
   };
 
@@ -203,6 +218,9 @@ export async function runSync(
       records_updated: counts.updated,
       records_skipped: counts.skipped,
       error_count: errors.length,
+      ...(Object.keys(notes).length > 0
+        ? { meta: notes as unknown as Json }
+        : {}),
       // Cap the payload: a sync that fails on every one of 10,000 rows should
       // not write a megabyte of near-identical JSON.
       //

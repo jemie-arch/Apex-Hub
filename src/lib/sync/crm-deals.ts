@@ -85,10 +85,12 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
       : null;
 
   if (!locationId) {
-    ctx.log(
+    // Recorded rather than logged, for the same reason as windsor-ads: a sync
+    // that cannot run must not be filed as a success that found nothing.
+    ctx.recordError(
       'app_settings.b2b_location_id is not set, so there is no pipeline to ' +
-        'read. Set it to the GoHighLevel location holding Apex\'s own sales ' +
-        'pipeline.',
+        'read — set it to the GoHighLevel location holding the agency\'s own ' +
+        'sales pipeline',
     );
     return;
   }

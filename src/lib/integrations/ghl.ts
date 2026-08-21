@@ -740,6 +740,22 @@ export interface GhlContact {
     adId: string | null;
     campaignId: string | null;
   };
+  /** Key names only — see ContactShape. */
+  shape: ContactShape;
+}
+
+/**
+ * What a contact payload actually carried, by key name only.
+ *
+ * Recorded because "we have no ad attribution" and "we are reading the wrong
+ * key" look identical from the database — both leave utm_campaign null across
+ * every row. Key names are safe to keep; the values are a patient's details
+ * and are deliberately not included.
+ */
+export interface ContactShape {
+  hasAttributions: boolean;
+  attributionKeys: string[];
+  topLevelKeys: string[];
 }
 
 /** One contact, for the name and the attribution on a booking. */
@@ -781,6 +797,13 @@ export async function getContact(
     email: asString(record['email']),
     phone: asString(record['phone']),
     source: asString(record['source']),
+    shape: {
+      hasAttributions: attributions.length > 0,
+      attributionKeys: Object.keys(first),
+      topLevelKeys: Object.keys(record).filter((key) =>
+        /attribut|utm|source|campaign|ad/i.test(key),
+      ),
+    },
     attribution: {
       utmSource: asString(first['utmSource']),
       utmMedium: asString(first['utmMedium']),

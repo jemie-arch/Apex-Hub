@@ -17,6 +17,38 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Settings' };
 
+/**
+ * The first error and any notes a run left behind, as one readable line.
+ *
+ * Notes come from ctx.note and are shapes and counts — never patient details —
+ * so they are safe to render on an admin page.
+ */
+function runDetail(run: {
+  errors: unknown;
+  meta: unknown;
+}): string | null {
+  const parts: string[] = [];
+
+  if (Array.isArray(run.errors) && run.errors.length > 0) {
+    const first = run.errors[0];
+    if (typeof first === 'object' && first !== null) {
+      const message = (first as Record<string, unknown>)['message'];
+      if (typeof message === 'string') parts.push(message);
+    }
+    if (run.errors.length > 1) {
+      parts.push(`and ${run.errors.length - 1} more`);
+    }
+  }
+
+  if (typeof run.meta === 'object' && run.meta !== null) {
+    for (const [key, value] of Object.entries(run.meta)) {
+      parts.push(`${humanise(key)}: ${JSON.stringify(value)}`);
+    }
+  }
+
+  return parts.length === 0 ? null : parts.join(' · ');
+}
+
 export default async function SettingsPage() {
   const db = serviceClient();
 
@@ -221,10 +253,10 @@ export default async function SettingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {(runs.data ?? []).map((run) => (
+                {(runs.data ?? []).flatMap((run) => [
                   <tr
                     key={run.id}
-                    className="border-b border-line last:border-0 hover:bg-surface-hover"
+                    className="border-b border-line hover:bg-surface-hover"
                   >
                     <td className="px-4 py-3 font-medium text-fg">{run.name}</td>
                     <td className="px-4 py-3">
@@ -268,8 +300,22 @@ export default async function SettingsPage() {
                     <td className="numeric px-4 py-3 text-fg-subtle">
                       {run.started_at.slice(0, 16).replace('T', ' ')}
                     </td>
-                  </tr>
-                ))}
+                  </tr>,
+                  runDetail(run) === null ? null : (
+                    <tr key={`${run.id}-detail`} className="border-b border-line">
+                      <td
+                        colSpan={9}
+                        className={
+                          run.error_count > 0
+                            ? 'px-4 pb-3 text-xs text-negative'
+                            : 'px-4 pb-3 text-xs text-fg-subtle'
+                        }
+                      >
+                        {runDetail(run)}
+                      </td>
+                    </tr>
+                  ),
+                ])}
               </tbody>
             </table>
           </div>

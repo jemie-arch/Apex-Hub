@@ -72,9 +72,17 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
   }
 
   if (clientByAccount.size === 0) {
-    ctx.log(
-      'no client has an ad_account_id set — nothing to pull. Map Windsor ' +
-        'account ids onto clients first.',
+    /*
+     * Recorded as a problem, not merely logged.
+     *
+     * This branch used to return quietly and the run was filed as a success
+     * that read nothing — indistinguishable, on the Settings page and in
+     * sync_runs, from a genuinely quiet day. An unconfigured integration has
+     * to look different from a working one, or it stays unconfigured.
+     */
+    ctx.recordError(
+      'no client has an ad_account_id set, so no ad data can be pulled — map ' +
+        'Windsor account ids onto clients first',
     );
     return;
   }

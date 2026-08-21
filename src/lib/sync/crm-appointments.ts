@@ -83,6 +83,8 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   const from = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000);
   const to = new Date(Date.now() + LOOKAHEAD_DAYS * 86_400_000);
   let contactLookups = 0;
+  /** One shape note per run is enough; see ctx.note beside the lookup. */
+  let shapeNoted = false;
 
   for (const client of clients.data ?? []) {
     if (!client.crm_location_id) continue;
@@ -142,6 +144,20 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         try {
           contact = await getContact(client.id, event.contactId);
           contactLookups += 1;
+
+          /*
+           * Record what a contact payload actually carried, once per run.
+           *
+           * Across 2,398 bookings, not one had a utm_campaign or an ad id,
+           * while 173 had a source — and from the database alone there is no
+           * way to tell "these patients came from forms, not ads" apart from
+           * "we are reading the wrong key". Key names answer that; the values
+           * are patient details and are deliberately not recorded.
+           */
+          if (contact && !shapeNoted) {
+            ctx.note('contact_shape', contact.shape);
+            shapeNoted = true;
+          }
         } catch (error) {
           ctx.recordError(`contact lookup failed for ${event.id}`, {
             clientId: client.id,
@@ -285,6 +301,8 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       ctx.counts.updated += 1;
     }
   }
+
+  ctx.note('contact_lookups', contactLookups);
 
   if (contactLookups >= MAX_CONTACT_LOOKUPS) {
     // Say so out loud rather than letting a partial enrichment look complete.
