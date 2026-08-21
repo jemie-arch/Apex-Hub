@@ -580,12 +580,13 @@ export async function getContact(
       ? (attributions[0] as Record<string, unknown>)
       : {};
 
-  const name =
-    asString(record['contactName']) ??
-    [asString(record['firstName']), asString(record['lastName'])]
-      .filter(Boolean)
-      .join(' ') ||
-    null;
+  // Built in two steps on purpose: `a ?? b || c` is a SyntaxError, because
+  // mixing ?? with || without parentheses is not allowed.
+  const fullName = [asString(record['firstName']), asString(record['lastName'])]
+    .filter(Boolean)
+    .join(' ');
+
+  const name = asString(record['contactName']) ?? (fullName === '' ? null : fullName);
 
   return {
     id: contactId,
