@@ -16,6 +16,9 @@ export const metadata = { title: 'Forms' };
 const SUMMARY_FIELDS = [
   'practice_name',
   'contact_name',
+  // Portal invite requests use bare name/role; onboarding uses the rest.
+  'name',
+  'role',
   'email',
   'phone',
   'address',
