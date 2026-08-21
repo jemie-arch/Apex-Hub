@@ -8,10 +8,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { BarChart } from '@/components/ui/BarChart';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { KPICard } from '@/components/ui/KPICard';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { tenant, titleCase } from '@/config/tenant.config';
 import { HEALTH_TONE, getGroupRollups } from '@/lib/client-metrics';
@@ -31,7 +31,9 @@ import {
   type GoalProgress,
 } from '@/lib/metrics';
 import { resolveRange } from '@/lib/range';
+import { currentCaller } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
+import { getMonthlyTrend } from '@/lib/trend';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,9 +138,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   });
 
   const db = serviceClient();
-  const [metrics, rollups, lastSync] = await Promise.all([
+  const [metrics, rollups, trend, caller, lastSync] = await Promise.all([
     getDashboardMetrics(range),
     getGroupRollups(range),
+    getMonthlyTrend(8),
+    currentCaller(),
     db
       .from('sync_runs')
       .select('name, status, started_at, error_count')
@@ -146,6 +150,19 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       .limit(1)
       .maybeSingle(),
   ]);
+
+  // First name only, and only if we have one — "Hello, jemie@…" reads worse
+  // than no greeting at all.
+  const profile = caller
+    ? await db
+        .from('user_profiles')
+        .select('full_name')
+        .eq('id', caller.id)
+        .maybeSingle()
+    : null;
+
+  const firstName = profile?.data?.full_name?.trim().split(/\s+/)[0] ?? null;
+  const thisMonth = new Date().toISOString().slice(0, 7);
 
   const { current, previous, hero, goal } = metrics;
   const booking = tenant.vocabulary.booking;
@@ -158,11 +175,19 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description={`${range.label} · versus the preceding period`}
-        actions={<DateRangePicker />}
-      />
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            {firstName ? `Hello, ${firstName}` : 'Dashboard'}
+          </h1>
+          <p className="mt-1 text-sm text-fg-muted">
+            {`${range.label} · versus the preceding period`}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <DateRangePicker />
+        </div>
+      </header>
 
       {metrics.isEmpty ? (
         <EmptyState
@@ -258,6 +283,31 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <div className="mt-6">
         <GoalBar goal={goal} />
       </div>
+
+      <section className="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-fg">
+              {titleCase(booking.plural)} by month
+            </h2>
+            <p className="mt-0.5 text-xs text-fg-subtle">
+              Last 8 months across every {client.singular} · attendance nested
+              inside each bar
+            </p>
+          </div>
+        </div>
+
+        <BarChart
+          outerLabel="booked"
+          innerLabel="showed"
+          bars={trend.map((point) => ({
+            label: point.label,
+            value: point.booked,
+            inner: point.showed,
+            partial: point.month === thisMonth,
+          }))}
+        />
+      </section>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="rounded-lg border border-line bg-surface p-6 lg:col-span-2">

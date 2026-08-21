@@ -23,6 +23,24 @@ const config: Config = {
           raised: 'var(--surface-raised)',
           sunken: 'var(--surface-sunken)',
           hover: 'var(--surface-hover)',
+          // The inverted panel, for the single card that must outrank the rest.
+          invert: 'var(--surface-invert)',
+        },
+        'invert-fg': {
+          DEFAULT: 'var(--surface-invert-text)',
+          muted: 'var(--surface-invert-muted)',
+        },
+        // Categorical series colours. These carry no meaning — they only
+        // separate one series from another, which is why they are kept apart
+        // from both the accent and the semantic scale.
+        chart: {
+          1: 'var(--chart-1)',
+          2: 'var(--chart-2)',
+          3: 'var(--chart-3)',
+          4: 'var(--chart-4)',
+          5: 'var(--chart-5)',
+          6: 'var(--chart-6)',
+          track: 'var(--chart-track)',
         },
         overlay: 'var(--overlay)',
         // Named fg rather than text so the utility reads `text-fg-muted`
@@ -40,14 +58,17 @@ const config: Config = {
         positive: {
           DEFAULT: 'var(--positive)',
           subtle: 'var(--positive-subtle)',
+          strong: 'var(--positive-strong)',
         },
         warning: {
           DEFAULT: 'var(--warning)',
           subtle: 'var(--warning-subtle)',
+          strong: 'var(--warning-strong)',
         },
         negative: {
           DEFAULT: 'var(--negative)',
           subtle: 'var(--negative-subtle)',
+          strong: 'var(--negative-strong)',
         },
         neutral: {
           DEFAULT: 'var(--neutral)',

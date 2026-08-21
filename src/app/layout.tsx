@@ -15,8 +15,10 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  // Dark by default — the palette in globals.css is dark-first, and declaring
+  // the scheme stops form controls and scrollbars rendering light against it.
   return (
-    <html lang="en">
+    <html lang="en" style={{ colorScheme: 'dark' }}>
       <body>{children}</body>
     </html>
   );
