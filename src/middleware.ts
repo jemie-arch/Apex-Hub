@@ -47,12 +47,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Checked rather than asserted with `!`. Passing an empty URL to
+  // createServerClient throws inside middleware, and Vercel renders that as an
+  // opaque MIDDLEWARE_INVOCATION_FAILED with no clue what is wrong. Say it.
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return new NextResponse(
+      'Configuration incomplete: NEXT_PUBLIC_SUPABASE_URL and ' +
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY must be set in the deployment ' +
+        'environment, then redeployed.',
+      { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+    );
+  }
+
   // Carry refreshed auth cookies through to the response.
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
