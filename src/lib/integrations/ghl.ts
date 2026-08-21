@@ -59,11 +59,15 @@ export async function getToken(clientId: string | null): Promise<GhlToken> {
     : await query.is('client_id', null).maybeSingle();
 
   if (error) throw error;
+
   if (!data) {
+    // A marketplace app installed at agency level can mint a token for any of
+    // its locations, so a missing per-location row is not a dead end — it just
+    // has not been minted yet. Only the agency token requires a human.
+    if (clientId) return mintLocationToken(clientId);
+
     throw new Error(
-      clientId
-        ? `No GoHighLevel token stored for client ${clientId}. Connect it in settings.`
-        : 'No agency-level GoHighLevel token stored. Connect the app first.',
+      'No agency-level GoHighLevel token stored. Connect the app in settings.',
     );
   }
 
@@ -77,13 +81,25 @@ export async function getToken(clientId: string | null): Promise<GhlToken> {
   const expiresAtMs = data.expires_at ? new Date(data.expires_at).getTime() : 0;
   const stillValid = expiresAtMs - Date.now() > REFRESH_MARGIN_MS;
 
-  if (stillValid || !data.refresh_token) {
+  if (stillValid) {
     return {
       accessToken: data.access_token,
       locationId: data.crm_location_id,
       companyId,
       expiresAt: data.expires_at,
     };
+  }
+
+  // Expired with no refresh token. Location tokens minted from the agency
+  // install come without one by design, so the answer is to mint a fresh one
+  // rather than to hand back something already dead.
+  if (!data.refresh_token) {
+    if (clientId) return mintLocationToken(clientId);
+
+    throw new Error(
+      'The agency GoHighLevel token has expired and has no refresh token. ' +
+        'Reconnect the app in settings.',
+    );
   }
 
   // GoHighLevel invalidates a refresh token the moment it is used. If two
@@ -193,6 +209,125 @@ export async function getToken(clientId: string | null): Promise<GhlToken> {
     accessToken: payload.access_token,
     locationId: data.crm_location_id,
     companyId,
+    expiresAt,
+  };
+}
+
+/**
+ * Mints a location access token from the agency install.
+ *
+ * This is the whole point of installing as a marketplace app at agency level:
+ * one Company token can issue a token for any location under it, so 45
+ * practices do not need 45 separate OAuth handshakes.
+ *
+ * Tokens minted this way carry no refresh token — they are cheap to reissue,
+ * so getToken re-mints on expiry instead of refreshing.
+ *
+ * NOTE: unverified against a live agency install. The endpoint and field names
+ * follow GoHighLevel's documented shape; confirm with one location before
+ * trusting a bulk run.
+ */
+export async function mintLocationToken(clientId: string): Promise<GhlToken> {
+  const db = serviceClient();
+  const env = ghlCredentials();
+
+  const client = await db
+    .from('clients')
+    .select('id, name, crm_location_id')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  if (client.error) throw client.error;
+  if (!client.data?.crm_location_id) {
+    throw new Error(
+      `Client ${clientId} has no crm_location_id, so no token can be minted.`,
+    );
+  }
+
+  const locationId = client.data.crm_location_id;
+  const agency = await getToken(null);
+
+  if (!agency.companyId) {
+    throw new Error(
+      'The agency token has no companyId stored, which /oauth/locationToken ' +
+        'requires. Reconnect the agency install so the companyId is captured.',
+    );
+  }
+
+  const response = await fetch(`${env.apiBase}/oauth/locationToken`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${agency.accessToken}`,
+      Version: env.apiVersion,
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      companyId: agency.companyId,
+      locationId,
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(
+      `Could not mint a token for ${client.data.name} (${locationId}): ` +
+        `${response.status} ${detail.slice(0, 300)}`,
+    );
+  }
+
+  const payload = (await response.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    scope?: string;
+  };
+
+  if (!payload.access_token) {
+    throw new Error(
+      `Minting a token for ${client.data.name} returned no access_token.`,
+    );
+  }
+
+  const expiresAt = new Date(
+    Date.now() + (payload.expires_in ?? 86_400) * 1000,
+  ).toISOString();
+
+  const record = {
+    provider: 'gohighlevel',
+    client_id: clientId,
+    crm_location_id: locationId,
+    access_token: payload.access_token,
+    // Minted tokens have none; expiry is handled by re-minting.
+    refresh_token: null,
+    expires_at: expiresAt,
+    scope: payload.scope ?? null,
+    refreshed_at: new Date().toISOString(),
+    last_error: null,
+    meta: { mintedFromAgency: true, companyId: agency.companyId },
+  };
+
+  // Upsert by hand: uniqueness is a partial index, which ON CONFLICT cannot
+  // target.
+  const existing = await db
+    .from('oauth_tokens')
+    .select('id')
+    .eq('provider', 'gohighlevel')
+    .eq('client_id', clientId)
+    .maybeSingle();
+
+  if (existing.error) throw existing.error;
+
+  const written = existing.data
+    ? await db.from('oauth_tokens').update(record).eq('id', existing.data.id)
+    : await db.from('oauth_tokens').insert(record);
+
+  if (written.error) throw written.error;
+
+  return {
+    accessToken: payload.access_token,
+    locationId,
+    companyId: agency.companyId,
     expiresAt,
   };
 }

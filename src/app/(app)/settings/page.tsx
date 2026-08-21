@@ -1,6 +1,7 @@
 import { AlertTriangle, Link2, RefreshCw } from 'lucide-react';
 
 import { RunSyncButton } from '@/components/settings/RunSyncButton';
+import { TokenManager, type TokenRow } from '@/components/settings/TokenManager';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
 import {
@@ -19,12 +20,16 @@ export const metadata = { title: 'Settings' };
 export default async function SettingsPage() {
   const db = serviceClient();
 
-  const [tokens, clients, runs] = await Promise.all([
-    db.from('oauth_tokens').select('provider, client_id, expires_at, last_error'),
+  const [tokens, locations, groups, runs] = await Promise.all([
+    db
+      .from('oauth_tokens')
+      .select('provider, client_id, expires_at, last_error, meta'),
     db
       .from('clients')
-      .select('id', { count: 'exact', head: true })
-      .not('crm_location_id', 'is', null),
+      .select('id, name, group_id, crm_location_id, is_active')
+      .not('crm_location_id', 'is', null)
+      .order('name'),
+    db.from('client_groups').select('id, name'),
     db
       .from('sync_runs')
       .select('*')
@@ -33,18 +38,42 @@ export default async function SettingsPage() {
   ]);
 
   if (tokens.error) throw tokens.error;
+  if (locations.error) throw locations.error;
+  if (groups.error) throw groups.error;
   if (runs.error) throw runs.error;
 
   const rows = tokens.data ?? [];
   const agency = rows.find(
     (row) => row.provider === 'gohighlevel' && row.client_id === null,
   );
-  const locationTokens = rows.filter(
-    (row) => row.provider === 'gohighlevel' && row.client_id !== null,
-  ).length;
-  const linkedClients = clients.count ?? 0;
+  const linkedClients = (locations.data ?? []).length;
   const clientNoun = tenant.vocabulary.client;
   const locationNoun = tenant.vocabulary.location;
+
+  const groupNameById = new Map(
+    (groups.data ?? []).map((row) => [row.id, row.name]),
+  );
+  const tokenByClient = new Map(
+    rows
+      .filter((row) => row.provider === 'gohighlevel' && row.client_id !== null)
+      .map((row) => [row.client_id as string, row]),
+  );
+
+  const tokenRows: TokenRow[] = (locations.data ?? []).map((row) => {
+    const token = tokenByClient.get(row.id);
+    const meta = (token?.meta ?? {}) as Record<string, unknown>;
+
+    return {
+      clientId: row.id,
+      locationName: row.name,
+      businessName: groupNameById.get(row.group_id) ?? 'Unknown',
+      crmLocationId: row.crm_location_id ?? '',
+      isActive: row.is_active,
+      expiresAt: token?.expires_at ?? null,
+      lastError: token?.last_error ?? null,
+      mintedFromAgency: meta['mintedFromAgency'] === true,
+    };
+  });
 
   return (
     <>
@@ -95,7 +124,7 @@ export default async function SettingsPage() {
                 tone={agency ? (agency.last_error ? 'negative' : 'positive') : 'neutral'}
               />
               <a
-                href="/api/oauth/ghl/start?userType=Company"
+                href="/api/oauth/crm/start?userType=Company"
                 className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm text-fg hover:bg-surface-hover"
               >
                 <Link2 size={14} />
@@ -107,39 +136,18 @@ export default async function SettingsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div>
               <p className="text-sm font-medium text-fg">
-                GoHighLevel — locations
+                GoHighLevel — {locationNoun.plural}
               </p>
               <p className="text-xs text-fg-subtle">
-                {formatCount(locationTokens)} of {formatCount(linkedClients)}{' '}
-                {locationNoun.plural} have a token. Ones without cannot sync
-                bookings.
+                {formatCount(linkedClients)} {locationNoun.plural} linked. Their
+                tokens are minted from the agency install below — no separate
+                sign-in per {locationNoun.singular}.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <StatusPill
-                value={
-                  linkedClients === 0
-                    ? 'none yet'
-                    : locationTokens >= linkedClients
-                      ? 'complete'
-                      : 'partial'
-                }
-                tone={
-                  linkedClients === 0
-                    ? 'neutral'
-                    : locationTokens >= linkedClients
-                      ? 'positive'
-                      : 'warning'
-                }
-              />
-              <a
-                href="/api/oauth/ghl/start?userType=Location"
-                className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm text-fg hover:bg-surface-hover"
-              >
-                <Link2 size={14} />
-                Connect a location
-              </a>
-            </div>
+            <StatusPill
+              value={linkedClients === 0 ? 'none yet' : 'managed'}
+              tone={linkedClients === 0 ? 'neutral' : 'accent'}
+            />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -157,6 +165,8 @@ export default async function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <TokenManager rows={tokenRows} agencyConnected={agency !== undefined} />
 
       <section className="mb-6 rounded-lg border border-line bg-surface p-6">
         <h2 className="text-sm font-semibold text-fg">Run a sync by hand</h2>
