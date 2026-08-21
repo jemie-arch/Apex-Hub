@@ -16,6 +16,7 @@ import {
   listAppointments,
   type GhlAppointment,
 } from '@/lib/integrations/ghl';
+import { chunk, ID_LOOKUP_BATCH } from '@/lib/chunk';
 import { authoritative, humanOwned } from '@/lib/sync/merge';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
@@ -107,16 +108,22 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     if (events.length === 0) continue;
 
     const ids = events.map((event) => event.id);
-    const existing = await db
-      .from('appointments')
-      .select('*')
-      .eq('client_id', client.id)
-      .in('crm_appointment_id', ids);
-    if (existing.error) throw existing.error;
-
     const byCrmId = new Map<string, AppointmentRow>();
-    for (const row of existing.data ?? []) {
-      if (row.crm_appointment_id) byCrmId.set(row.crm_appointment_id, row);
+
+    // Batched: PostgREST puts the id list in the query string, and a busy
+    // location has hundreds of events, which produced a bare "Bad Request"
+    // from a URL that was simply too long.
+    for (const batch of chunk(ids, ID_LOOKUP_BATCH)) {
+      const existing = await db
+        .from('appointments')
+        .select('*')
+        .eq('client_id', client.id)
+        .in('crm_appointment_id', batch);
+      if (existing.error) throw existing.error;
+
+      for (const row of existing.data ?? []) {
+        if (row.crm_appointment_id) byCrmId.set(row.crm_appointment_id, row);
+      }
     }
 
     for (const event of events) {

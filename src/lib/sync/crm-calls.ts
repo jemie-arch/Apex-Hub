@@ -15,6 +15,7 @@
  */
 import type { CallOutcome } from '@/types/database';
 
+import { chunk, ID_LOOKUP_BATCH } from '@/lib/chunk';
 import { listConversationCalls } from '@/lib/integrations/ghl';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
@@ -116,17 +117,21 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
     if (calls.length === 0) continue;
 
     const ids = calls.map((call) => call.id);
-    const existing = await db
-      .from('calls')
-      .select('id, crm_call_id')
-      .in('crm_call_id', ids);
-    if (existing.error) throw existing.error;
+    const seen = new Set<string>();
 
-    const seen = new Set(
-      (existing.data ?? []).flatMap((row) =>
-        row.crm_call_id ? [row.crm_call_id] : [],
-      ),
-    );
+    // Batched for the same reason as the appointments lookup: the id list
+    // travels in the query string.
+    for (const batch of chunk(ids, ID_LOOKUP_BATCH)) {
+      const existing = await db
+        .from('calls')
+        .select('id, crm_call_id')
+        .in('crm_call_id', batch);
+      if (existing.error) throw existing.error;
+
+      for (const row of existing.data ?? []) {
+        if (row.crm_call_id) seen.add(row.crm_call_id);
+      }
+    }
 
     const fresh = calls.filter((call) => !seen.has(call.id));
     ctx.counts.skipped += calls.length - fresh.length;
