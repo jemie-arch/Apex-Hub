@@ -88,7 +88,19 @@ export function serverEnv(): ServerEnv {
     );
   }
 
-  const parsed = serverSchema.safeParse(process.env);
+  // Empty strings are treated as absent.
+  //
+  // A hosting platform stores a variable you left blank as "", not as missing.
+  // Zod sees a present value and runs the validator on it, so every optional
+  // field declared .url() or .min(1) fails and this throws — taking down every
+  // server-rendered page over a variable nobody needed yet.
+  const present = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([, value]) => value !== undefined && value !== '',
+    ),
+  );
+
+  const parsed = serverSchema.safeParse(present);
   if (!parsed.success) {
     throw new Error(
       'Invalid environment configuration:\n' +
@@ -180,8 +192,10 @@ export function publicEnv(): {
   supabaseUrl: string;
   supabaseAnonKey: string;
 } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Trimmed because a value pasted into a dashboard field can carry a stray
+  // newline, which survives into the bundle and produces a malformed URL.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
   if (!url || !key) {
     throw new Error(
