@@ -44,9 +44,9 @@ export default async function SalesTrackerPage() {
   const [deals, owners, groups] = await Promise.all([
     db
       .from('deals')
+      // Must stay one literal — see the note in clients/[id]/page.tsx.
       .select(
-        'id, practice_name, contact_name, stage, value_cents, currency, source, ' +
-          'owner_user_id, client_group_id, lost_reason, first_contact_at, won_at, lost_at, created_at',
+        'id, practice_name, contact_name, stage, value_cents, currency, source, owner_user_id, client_group_id, lost_reason, first_contact_at, won_at, lost_at, created_at',
       )
       .order('created_at', { ascending: false })
       .limit(1000),

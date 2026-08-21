@@ -7,7 +7,7 @@
  * status 'error' and the message, because a run that vanished is worse than a
  * run that failed.
  */
-import type { SyncTrigger } from '@/types/database';
+import type { Json, SyncTrigger } from '@/types/database';
 
 import { alertSyncFailure } from '@/lib/notify/slack';
 import { serviceClient } from '@/lib/supabase/service';
@@ -157,7 +157,11 @@ export async function runSync(
       error_count: errors.length,
       // Cap the payload: a sync that fails on every one of 10,000 rows should
       // not write a megabyte of near-identical JSON.
-      errors: errors.slice(0, 50),
+      //
+      // The cast is needed because the column is jsonb and its generated type
+      // is the recursive Json union, which a concrete interface array does not
+      // structurally satisfy even though it serialises fine.
+      errors: errors.slice(0, 50) as unknown as Json,
     })
     .eq('id', runId);
 

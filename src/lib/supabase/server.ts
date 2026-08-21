@@ -7,13 +7,21 @@
  */
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { publicEnv } from '@/lib/env';
-import type { Database } from '@/types/database';
-import type { UserRole } from '@/types/database';
+import type { Database, UserRole } from '@/types/database';
 
-export function serverClient(): SupabaseClient<Database> {
+/** Derived from the factory — see the note in browser.ts. */
+type ServerClient = ReturnType<typeof createServerClient<Database>>;
+
+/** The shape @supabase/ssr hands to setAll. */
+interface CookieToSet {
+  name: string;
+  value: string;
+  options?: Record<string, unknown>;
+}
+
+export function serverClient(): ServerClient {
   const cookieStore = cookies();
   const { supabaseUrl, supabaseAnonKey } = publicEnv();
 
@@ -22,7 +30,7 @@ export function serverClient(): SupabaseClient<Database> {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookieToSet[]) {
         // A server component cannot set cookies. Middleware already refreshed
         // the session, so swallowing this is correct rather than lossy.
         try {

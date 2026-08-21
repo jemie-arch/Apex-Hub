@@ -1,5 +1,5 @@
-/**
- * Database types — GENERATED from the live schema, do not hand-edit.
+﻿/**
+ * Database types â€” GENERATED from the live schema, do not hand-edit.
  *
  * Regenerate after any change to supabase/migrations/0001_init.sql:
  *   npx supabase gen types typescript --project-id vgqvpikmudydgucrgulr
@@ -1551,48 +1551,48 @@ export const Constants = {
 } as const
 
 // ---------------------------------------------------------------------------
-// Aliases. The generated shapes are accurate but unwieldy to write out at
-// every call site, so the app imports these names instead.
+// Aliases built on the generated Tables<> and Enums<> helpers above.
+//
+// Do NOT declare local types named Tables or Enums here — the generator
+// already exports those as generics, and shadowing them breaks every alias
+// below with "Generic type requires between 1 and 2 type arguments".
 //
 // The distinction that matters: ClientGroupRow is the BUSINESS (a practice,
 // the unit the 100-client goal counts); ClientRow is one GoHighLevel
 // sub-account belonging to it.
 // ---------------------------------------------------------------------------
 
-type Tables = Database['public']['Tables'];
-type Enums = Database['public']['Enums'];
+export type ClientGroupRow = Tables<'client_groups'>;
+export type ClientRow = Tables<'clients'>;
+export type UserProfileRow = Tables<'user_profiles'>;
+export type OauthTokenRow = Tables<'oauth_tokens'>;
+export type DealRow = Tables<'deals'>;
+export type SalesCallRow = Tables<'sales_calls'>;
+export type AppointmentRow = Tables<'appointments'>;
+export type CampaignRow = Tables<'campaigns'>;
+export type AdRow = Tables<'ads'>;
+export type AdSnapshotRow = Tables<'ad_snapshots'>;
+export type AdLevelInsightRow = Tables<'ad_level_insights'>;
+export type CallRow = Tables<'calls'>;
+export type CallRecordingRow = Tables<'call_recordings'>;
+export type FormSubmissionRow = Tables<'form_submissions'>;
+export type ClientNoteRow = Tables<'client_notes'>;
+export type ClientTaskRow = Tables<'client_tasks'>;
+export type NotificationRow = Tables<'notifications'>;
+export type FinanceEntryRow = Tables<'finance_entries'>;
+export type AppSettingRow = Tables<'app_settings'>;
+export type SyncRunRow = Tables<'sync_runs'>;
 
-export type ClientGroupRow = Tables['client_groups']['Row'];
-export type ClientRow = Tables['clients']['Row'];
-export type UserProfileRow = Tables['user_profiles']['Row'];
-export type OauthTokenRow = Tables['oauth_tokens']['Row'];
-export type DealRow = Tables['deals']['Row'];
-export type SalesCallRow = Tables['sales_calls']['Row'];
-export type AppointmentRow = Tables['appointments']['Row'];
-export type CampaignRow = Tables['campaigns']['Row'];
-export type AdRow = Tables['ads']['Row'];
-export type AdSnapshotRow = Tables['ad_snapshots']['Row'];
-export type AdLevelInsightRow = Tables['ad_level_insights']['Row'];
-export type CallRow = Tables['calls']['Row'];
-export type CallRecordingRow = Tables['call_recordings']['Row'];
-export type FormSubmissionRow = Tables['form_submissions']['Row'];
-export type ClientNoteRow = Tables['client_notes']['Row'];
-export type ClientTaskRow = Tables['client_tasks']['Row'];
-export type NotificationRow = Tables['notifications']['Row'];
-export type FinanceEntryRow = Tables['finance_entries']['Row'];
-export type AppSettingRow = Tables['app_settings']['Row'];
-export type SyncRunRow = Tables['sync_runs']['Row'];
-
-export type UserRole = Enums['user_role'];
-export type Funnel = Enums['funnel'];
-export type ClientStatus = Enums['client_status'];
-export type AppointmentStatus = Enums['appointment_status'];
-export type AppointmentOutcome = Enums['appointment_outcome'];
-export type DealStage = Enums['deal_stage'];
-export type CallDirection = Enums['call_direction'];
-export type CallOutcome = Enums['call_outcome'];
-export type TaskStatus = Enums['task_status'];
-export type NotificationKind = Enums['notification_kind'];
-export type FinanceKind = Enums['finance_kind'];
-export type SyncStatus = Enums['sync_status'];
-export type SyncTrigger = Enums['sync_trigger'];
+export type UserRole = Enums<'user_role'>;
+export type Funnel = Enums<'funnel'>;
+export type ClientStatus = Enums<'client_status'>;
+export type AppointmentStatus = Enums<'appointment_status'>;
+export type AppointmentOutcome = Enums<'appointment_outcome'>;
+export type DealStage = Enums<'deal_stage'>;
+export type CallDirection = Enums<'call_direction'>;
+export type CallOutcome = Enums<'call_outcome'>;
+export type TaskStatus = Enums<'task_status'>;
+export type NotificationKind = Enums<'notification_kind'>;
+export type FinanceKind = Enums<'finance_kind'>;
+export type SyncStatus = Enums<'sync_status'>;
+export type SyncTrigger = Enums<'sync_trigger'>;

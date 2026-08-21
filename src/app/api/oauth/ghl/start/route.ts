@@ -11,6 +11,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { ghlCredentials } from '@/lib/env';
 
+// Without this, Next prerenders the route at build time, which calls
+// ghlCredentials() and fails the build on a machine that has no CRM
+// credentials. The env check belongs at request time, not compile time.
+export const dynamic = 'force-dynamic';
+
 const AUTHORIZE_URL = 'https://marketplace.gohighlevel.com/oauth/chooselocation';
 
 const SCOPES = [

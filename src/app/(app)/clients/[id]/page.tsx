@@ -119,10 +119,11 @@ export default async function ClientDetailPage({
       .lte('insight_on', dateEnd),
     db
       .from('appointments')
+      // One unbroken literal: Supabase infers row types from the select
+      // string, and a concatenation is not a literal type, so splitting this
+      // across lines with + collapses every field to GenericStringError.
       .select(
-        'id, client_id, patient_name, patient_phone, address, scheduled_at, ' +
-          'status, showed, outcome, value_cents, booked_by_name, ' +
-          'attribution_source, utm_campaign, notes, reschedule_count',
+        'id, client_id, patient_name, patient_phone, address, scheduled_at, status, showed, outcome, value_cents, booked_by_name, attribution_source, utm_campaign, notes, reschedule_count',
       )
       .in('client_id', locationIds)
       .gte('scheduled_at', start)

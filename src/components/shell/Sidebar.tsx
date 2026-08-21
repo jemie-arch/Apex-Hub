@@ -16,9 +16,9 @@ import {
   Target,
   Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ComponentType } from 'react';
 
 import { tenant, titleCase } from '@/config/tenant.config';
 import { cn } from '@/lib/cn';
@@ -26,7 +26,11 @@ import { cn } from '@/lib/cn';
 interface NavItem {
   href: string;
   label: string;
-  icon: ComponentType<{ size?: number }>;
+  /**
+   * LucideIcon rather than ComponentType<{ size?: number }> — lucide's `size`
+   * accepts string | number, so the narrower shape rejects every icon.
+   */
+  icon: LucideIcon;
 }
 
 interface NavGroup {
@@ -35,7 +39,7 @@ interface NavGroup {
 }
 
 function groups(): NavGroup[] {
-  const { client, booking, staffRole } = tenant.vocabulary;
+  const { client, booking, isr } = tenant.vocabulary;
 
   return [
     {
@@ -54,8 +58,9 @@ function groups(): NavGroup[] {
         { href: '/pipeline', label: 'Pipeline', icon: GitBranch },
         { href: '/sales-tracker', label: 'Sales tracker', icon: Target },
         {
+          // The page carries both call-centre roles; the ISR view is default.
           href: '/call-center',
-          label: `${titleCase(staffRole.singular)} performance`,
+          label: `${isr.singular} performance`,
           icon: PhoneCall,
         },
       ],
