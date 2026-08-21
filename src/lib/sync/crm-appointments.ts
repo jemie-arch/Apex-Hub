@@ -169,7 +169,9 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         ad_external_id: contact?.attribution.adId ?? null,
         campaign_external_id: contact?.attribution.campaignId ?? null,
         booked_at: event.createdAt,
-        ...(mapped.showed === null ? {} : { showed: mapped.showed }),
+        ...(mapped.showed === null
+          ? {}
+          : { showed: mapped.showed, showed_source: 'crm' }),
       };
 
       if (!current) {
@@ -186,6 +188,7 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
             'scheduled_end_at',
             'status',
             'showed',
+            'showed_source',
             'address',
             'patient_name',
             'patient_email',
@@ -218,6 +221,18 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       // where it came from so the reschedule is visible rather than silent.
       const moved = current.scheduled_at !== event.startsAt;
 
+      /*
+       * Attendance is the one field both sides report, and they can disagree.
+       * The clinic was in the room, so once they have answered through the
+       * portal the CRM stops overwriting it — otherwise the next sync pass
+       * silently replaces the only first-hand account we have, and nobody
+       * notices until the month's treatment revenue is short.
+       *
+       * The booking STATUS stays authoritative either way: a cancellation is
+       * the CRM's to report, and it is a different question from attendance.
+       */
+      const clinicAnswered = current.showed_source === 'client';
+
       const patch: Partial<AppointmentRow> = {
         ...authoritative(incoming, [
           'crm_contact_id',
@@ -225,9 +240,11 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
           'scheduled_at',
           'scheduled_end_at',
           'status',
-          'showed',
           'booked_at',
         ]),
+        ...(clinicAnswered
+          ? {}
+          : authoritative(incoming, ['showed', 'showed_source'])),
         // These may have been typed by a person in the portal.
         ...humanOwned(current, incoming, [
           'patient_name',

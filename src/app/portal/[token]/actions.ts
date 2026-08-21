@@ -102,8 +102,12 @@ export async function updateAppointmentOutcome(input: {
       outcome: input.outcome as AppointmentOutcome,
       // Only write showed when the person actually said; 'unknown' leaves the
       // existing value alone rather than clearing it.
-      ...(showed === null ? {} : { showed }),
+      //
+      // The source stamp stops the next CRM sync replacing it — see
+      // crm-appointments.ts, where the clinic's answer wins.
+      ...(showed === null ? {} : { showed, showed_source: 'client' }),
       ...(valueCents === null ? {} : { value_cents: valueCents }),
+      outcome_updated_at: new Date().toISOString(),
     })
     .eq('id', input.appointmentId);
 

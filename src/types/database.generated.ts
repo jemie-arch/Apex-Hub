@@ -266,6 +266,7 @@ export type Database = {
           scheduled_at: string
           scheduled_end_at: string | null
           showed: boolean | null
+          showed_source: string | null
           source: string
           status: Database["public"]["Enums"]["appointment_status"]
           synced_at: string | null
@@ -306,6 +307,7 @@ export type Database = {
           scheduled_at: string
           scheduled_end_at?: string | null
           showed?: boolean | null
+          showed_source?: string | null
           source?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           synced_at?: string | null
@@ -346,6 +348,7 @@ export type Database = {
           scheduled_at?: string
           scheduled_end_at?: string | null
           showed?: boolean | null
+          showed_source?: string | null
           source?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           synced_at?: string | null

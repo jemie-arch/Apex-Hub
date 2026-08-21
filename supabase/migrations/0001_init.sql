@@ -1343,3 +1343,16 @@ alter table appointments
   -- When the clinic last told us something about this appointment. Distinct
   -- from updated_at, which any sync touch bumps.
   add column if not exists outcome_updated_at  timestamptz;
+
+
+-- ---------------------------------------------------------------------------
+-- Who said whether the patient attended.
+--
+-- Attendance is the one field both sides report: the CRM records it when
+-- practice staff mark the appointment, and the clinic records it in the
+-- portal. This column makes the answer's origin explicit so the sync can
+-- defer to the clinic — they were in the room. See crm-appointments.ts.
+-- ---------------------------------------------------------------------------
+alter table appointments
+  add column if not exists showed_source text
+    check (showed_source is null or showed_source in ('crm', 'client'));

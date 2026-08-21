@@ -116,7 +116,10 @@ export async function saveConsultationOutcome(input: {
       outcome: input.outcome as AppointmentOutcome,
       // 'unknown' leaves the stored answer alone rather than clearing it —
       // "we have not asked yet" is not the same as "no".
-      ...(showed === null ? {} : { showed }),
+      //
+      // Stamping the source is what stops the next CRM sync overwriting this:
+      // the clinic was in the room, so their answer outranks the calendar's.
+      ...(showed === null ? {} : { showed, showed_source: 'client' }),
       ...(financing === null ? {} : { financing_approved: financing }),
       ...(valueCents === null ? {} : { value_cents: valueCents }),
       ...(input.leadQuality === ''

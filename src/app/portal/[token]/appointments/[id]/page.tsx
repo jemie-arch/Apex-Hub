@@ -37,7 +37,7 @@ export default async function PortalConsultationPage({ params }: PageProps) {
   const result = await serviceClient()
     .from('appointments')
     .select(
-      'id, patient_name, patient_phone, patient_email, scheduled_at, status, showed, outcome, value_cents, financing_approved, lead_quality, notes, client_id, booked_by_name, attribution_source',
+      'id, patient_name, patient_phone, patient_email, scheduled_at, status, showed, showed_source, outcome, value_cents, financing_approved, lead_quality, notes, client_id, booked_by_name, attribution_source',
     )
     .eq('id', params.id)
     .in('client_id', portal.locationIds)
@@ -56,6 +56,7 @@ export default async function PortalConsultationPage({ params }: PageProps) {
     scheduledAt: row.scheduled_at,
     status: row.status,
     showed: row.showed,
+    showedSource: row.showed_source,
     outcome: row.outcome,
     valueCents: row.value_cents,
     financingApproved: row.financing_approved,

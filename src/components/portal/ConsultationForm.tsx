@@ -23,6 +23,8 @@ export interface ConsultationDetail {
   scheduledAt: string;
   status: string;
   showed: boolean | null;
+  /** 'crm' when the calendar answered, 'client' when the practice did. */
+  showedSource: string | null;
   outcome: string;
   valueCents: number | null;
   financingApproved: boolean | null;
@@ -121,6 +123,16 @@ export function ConsultationForm({
               </option>
             ))}
           </select>
+          {appointment.showedSource === 'crm' ? (
+            <span className="text-[11px] text-fg-subtle">
+              Taken from the calendar. Correct it if it is wrong — your answer
+              stands from then on.
+            </span>
+          ) : appointment.showedSource === 'client' ? (
+            <span className="text-[11px] text-fg-subtle">
+              Your answer. Nothing overwrites it.
+            </span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1.5">
