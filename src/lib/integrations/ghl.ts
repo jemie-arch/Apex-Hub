@@ -424,9 +424,49 @@ export interface GhlAppointment {
   createdAt: string | null;
 }
 
+export interface GhlCalendar {
+  id: string;
+  name: string | null;
+}
+
+/** Calendars belonging to one location. */
+export async function listCalendars(
+  clientId: string,
+  locationId: string,
+): Promise<GhlCalendar[]> {
+  const { accessToken } = await getToken(clientId);
+
+  const payload = await request<{ calendars?: unknown[] }>(
+    accessToken,
+    '/calendars/',
+    { locationId },
+  );
+
+  const rows = Array.isArray(payload.calendars) ? payload.calendars : [];
+
+  return rows.flatMap((row) => {
+    if (typeof row !== 'object' || row === null) return [];
+    const record = row as Record<string, unknown>;
+    const id = asString(record['id']);
+    if (!id) return [];
+    return [{ id, name: asString(record['name']) }];
+  });
+}
+
 /**
- * Calendar events for one location in a window. The window is required: asking
- * for everything is how a sync starts timing out in month three.
+ * How many calendars per location to read. A practice usually has a handful
+ * (one per treatment type); the cap stops one misconfigured location with
+ * dozens from consuming the whole function timeout.
+ */
+const MAX_CALENDARS_PER_LOCATION = 8;
+
+/**
+ * Calendar events for one location in a window.
+ *
+ * /calendars/events will not accept a location alone — it answers 422 with
+ * "Either of userId, calendarId or groupId is required" — so this lists the
+ * location's calendars first and asks per calendar. The window is required
+ * too: asking for everything is how a sync starts timing out in month three.
  */
 export async function listAppointments(
   clientId: string,
@@ -434,19 +474,28 @@ export async function listAppointments(
   from: Date,
   to: Date,
 ): Promise<GhlAppointment[]> {
+  const calendars = await listCalendars(clientId, locationId);
+  if (calendars.length === 0) return [];
+
   const { accessToken } = await getToken(clientId);
+  const events: unknown[] = [];
 
-  const payload = await request<{ events?: unknown[] }>(
-    accessToken,
-    '/calendars/events',
-    {
-      locationId,
-      startTime: String(from.getTime()),
-      endTime: String(to.getTime()),
-    },
-  );
+  for (const calendar of calendars.slice(0, MAX_CALENDARS_PER_LOCATION)) {
+    const payload = await request<{ events?: unknown[] }>(
+      accessToken,
+      '/calendars/events',
+      {
+        locationId,
+        calendarId: calendar.id,
+        startTime: String(from.getTime()),
+        endTime: String(to.getTime()),
+      },
+    );
 
-  const rows = Array.isArray(payload.events) ? payload.events : [];
+    if (Array.isArray(payload.events)) events.push(...payload.events);
+  }
+
+  const rows = events;
 
   return rows.flatMap((row) => {
     if (typeof row !== 'object' || row === null) return [];
