@@ -2,6 +2,7 @@ import { ExternalLink, MapPin } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
 import { BookingsTable, type BookingRow } from '@/components/clients/BookingsTable';
+import { ClientEditor } from '@/components/clients/ClientEditor';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { KPICard } from '@/components/ui/KPICard';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -76,12 +77,28 @@ export default async function ClientDetailPage({
 
   const group = groupResult.data;
 
-  const locationsResult = await db
-    .from('clients')
-    .select('*')
-    .eq('group_id', group.id)
-    .order('name');
+  const [locationsResult, otherGroupsResult, stageSetting] = await Promise.all([
+    db.from('clients').select('*').eq('group_id', group.id).order('name'),
+    // Merge targets for moving a sub-account onto another business.
+    db
+      .from('client_groups')
+      .select('id, name')
+      .neq('id', group.id)
+      .order('name'),
+    db
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'onboarding_stages')
+      .maybeSingle(),
+  ]);
   if (locationsResult.error) throw locationsResult.error;
+  if (otherGroupsResult.error) throw otherGroupsResult.error;
+
+  const stages: readonly string[] = Array.isArray(stageSetting.data?.value)
+    ? (stageSetting.data.value as unknown[]).filter(
+        (entry): entry is string => typeof entry === 'string',
+      )
+    : ['signed'];
 
   const locations = locationsResult.data ?? [];
   const locationIds = locations.map((row) => row.id);
@@ -188,6 +205,12 @@ export default async function ClientDetailPage({
             <StatusPill
               value={group.status}
               tone={clientStatusTone(group.status)}
+            />
+            <ClientEditor
+              group={group}
+              locations={locations}
+              otherGroups={otherGroupsResult.data ?? []}
+              stages={stages}
             />
             <DateRangePicker />
           </>
