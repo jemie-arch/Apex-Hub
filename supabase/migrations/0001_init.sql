@@ -991,7 +991,7 @@ insert into app_settings (key, value, description) values
   ),
   (
     'sync_enabled',
-    '{"crm":true,"ads":true,"calls":false}'::jsonb,
+    '{"crm":true,"ads":true,"calls":true}'::jsonb,
     'Kill switch per integration. A disabled sync records a skipped run.'
   ),
   (

@@ -38,8 +38,33 @@ export interface SyncResult {
   durationMs: number;
 }
 
-/** Checks the app_settings kill switch. Unknown keys default to enabled. */
+/**
+ * Which kill-switch group each sync belongs to.
+ *
+ * Explicit rather than inferred from the name. This was previously derived
+ * from prefixes ('meta-' meant ads), and renaming meta-ads to windsor-ads
+ * silently dropped it into the 'calls' group, which was switched off — so the
+ * ads sync reported "skipped" for days without anyone asking it to stop.
+ */
+const SYNC_GROUPS: Record<string, string> = {
+  'crm-clients': 'crm',
+  'crm-appointments': 'crm',
+  'crm-deals': 'crm',
+  'crm-calls': 'calls',
+  'windsor-ads': 'ads',
+};
+
+/**
+ * Checks the app_settings kill switch.
+ *
+ * A sync with no group mapping runs. A kill switch should only stop what someone
+ * deliberately switched off; defaulting to "off" means a typo silently disables
+ * a sync, which is the worst of both worlds.
+ */
 async function isEnabled(name: string): Promise<boolean> {
+  const group = SYNC_GROUPS[name];
+  if (!group) return true;
+
   const db = serviceClient();
   const { data } = await db
     .from('app_settings')
@@ -50,12 +75,6 @@ async function isEnabled(name: string): Promise<boolean> {
   if (!data || typeof data.value !== 'object' || data.value === null) return true;
 
   const flags = data.value as Record<string, unknown>;
-  const group = name.startsWith('crm-')
-    ? 'crm'
-    : name.startsWith('meta-')
-      ? 'ads'
-      : 'calls';
-
   return flags[group] !== false;
 }
 
