@@ -29,7 +29,12 @@ const PUBLIC_PREFIXES = [
  * Guarded by a shared secret in the route itself, not by a session. These are
  * machine-to-machine: Vercel cron and Make.
  */
-const SECRET_PREFIXES = ['/api/sync', '/api/cron', '/api/tokens'];
+const SECRET_PREFIXES = [
+  '/api/sync',
+  '/api/cron',
+  '/api/tokens',
+  '/api/health',
+];
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some(

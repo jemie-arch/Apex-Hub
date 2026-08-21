@@ -56,13 +56,27 @@ export async function GET(
     return NextResponse.json({ error: `unknown sync "${name}"` }, { status: 404 });
   }
 
-  const result = await runSync(definition.name, 'cron', definition.run);
+  try {
+    const result = await runSync(definition.name, 'cron', definition.run);
 
-  // A failed sync returns 500 so the platform's cron log shows red. The
-  // sync_runs row is already written either way.
-  return NextResponse.json(result, {
-    status: result.status === 'error' ? 500 : 200,
-  });
+    // A failed sync returns 500 so the platform's cron log shows red. The
+    // sync_runs row is already written either way.
+    return NextResponse.json(result, {
+      status: result.status === 'error' ? 500 : 200,
+    });
+  } catch (error) {
+    // runSync can throw before it manages to open its sync_runs row — a bad
+    // service-role key, for instance. Left unhandled that becomes a blank 500
+    // with nothing to diagnose, so say what happened.
+    return NextResponse.json(
+      {
+        name,
+        status: 'failed_before_start',
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    );
+  }
 }
 
 /** POST is allowed so an admin can trigger a run from settings. */
