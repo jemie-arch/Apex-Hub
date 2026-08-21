@@ -24,12 +24,29 @@ export function LoginForm() {
     setBusy(true);
     setError(null);
 
-    const { error: signInError } = await browserClient().auth.signInWithPassword(
-      { email, password },
-    );
+    let client;
+    try {
+      client = browserClient();
+    } catch {
+      // Missing NEXT_PUBLIC_* configuration throws here, before any request is
+      // made. Without this the button simply did nothing, which is
+      // indistinguishable from a wrong password.
+      setError(
+        'This deployment is not configured yet — its Supabase keys are ' +
+          'missing. Nothing is wrong with your details.',
+      );
+      setBusy(false);
+      return;
+    }
+
+    const { error: signInError } = await client.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (signInError) {
-      // Deliberately vague: do not confirm whether an address has an account.
+      // Deliberately vague about which half was wrong: do not confirm whether
+      // an address has an account.
       setError('Those details were not accepted.');
       setBusy(false);
       return;
