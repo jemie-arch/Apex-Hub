@@ -1031,3 +1031,279 @@ insert into app_settings (key, value, description) values
     '{"target":100,"deadline":"2026-12-01"}'::jsonb,
     'The growth target the hero metric measures against.'
   );
+
+
+-- ---------------------------------------------------------------------------
+-- The five pages the sidebar showed as "soon": Leads, B2B Ads Tracker,
+-- Projects, Team and Tech Support.
+--
+-- Everything here is human-owned. None of it is a mirror of a CRM object, so
+-- no sync may overwrite it; where a row can also arrive from an integration it
+-- carries source + external_id and upserts on those, the same shape used by
+-- finance_entries.
+-- ---------------------------------------------------------------------------
+
+create type lead_classification as enum (
+  'unclassified', 'qualified', 'unqualified', 'nurture', 'duplicate', 'spam'
+);
+
+create type project_status as enum (
+  'idea', 'planned', 'in_progress', 'blocked', 'done', 'cancelled'
+);
+
+create type time_off_kind as enum (
+  'vacation', 'sick', 'unpaid', 'parental', 'other'
+);
+
+create type request_status as enum ('pending', 'approved', 'declined', 'cancelled');
+
+create type tech_call_status as enum (
+  'requested', 'confirmed', 'completed', 'cancelled', 'no_show'
+);
+
+-- ---------------------------------------------------------------------------
+-- b2b_leads — inbound leads for the agency's OWN advertising
+--
+-- Distinct from `deals`: a lead is somebody who raised a hand, a deal is a
+-- practice we are actively selling. A lead is promoted to a deal, and the link
+-- is kept so the funnel can be read end to end.
+-- ---------------------------------------------------------------------------
+create table b2b_leads (
+  id             uuid primary key default gen_random_uuid(),
+
+  -- What the person told us. All three are optional individually, but a row
+  -- with none of them identifies nobody: see the check below.
+  name           text,
+  email          text,
+  phone          text,
+  practice_name  text,
+
+  -- Where they came from. `channel` is the ad platform or 'manual'.
+  channel        text not null default 'manual',
+  campaign_name  text,
+  ad_name        text,
+
+  classification lead_classification not null default 'unclassified',
+
+  -- Set when this lead became a real opportunity.
+  deal_id        uuid references deals (id) on delete set null,
+
+  owner_user_id  uuid references user_profiles (id) on delete set null,
+  notes          text,
+
+  -- Present when the lead came from the CRM rather than being typed in.
+  crm_contact_id text,
+  source         text not null default 'manual',
+  external_id    text,
+
+  received_at    timestamptz not null default now(),
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+
+  /*
+   * A lead with no name, no email and no phone is not a lead — it is an empty
+   * form submission. Rejected at write time rather than filtered at read time,
+   * so the same blank row cannot arrive twice by two different routes.
+   */
+  constraint b2b_leads_identifiable check (
+    coalesce(nullif(trim(name), ''), nullif(trim(email), ''),
+             nullif(trim(phone), '')) is not null
+  )
+);
+
+create unique index b2b_leads_source_external_idx
+  on b2b_leads (source, external_id)
+  where external_id is not null;
+create unique index b2b_leads_crm_contact_idx
+  on b2b_leads (crm_contact_id)
+  where crm_contact_id is not null;
+create index b2b_leads_received_idx on b2b_leads (received_at desc);
+create index b2b_leads_classification_idx on b2b_leads (classification);
+
+create trigger b2b_leads_set_updated_at
+  before update on b2b_leads
+  for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- b2b_ad_days — per-ad economics for the agency's own advertising
+--
+-- One row per ad per day, which is the grain every derived figure needs: cost
+-- per lead, cost per booking, show rate, cost per qualified call and ROAS are
+-- all ratios of these columns and are therefore NOT stored. Storing a ratio
+-- would let it disagree with its own numerator.
+-- ---------------------------------------------------------------------------
+create table b2b_ad_days (
+  id                 uuid primary key default gen_random_uuid(),
+  day                date not null,
+  platform           text not null default 'meta',
+  campaign_name      text not null,
+  ad_name            text not null default '(all ads)',
+
+  spend_cents        integer not null default 0,
+  impressions        integer not null default 0,
+  clicks             integer not null default 0,
+
+  leads              integer not null default 0,
+  bookings           integer not null default 0,
+  showed             integer not null default 0,
+  qualified_calls    integer not null default 0,
+  closed             integer not null default 0,
+  cash_collected_cents integer not null default 0,
+
+  currency           text not null default 'USD',
+  source             text not null default 'manual',
+  external_id        text,
+
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+
+  -- Idempotent by the natural key, so a re-import corrects a day instead of
+  -- doubling it.
+  constraint b2b_ad_days_grain unique (day, platform, campaign_name, ad_name)
+);
+
+create index b2b_ad_days_day_idx on b2b_ad_days (day desc);
+
+create trigger b2b_ad_days_set_updated_at
+  before update on b2b_ad_days
+  for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- projects + project_notes — the internal board
+-- ---------------------------------------------------------------------------
+create table projects (
+  id            uuid primary key default gen_random_uuid(),
+  title         text not null,
+  summary       text,
+  status        project_status not null default 'idea',
+
+  owner_user_id uuid references user_profiles (id) on delete set null,
+
+  -- Set when the project is for one client rather than for the agency.
+  client_group_id uuid references client_groups (id) on delete set null,
+
+  due_on        date,
+  -- Ordering within a column, so the board is not stuck in date order.
+  position      integer not null default 0,
+
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index projects_status_idx on projects (status, position);
+create index projects_group_idx on projects (client_group_id);
+
+create trigger projects_set_updated_at
+  before update on projects
+  for each row execute function set_updated_at();
+
+create table project_notes (
+  id             uuid primary key default gen_random_uuid(),
+  project_id     uuid not null references projects (id) on delete cascade,
+  author_user_id uuid references user_profiles (id) on delete set null,
+  body           text not null,
+  created_at     timestamptz not null default now()
+);
+
+create index project_notes_project_idx on project_notes (project_id, created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Team — employment facts live on the profile; requests are their own table
+-- ---------------------------------------------------------------------------
+alter table user_profiles
+  add column if not exists job_title  text,
+  add column if not exists started_on date,
+  add column if not exists timezone   text;
+
+create table time_off_requests (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references user_profiles (id) on delete cascade,
+  kind           time_off_kind not null default 'vacation',
+
+  starts_on      date not null,
+  ends_on        date not null,
+  note           text,
+
+  status         request_status not null default 'pending',
+  decided_by     uuid references user_profiles (id) on delete set null,
+  decided_at     timestamptz,
+  decision_note  text,
+
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+
+  constraint time_off_dates_ordered check (ends_on >= starts_on)
+);
+
+create index time_off_user_idx on time_off_requests (user_id, starts_on desc);
+create index time_off_status_idx on time_off_requests (status, starts_on);
+
+create trigger time_off_requests_set_updated_at
+  before update on time_off_requests
+  for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- tech_calls — clinic tech-support bookings, confirmed from the Hub
+-- ---------------------------------------------------------------------------
+create table tech_calls (
+  id                 uuid primary key default gen_random_uuid(),
+
+  -- The BUSINESS, plus optionally which sub-account it came through.
+  client_group_id    uuid references client_groups (id) on delete cascade,
+  client_id          uuid references clients (id) on delete set null,
+
+  requested_by       text,
+  contact_email      text,
+  contact_phone      text,
+  topic              text not null,
+  detail             text,
+
+  requested_at       timestamptz not null default now(),
+  scheduled_at       timestamptz,
+
+  status             tech_call_status not null default 'requested',
+  confirmed_by       uuid references user_profiles (id) on delete set null,
+  confirmed_at       timestamptz,
+  resolution         text,
+
+  -- Set when the booking also exists as a CRM calendar event.
+  crm_appointment_id text,
+
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+create unique index tech_calls_crm_appointment_idx
+  on tech_calls (crm_appointment_id)
+  where crm_appointment_id is not null;
+create index tech_calls_status_idx on tech_calls (status, requested_at desc);
+create index tech_calls_group_idx on tech_calls (client_group_id);
+
+create trigger tech_calls_set_updated_at
+  before update on tech_calls
+  for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- RLS. Every table is closed by default; the app reads through the service
+-- role in server code, and these policies cover a signed-in browser client.
+-- ---------------------------------------------------------------------------
+alter table b2b_leads         enable row level security;
+alter table b2b_ad_days       enable row level security;
+alter table projects          enable row level security;
+alter table project_notes     enable row level security;
+alter table time_off_requests enable row level security;
+alter table tech_calls        enable row level security;
+
+create policy admin_all on b2b_leads         for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on b2b_ad_days       for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on projects          for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on project_notes     for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on time_off_requests for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on tech_calls        for all using (auth_is_admin()) with check (auth_is_admin());
+
+-- Anybody signed in reads and raises their own time off, and nobody else's.
+create policy self_read on time_off_requests
+  for select using (user_id = auth.uid());
+
+create policy self_insert on time_off_requests
+  for insert with check (user_id = auth.uid() and status = 'pending');

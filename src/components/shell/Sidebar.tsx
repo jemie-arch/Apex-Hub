@@ -61,9 +61,9 @@ const SECTIONS: NavSection[] = [
     heading: 'B2B — winning clients',
     items: [
       { href: '/pipeline', label: 'B2B Overview', icon: GitBranch },
-      { href: '/leads', label: 'Leads', icon: Target, pending: true },
+      { href: '/leads', label: 'Leads', icon: Target },
       { href: '/sales-tracker', label: 'Sales Tracker', icon: ClipboardList },
-      { href: '/b2b-ads', label: 'B2B Ads Tracker', icon: BarChart3, pending: true },
+      { href: '/b2b-ads', label: 'B2B Ads Tracker', icon: BarChart3 },
     ],
   },
   {
@@ -87,9 +87,9 @@ const SECTIONS: NavSection[] = [
     heading: 'Company',
     items: [
       { href: '/meetings', label: 'Meetings', icon: MessagesSquare },
-      { href: '/projects', label: 'Projects', icon: ClipboardList, pending: true },
-      { href: '/hr', label: 'Team', icon: UsersRound, pending: true },
-      { href: '/tech-support', label: 'Tech Support', icon: LifeBuoy, pending: true },
+      { href: '/projects', label: 'Projects', icon: ClipboardList },
+      { href: '/hr', label: 'Team', icon: UsersRound },
+      { href: '/tech-support', label: 'Tech Support', icon: LifeBuoy },
       { href: '/forms', label: 'Forms', icon: FileText },
       { href: '/finance', label: 'Finance', icon: Wallet },
     ],
