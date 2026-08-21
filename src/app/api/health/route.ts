@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
 
   // Only attempt the database once the key it needs is known to be present.
   let database: string;
+  let serviceRole = 'not checked';
   let counts: Record<string, number> | null = null;
 
   if (missingRequired.includes('SUPABASE_SERVICE_ROLE_KEY')) {
@@ -85,6 +86,29 @@ export async function GET(request: NextRequest) {
           crm_tokens: tokens.count ?? 0,
           sync_runs: runs.count ?? 0,
         };
+
+        // Does the key actually bypass RLS?
+        //
+        // app_settings is seeded by the migration and has no policy granting
+        // anon or authenticated any access, so a real service-role key sees
+        // rows and anything else sees none. Counting them tells us which key
+        // is in the variable without ever reading its value — and this is
+        // worth checking, because an anon key pasted here fails much later
+        // with a confusing "violates row-level security policy" on write.
+        const settings = await db
+          .from('app_settings')
+          .select('key', { count: 'exact', head: true });
+
+        if (settings.error) {
+          serviceRole = `cannot read app_settings: ${settings.error.message}`;
+        } else if ((settings.count ?? 0) === 0) {
+          serviceRole =
+            'WRONG KEY — SUPABASE_SERVICE_ROLE_KEY does not bypass RLS, so it ' +
+            'is not a service-role key. Copy the service_role secret from ' +
+            'Supabase → Settings → API; it is not the anon key.';
+        } else {
+          serviceRole = 'ok — bypasses RLS as expected';
+        }
       }
     } catch (error) {
       database = error instanceof Error ? error.message : 'unreachable';
@@ -93,11 +117,15 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     {
-      ok: missingRequired.length === 0 && database === 'ok',
+      ok:
+        missingRequired.length === 0 &&
+        database === 'ok' &&
+        serviceRole.startsWith('ok'),
       missingRequired,
       configured: setOptional,
       notConfigured: unsetOptional,
       database,
+      serviceRole,
       counts,
     },
     { status: 200, headers: { 'cache-control': 'no-store' } },
