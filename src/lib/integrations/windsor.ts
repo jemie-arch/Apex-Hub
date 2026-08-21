@@ -180,3 +180,75 @@ export async function fetchAdRows(
     ];
   });
 }
+
+export interface WindsorAccount {
+  id: string;
+  name: string | null;
+  /** Spend over the probe window, in cents. Zero means "connected but quiet". */
+  spendCents: number;
+}
+
+/**
+ * The ad accounts Windsor can see, discovered from the data endpoint.
+ *
+ * There is no separate accounts call in use here: asking the reporting
+ * endpoint for account_id, account_name and spend over a short window returns
+ * exactly the accounts that have activity, through the one request path that
+ * is already proven to work. An account connected but not spending will not
+ * appear — which is the right trade for a mapping screen, because an account
+ * with no data cannot be verified as the right one anyway.
+ */
+export async function fetchAdAccounts(
+  dateFrom: string,
+  dateTo: string,
+): Promise<WindsorAccount[]> {
+  const { apiKey, apiBase } = windsorCredentials();
+
+  const url = new URL(`${apiBase}/${WINDSOR_CONNECTOR}`);
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('fields', 'account_id,account_name,spend');
+  url.searchParams.set('date_from', dateFrom);
+  url.searchParams.set('date_to', dateTo);
+
+  const response = await fetch(url, { cache: 'no-store' });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    // The key rides in the query string, so the URL never appears in an error.
+    throw new Error(
+      `Windsor ${WINDSOR_CONNECTOR} responded ${response.status}: ` +
+        detail.slice(0, 300),
+    );
+  }
+
+  const payload: unknown = await response.json();
+  const rows = Array.isArray(payload)
+    ? payload
+    : typeof payload === 'object' &&
+        payload !== null &&
+        Array.isArray((payload as { data?: unknown }).data)
+      ? (payload as { data: unknown[] }).data
+      : [];
+
+  // One row per account per day comes back; fold them into one row each.
+  const byId = new Map<string, WindsorAccount>();
+
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const record = row as Record<string, unknown>;
+
+    const id = asString(record['account_id']);
+    if (!id) continue;
+
+    const existing = byId.get(id);
+    const spendCents = (existing?.spendCents ?? 0) + toCents(record['spend']);
+
+    byId.set(id, {
+      id,
+      name: asString(record['account_name']) ?? existing?.name ?? null,
+      spendCents,
+    });
+  }
+
+  return [...byId.values()].sort((a, b) => b.spendCents - a.spendCents);
+}

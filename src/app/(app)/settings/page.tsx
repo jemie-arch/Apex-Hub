@@ -1,5 +1,7 @@
 import { AlertTriangle, Link2, RefreshCw } from 'lucide-react';
 
+import Link from 'next/link';
+
 import { RunSyncButton } from '@/components/settings/RunSyncButton';
 import { TokenManager, type TokenRow } from '@/components/settings/TokenManager';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -58,7 +60,7 @@ export default async function SettingsPage() {
       .select('provider, client_id, expires_at, last_error, meta'),
     db
       .from('clients')
-      .select('id, name, group_id, crm_location_id, is_active')
+      .select('id, name, group_id, crm_location_id, is_active, ad_account_id')
       .not('crm_location_id', 'is', null)
       .order('name'),
     db.from('client_groups').select('id, name'),
@@ -79,6 +81,9 @@ export default async function SettingsPage() {
     (row) => row.provider === 'gohighlevel' && row.client_id === null,
   );
   const linkedClients = (locations.data ?? []).length;
+  const unmappedLocations = (locations.data ?? []).filter(
+    (row) => row.is_active && row.ad_account_id === null,
+  ).length;
   const clientNoun = tenant.vocabulary.client;
   const locationNoun = tenant.vocabulary.location;
 
@@ -186,8 +191,22 @@ export default async function SettingsPage() {
             <div>
               <p className="text-sm font-medium text-fg">Windsor.ai — ad spend</p>
               <p className="text-xs text-fg-subtle">
-                Needs WINDSOR_API_KEY, and an ad account id on each{' '}
-                {locationNoun.singular}. Locations without one are skipped.
+                Needs WINDSOR_API_KEY, and an ad account on each{' '}
+                {locationNoun.singular}.{' '}
+                {unmappedLocations === 0 ? (
+                  <>Every active {locationNoun.singular} is mapped.</>
+                ) : (
+                  <>
+                    {unmappedLocations} active {locationNoun.plural} have no
+                    account yet, so no ad data arrives for them.
+                  </>
+                )}{' '}
+                <Link
+                  href="/settings/ad-accounts"
+                  className="text-accent hover:underline"
+                >
+                  Map ad accounts
+                </Link>
               </p>
             </div>
             <StatusPill
