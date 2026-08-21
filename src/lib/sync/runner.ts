@@ -29,6 +29,35 @@ export interface SyncContext {
 
 export type SyncFn = (ctx: SyncContext) => Promise<void>;
 
+/**
+ * Turns anything thrown into something legible.
+ *
+ * Supabase returns plain objects rather than Error instances, so the usual
+ * `error instanceof Error ? error.message : String(error)` renders them as
+ * "[object Object]" — which is how a fatal database error can end up telling
+ * you nothing at all.
+ */
+export function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+
+  if (typeof error === 'object' && error !== null) {
+    const record = error as Record<string, unknown>;
+    const parts = (['message', 'code', 'details', 'hint'] as const)
+      .filter((key) => typeof record[key] === 'string' && record[key] !== '')
+      .map((key) => `${key}: ${String(record[key])}`);
+
+    if (parts.length > 0) return parts.join(' | ');
+
+    try {
+      return JSON.stringify(error).slice(0, 500);
+    } catch {
+      return 'an error that could not be serialised';
+    }
+  }
+
+  return String(error);
+}
+
 export interface SyncResult {
   runId: string | null;
   name: string;
@@ -152,7 +181,7 @@ export async function runSync(
   try {
     await fn(ctx);
   } catch (error) {
-    fatal = error instanceof Error ? error.message : String(error);
+    fatal = describeError(error);
     errors.push({ message: `fatal: ${fatal}` });
   }
 
