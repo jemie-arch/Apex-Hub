@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   Design tokens. Every colour, radius and shadow in the app resolves to one of
+   these custom properties. Tailwind maps onto them in tailwind.config.ts, so a
+   component never writes a raw hex value.
+
+   The accent is the brand. The semantic colours (positive / warning /
+   negative) are a separate scale and never stand in for the accent — a
+   positive number is green because it is positive, not because it is on brand.
+   =========================================================================== */
+
+:root {
+  /* --- brand accent -------------------------------------------------------
+     TODO(tenant): BRAND_ACCENT was not supplied. This placeholder is the only
+     place it appears; replace these four values and the app follows. */
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-subtle: #eef2ff;
+  --accent-contrast: #ffffff;
+
+  /* --- surfaces ---------------------------------------------------------- */
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f1f2f5;
+  --surface-hover: #f5f6f8;
+  --overlay: rgb(15 18 26 / 0.45);
+
+  /* --- text ------------------------------------------------------------- */
+  --text: #14171f;
+  --text-muted: #5b6272;
+  --text-subtle: #868d9c;
+  --text-inverse: #ffffff;
+
+  /* --- lines ------------------------------------------------------------ */
+  --border: #e3e5ea;
+  --border-strong: #c9ccd4;
+  --focus-ring: var(--accent);
+
+  /* --- semantic --------------------------------------------------------- */
+  --positive: #0f8a54;
+  --positive-subtle: #e7f6ee;
+  --warning: #b06a00;
+  --warning-subtle: #fdf3e2;
+  --negative: #c2382c;
+  --negative-subtle: #fdecea;
+  --neutral: #5b6272;
+  --neutral-subtle: #f1f2f5;
+
+  /* --- radii ------------------------------------------------------------ */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* --- shadows ---------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgb(16 20 30 / 0.06);
+  --shadow-md: 0 2px 8px rgb(16 20 30 / 0.08);
+  --shadow-lg: 0 12px 32px rgb(16 20 30 / 0.14);
+
+  /* --- typography ------------------------------------------------------- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', monospace;
+
+  /* The hero metric on /dashboard is deliberately larger than anything else. */
+  --size-hero: 3.75rem;
+}
+
+:root[data-theme='dark'] {
+  --accent-subtle: #1e1b4b;
+
+  --bg: #0d0f14;
+  --surface: #14171f;
+  --surface-raised: #1a1e28;
+  --surface-sunken: #0f1218;
+  --surface-hover: #1e222d;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --text: #f2f4f7;
+  --text-muted: #9aa1b1;
+  --text-subtle: #6c7383;
+
+  --border: #252a35;
+  --border-strong: #3a4150;
+
+  --positive-subtle: #0b2b1d;
+  --warning-subtle: #2e2109;
+  --negative-subtle: #33130f;
+  --neutral-subtle: #1a1e28;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures everywhere a number is compared against another number. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

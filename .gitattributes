@@ -1,0 +1,4 @@
+# Normalise line endings. Windows checkouts stay CRLF locally, the repo and
+# Vercel's Linux builders see LF, and diffs stay clean between them.
+* text=auto eol=lf
+*.sql text eol=lf
