@@ -25,6 +25,9 @@ const PUBLIC_PREFIXES = [
   '/portal',
   '/api/portal',
   '/api/auth',
+  // The Kick-Off and Post Close forms. A practice fills the Post Close form
+  // before it has access to anything, so a login here is impossible by design.
+  '/f',
 ];
 
 /**
@@ -36,6 +39,8 @@ const SECRET_PREFIXES = [
   '/api/cron',
   '/api/tokens',
   '/api/health',
+  // Inbound recorder webhook: checks CRON_SECRET in the route itself.
+  '/api/webhooks',
 ];
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
