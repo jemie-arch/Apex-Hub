@@ -251,10 +251,13 @@ export type Database = {
           crm_appointment_id: string | null
           crm_calendar_id: string | null
           crm_contact_id: string | null
+          financing_approved: boolean | null
           funnel: Database["public"]["Enums"]["funnel"]
           id: string
+          lead_quality: Database["public"]["Enums"]["lead_quality"] | null
           notes: string | null
           outcome: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_updated_at: string | null
           patient_email: string | null
           patient_name: string | null
           patient_phone: string | null
@@ -288,10 +291,13 @@ export type Database = {
           crm_appointment_id?: string | null
           crm_calendar_id?: string | null
           crm_contact_id?: string | null
+          financing_approved?: boolean | null
           funnel?: Database["public"]["Enums"]["funnel"]
           id?: string
+          lead_quality?: Database["public"]["Enums"]["lead_quality"] | null
           notes?: string | null
           outcome?: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_updated_at?: string | null
           patient_email?: string | null
           patient_name?: string | null
           patient_phone?: string | null
@@ -325,10 +331,13 @@ export type Database = {
           crm_appointment_id?: string | null
           crm_calendar_id?: string | null
           crm_contact_id?: string | null
+          financing_approved?: boolean | null
           funnel?: Database["public"]["Enums"]["funnel"]
           id?: string
+          lead_quality?: Database["public"]["Enums"]["lead_quality"] | null
           notes?: string | null
           outcome?: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_updated_at?: string | null
           patient_email?: string | null
           patient_name?: string | null
           patient_phone?: string | null
@@ -721,17 +730,25 @@ export type Database = {
       }
       client_groups: {
         Row: {
+          address_line1: string | null
+          address_line2: string | null
           churned_on: string | null
+          city: string | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
+          country: string | null
           created_at: string
           currency: string
+          details_updated_at: string | null
           id: string
           name: string
           onboarding_stage: string
+          opening_hours: Json
           portal_enabled: boolean
           portal_token: string
+          postal_code: string | null
+          region: string | null
           retainer_cents: number
           signed_on: string | null
           slug: string
@@ -742,17 +759,25 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
           churned_on?: string | null
+          city?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          country?: string | null
           created_at?: string
           currency?: string
+          details_updated_at?: string | null
           id?: string
           name: string
           onboarding_stage?: string
+          opening_hours?: Json
           portal_enabled?: boolean
           portal_token?: string
+          postal_code?: string | null
+          region?: string | null
           retainer_cents?: number
           signed_on?: string | null
           slug: string
@@ -763,17 +788,25 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          address_line1?: string | null
+          address_line2?: string | null
           churned_on?: string | null
+          city?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          country?: string | null
           created_at?: string
           currency?: string
+          details_updated_at?: string | null
           id?: string
           name?: string
           onboarding_stage?: string
+          opening_hours?: Json
           portal_enabled?: boolean
           portal_token?: string
+          postal_code?: string | null
+          region?: string | null
           retainer_cents?: number
           signed_on?: string | null
           slug?: string
@@ -1771,6 +1804,7 @@ export type Database = {
         | "nurture"
         | "duplicate"
         | "spam"
+      lead_quality: "high" | "medium" | "low" | "unusable"
       notification_kind: "info" | "success" | "warning" | "error"
       project_status:
         | "idea"
@@ -1964,6 +1998,7 @@ export const Constants = {
         "duplicate",
         "spam",
       ],
+      lead_quality: ["high", "medium", "low", "unusable"],
       notification_kind: ["info", "success", "warning", "error"],
       project_status: [
         "idea",

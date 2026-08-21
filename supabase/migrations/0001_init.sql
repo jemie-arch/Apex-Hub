@@ -1307,3 +1307,39 @@ create policy self_read on time_off_requests
 
 create policy self_insert on time_off_requests
   for insert with check (user_id = auth.uid() and status = 'pending');
+
+
+-- ---------------------------------------------------------------------------
+-- Practice details the clinic maintains itself through the portal.
+--
+-- Deliberately on the BUSINESS rather than the sub-account: an address belongs
+-- to the practice, not to a CRM location record. No sync writes these columns,
+-- so a correction typed by the clinic cannot be overwritten by an import.
+-- ---------------------------------------------------------------------------
+alter table client_groups
+  add column if not exists address_line1      text,
+  add column if not exists address_line2      text,
+  add column if not exists city               text,
+  add column if not exists region             text,
+  add column if not exists postal_code        text,
+  add column if not exists country            text,
+  -- Free text per day rather than a structured range: practices write things
+  -- like "8-1, 2-5 (closed alt Fridays)", and a start/end pair cannot hold it.
+  add column if not exists opening_hours      jsonb not null default '{}'::jsonb,
+  add column if not exists details_updated_at timestamptz;
+
+
+-- ---------------------------------------------------------------------------
+-- The two things only the clinic knows, alongside the outcome and the value.
+--
+-- No sync writes these columns, which is what makes them worth the clinic
+-- typing: an import cannot undo the answer.
+-- ---------------------------------------------------------------------------
+create type lead_quality as enum ('high', 'medium', 'low', 'unusable');
+
+alter table appointments
+  add column if not exists financing_approved  boolean,
+  add column if not exists lead_quality        lead_quality,
+  -- When the clinic last told us something about this appointment. Distinct
+  -- from updated_at, which any sync touch bumps.
+  add column if not exists outcome_updated_at  timestamptz;

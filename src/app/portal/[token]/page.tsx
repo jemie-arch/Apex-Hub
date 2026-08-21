@@ -139,118 +139,100 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
   const showLocation = locations.length > 1;
 
   return (
-    <main className="min-h-screen bg-bg">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
-              {tenant.company.name}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-fg">
-              {group.name}
-            </h1>
-            <p className="mt-1 text-sm text-fg-muted">
-              {titleCase(patient.singular)} results · {range.label.toLowerCase()}
-            </p>
-          </div>
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-sm font-semibold text-accent-contrast"
-            aria-hidden
-          >
-            {tenant.company.initial}
-          </span>
-        </header>
+    <>
+      <p className="mb-6 text-sm text-fg-muted">
+        {titleCase(patient.singular)} results · {range.label.toLowerCase()}
+      </p>
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KPICard
-            label={`${titleCase(booking.plural)} booked`}
-            value={formatCount(rows.length)}
-            hint={`${formatCount(awaiting)} still to confirm`}
-            icon={<CalendarCheck size={16} />}
-          />
-          <KPICard
-            label="Attended"
-            value={formatPercent(
-              rows.length === 0 ? null : showed / rows.length,
-              0,
-            )}
-            hint={`${formatCount(showed)} of ${formatCount(rows.length)}`}
-            icon={<UserCheck size={16} />}
-          />
-          <KPICard
-            label="Started treatment"
-            value={formatCount(won)}
-            hint={`${formatMoneyCompact(revenueCents, group.currency)} in value`}
-            icon={<CircleDollarSign size={16} />}
-          />
-          <KPICard
-            label="Ad spend"
-            value={formatMoneyCompact(spendCents, group.currency)}
-            higherIsBetter={false}
-            hint={
-              costPerBooking === null
-                ? 'no bookings yet'
-                : `${formatMoney(costPerBooking, group.currency)} per ${booking.singular}`
-            }
-            icon={<Megaphone size={16} />}
-          />
-        </section>
-
-        <section className="mt-8 overflow-hidden rounded-lg border border-line bg-surface">
-          <div className="border-b border-line px-4 py-3">
-            <h2 className="text-sm font-semibold text-fg">
-              Your {booking.plural}
-            </h2>
-            <p className="mt-0.5 text-xs text-fg-subtle">
-              Select a row to record whether they attended and what they went
-              ahead with. What you enter here is never overwritten.
-            </p>
-          </div>
-
-          {portalRows.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-fg-muted">
-              No {booking.plural} in this period.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
-                    <th className="px-4 py-3 font-medium">When</th>
-                    {showLocation ? (
-                      <th className="px-4 py-3 font-medium">
-                        {titleCase(tenant.vocabulary.location.singular)}
-                      </th>
-                    ) : null}
-                    <th className="px-4 py-3 font-medium">
-                      {titleCase(patient.singular)}
-                    </th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Outcome</th>
-                    <th className="px-4 py-3 text-right font-medium">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {portalRows.map((appointment) => (
-                    <OutcomeRow
-                      key={appointment.id}
-                      appointment={appointment}
-                      token={params.token}
-                      currency={group.currency}
-                      showLocation={showLocation}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KPICard
+          label={`${titleCase(booking.plural)} booked`}
+          value={formatCount(rows.length)}
+          hint={`${formatCount(awaiting)} still to confirm`}
+          icon={<CalendarCheck size={16} />}
+        />
+        <KPICard
+          label="Attended"
+          value={formatPercent(
+            rows.length === 0 ? null : showed / rows.length,
+            0,
           )}
-        </section>
+          hint={`${formatCount(showed)} of ${formatCount(rows.length)}`}
+          icon={<UserCheck size={16} />}
+        />
+        <KPICard
+          label="Started treatment"
+          value={formatCount(won)}
+          hint={`${formatMoneyCompact(revenueCents, group.currency)} in value`}
+          icon={<CircleDollarSign size={16} />}
+        />
+        <KPICard
+          label="Ad spend"
+          value={formatMoneyCompact(spendCents, group.currency)}
+          higherIsBetter={false}
+          hint={
+            costPerBooking === null
+              ? 'no bookings yet'
+              : `${formatMoney(costPerBooking, group.currency)} per ${booking.singular}`
+          }
+          icon={<Megaphone size={16} />}
+        />
+      </section>
 
-        <p className="mt-6 text-center text-xs text-fg-subtle">
-          Figures update through the day. Times shown in each{' '}
-          {tenant.vocabulary.location.singular}&apos;s local timezone.
-        </p>
-      </div>
-    </main>
+      <section className="mt-8 overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold text-fg">
+            Your {booking.plural}
+          </h2>
+          <p className="mt-0.5 text-xs text-fg-subtle">
+            Select a row to record whether they attended and what they went
+            ahead with. What you enter here is never overwritten.
+          </p>
+        </div>
+
+        {portalRows.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-fg-muted">
+            No {booking.plural} in this period.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">When</th>
+                  {showLocation ? (
+                    <th className="px-4 py-3 font-medium">
+                      {titleCase(tenant.vocabulary.location.singular)}
+                    </th>
+                  ) : null}
+                  <th className="px-4 py-3 font-medium">
+                    {titleCase(patient.singular)}
+                  </th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Outcome</th>
+                  <th className="px-4 py-3 text-right font-medium">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {portalRows.map((appointment) => (
+                  <OutcomeRow
+                    key={appointment.id}
+                    appointment={appointment}
+                    token={params.token}
+                    currency={group.currency}
+                    showLocation={showLocation}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <p className="mt-6 text-center text-xs text-fg-subtle">
+        Figures update through the day. Times shown in each{' '}
+        {tenant.vocabulary.location.singular}&apos;s local timezone.
+      </p>
+    </>
   );
 }
