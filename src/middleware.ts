@@ -4,8 +4,8 @@
  *
  * The three roles:
  *   admin      every route
- *   isr / csr  their own performance page and nothing else, not even the
- *              leaderboard that would show them a colleague's numbers
+ *   isr / csr  their own performance page, plus whichever pages an admin
+ *              has granted them in user_profiles.permissions
  *   client     bounced to their own portal; they do not get the internal app
  *
  * /portal/[token] is deliberately unauthenticated. It is safe because the page
@@ -15,6 +15,8 @@
  */
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+
+import { permissionForPath } from '@/config/permissions';
 
 /** Reachable without a session. */
 const PUBLIC_PREFIXES = [
@@ -125,28 +127,49 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(portal);
   }
 
-  // Both call-centre roles get exactly one page: their own. The leaderboard at
-  // /call-center would show them a colleague's numbers, so it is not theirs.
+  /*
+   * Both call-centre roles always get their own performance page, and beyond
+   * that exactly the pages an admin has granted them. The grant is read from
+   * the profile rather than the JWT: a revoked page has to stop working now,
+   * not whenever the token next refreshes.
+   *
+   * One rule survives regardless of grants — a rep never reaches a colleague's
+   * drill-down, because that page is about a named individual.
+   */
   if (role === 'isr' || role === 'csr') {
     const ownPage = `/call-center/${user.id}`;
-
-    if (
-      pathname === '/call-center' ||
-      pathname === '/dashboard' ||
-      pathname === '/'
-    ) {
-      const own = request.nextUrl.clone();
-      own.pathname = ownPage;
-      own.search = '';
-      return NextResponse.redirect(own);
-    }
 
     if (pathname === ownPage || pathname.startsWith(`${ownPage}/`)) {
       return response;
     }
 
-    // Everything else, including another rep's drill-down. 404 rather than 403
-    // so the URL does not confirm that a colleague's page exists.
+    // 404 rather than 403, so the URL does not confirm the colleague exists.
+    if (pathname.startsWith('/call-center/')) {
+      return new NextResponse('Not found', { status: 404 });
+    }
+
+    const profile = await supabase
+      .from('user_profiles')
+      .select('permissions')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const granted: string[] = profile.data?.permissions ?? [];
+
+    // The landing page depends on what they hold, so nobody arrives at a 404
+    // by signing in.
+    if (pathname === '/') {
+      const home = request.nextUrl.clone();
+      home.pathname = granted.includes('overview') ? '/dashboard' : ownPage;
+      home.search = '';
+      return NextResponse.redirect(home);
+    }
+
+    const required = permissionForPath(pathname);
+    if (required !== null && granted.includes(required)) {
+      return response;
+    }
+
     return new NextResponse('Not found', { status: 404 });
   }
 

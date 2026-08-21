@@ -249,6 +249,20 @@ create table user_profiles (
   -- attribute to the right person on the leaderboard.
   crm_user_id     text unique,
 
+  /*
+   * Menu permission keys. Two people can share the admin role and still see
+   * different sidebars — a media buyer and a closer need different menus.
+   *
+   * NEVER RENAME A KEY. They are stored per user, so renaming one silently
+   * revokes that page for everybody who had it. Menu labels are free to
+   * change; the key behind a label is not.
+   */
+  permissions     text[] not null default '{}',
+
+  -- Kept on the profile rather than in browser storage so the choice follows
+  -- the person to a new device.
+  theme           text not null default 'dark' check (theme in ('dark','light')),
+
   avatar_url      text,
   is_active       boolean not null default true,
 
@@ -986,8 +1000,11 @@ create policy client_own_snapshots on ad_snapshots
 insert into app_settings (key, value, description) values
   (
     'onboarding_stages',
-    '["signed","kickoff","account_access","assets","build","launched","live"]'::jsonb,
-    'Ordered column list for the /onboarding board. Reorder or rename here.'
+    -- The 14-step launch sequence, payment through to live ads.
+    '["payment","kickoff_call_booked","welcome_email_sent","onboarding_form_filled",
+      "kickoff_call","tech_setup_call","ad_scripts","crm_setup","a2p_approved",
+      "content_in","editing","ads_set_up","launch_call","live"]'::jsonb,
+    'Ordered columns for the onboarding board — the 14-step launch sequence.'
   ),
   (
     'sync_enabled',

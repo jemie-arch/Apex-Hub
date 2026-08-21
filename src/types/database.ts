@@ -1,10 +1,10 @@
-﻿/**
- * Database types â€” GENERATED from the live schema, do not hand-edit.
+/**
+ * Database types — GENERATED from the live schema, do not hand-edit.
  *
  * Regenerate after any change to supabase/migrations/0001_init.sql:
  *   npx supabase gen types typescript --project-id vgqvpikmudydgucrgulr
  *
- * Convenience aliases used across the app are at the foot of the file.
+ * Convenience aliases are at the foot of the file.
  */
 export type Json =
   | string
@@ -1286,7 +1286,9 @@ export type Database = {
           full_name: string | null
           id: string
           is_active: boolean
+          permissions: string[]
           role: Database["public"]["Enums"]["user_role"]
+          theme: string
           updated_at: string
         }
         Insert: {
@@ -1298,7 +1300,9 @@ export type Database = {
           full_name?: string | null
           id: string
           is_active?: boolean
+          permissions?: string[]
           role?: Database["public"]["Enums"]["user_role"]
+          theme?: string
           updated_at?: string
         }
         Update: {
@@ -1310,7 +1314,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean
+          permissions?: string[]
           role?: Database["public"]["Enums"]["user_role"]
+          theme?: string
           updated_at?: string
         }
         Relationships: [
