@@ -71,8 +71,11 @@ export async function getToken(clientId: string | null): Promise<GhlToken> {
   const companyId =
     typeof meta['companyId'] === 'string' ? meta['companyId'] : null;
 
-  const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
-  const stillValid = expiresAt - Date.now() > REFRESH_MARGIN_MS;
+  // Named ...Ms because it is a timestamp, and because a later `expiresAt`
+  // in this same function holds the new ISO expiry. Two `const expiresAt`
+  // declarations in one scope is a SyntaxError, not a shadow.
+  const expiresAtMs = data.expires_at ? new Date(data.expires_at).getTime() : 0;
+  const stillValid = expiresAtMs - Date.now() > REFRESH_MARGIN_MS;
 
   if (stillValid || !data.refresh_token) {
     return {
