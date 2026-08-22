@@ -81,7 +81,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
 
   const [leads, counts] = await Promise.all([
     query,
-    db.from('b2b_leads').select('classification, deal_id'),
+    db.from('b2b_leads').select('classification, deal_id, origin'),
   ]);
 
   if (leads.error) throw leads.error;
@@ -94,6 +94,19 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     (row) => row.classification === 'unclassified',
   ).length;
   const promoted = all.filter((row) => row.deal_id !== null).length;
+
+  /*
+   * The referral rate, which is the reason this page matters right now.
+   *
+   * Roughly a tenth of the client base is said to refer somebody each month, and
+   * that figure comes from having asked two people. It is measurable the moment
+   * anyone logs a lead, and it is deliberately shown against the leads whose
+   * origin is actually known rather than against every row — a page full of
+   * 'unknown' would otherwise report a referral rate of nearly zero and look
+   * like an answer.
+   */
+  const known = all.filter((row) => row.origin !== 'unknown').length;
+  const referrals = all.filter((row) => row.origin === 'referral').length;
 
   const rows = leads.data ?? [];
   const zone = tenant.defaultTimezone;
@@ -112,8 +125,17 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         actions={<AddLead />}
       />
 
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KPICard label="Leads all time" value={formatCount(total)} />
+        <KPICard
+          label="Referred"
+          value={formatCount(referrals)}
+          hint={
+            known > 0
+              ? `${formatPercent(referrals / known)} of the ${formatCount(known)} whose origin is known`
+              : 'nothing has an origin recorded yet'
+          }
+        />
         <KPICard
           label="Qualified"
           value={formatCount(qualified)}

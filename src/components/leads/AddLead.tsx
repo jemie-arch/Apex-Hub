@@ -6,6 +6,7 @@ import { useRef, useState, useTransition } from 'react';
 import { createLead, type LeadResult } from '@/app/(app)/leads/actions';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { LEAD_ORIGINS, ORIGIN_HINTS, ORIGIN_LABELS } from '@/config/lead-origin';
 import { cn } from '@/lib/cn';
 
 const FIELD =
@@ -83,12 +84,42 @@ export function AddLead() {
             <span className="text-xs font-medium text-fg-muted">Phone</span>
             <input name="phone" className={FIELD} />
           </label>
+          {/*
+            A choice, not a text box.
+
+            This was free text with "referral, phone, event…" for a placeholder,
+            which means the referral rate can never be counted: referral,
+            Referral, ref and word-of-mouth are four strings and one real answer.
+            The five values here are the same ones the b2b pipeline classifies
+            contacts into, so a referral logged by hand and a referral spotted
+            from a tag land in the same bucket.
+          */}
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-fg-muted">Channel</span>
+            <span className="text-xs font-medium text-fg-muted">
+              How did they come to us?
+            </span>
+            <select name="origin" defaultValue="referral" className={FIELD}>
+              {LEAD_ORIGINS.map((origin) => (
+                <option key={origin} value={origin}>
+                  {ORIGIN_LABELS[origin]}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-fg-subtle">
+              {ORIGIN_HINTS.referral}
+            </span>
+          </label>
+
+          {/* The detail behind the choice. Prose is right here — it is read, not
+              counted. */}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-fg-muted">
+              Who or where, if you know
+            </span>
             <input
               name="channel"
               className={FIELD}
-              placeholder="referral, phone, event…"
+              placeholder="Dr Patel, the Boston study club, a Google search…"
             />
           </label>
           <label className="flex flex-col gap-1.5">

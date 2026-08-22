@@ -2203,3 +2203,29 @@ where name in (
   'CloseBot v2 Test',
   'Pearl AI Dental Demo Account'
 );
+
+-- ---------------------------------------------------------------------------
+-- Where a b2b lead came from, as a value rather than as prose
+--
+-- The manual lead form asked for a "Channel" in a text box, with "referral,
+-- phone, event…" for a placeholder. Nothing wrong with the answers people would
+-- type; the problem is that a rate cannot be computed from them. Referral,
+-- Referral, ref and word-of-mouth are four strings and one real answer.
+--
+-- That matters because the referral rate is the one number Apex is working from
+-- and does not have: roughly a tenth of the client base is said to refer
+-- somebody each month, and that figure comes from having asked two people.
+--
+-- Same five values the b2b pipeline classifies contacts into, so a referral
+-- logged by hand and a referral spotted from a contact tag land in the same
+-- bucket. The channel column stays, still free text, for the detail behind the
+-- choice -- "Dr Patel at the Boston study club" is worth keeping and is read
+-- rather than counted.
+-- ---------------------------------------------------------------------------
+alter table b2b_leads
+  add column if not exists origin lead_origin not null default 'unknown';
+
+comment on column b2b_leads.origin is
+  'Where the lead came from, as one of five values rather than free text. The channel column is still free text and still useful for the detail ("Dr Patel at the Boston study club"), but a rate cannot be computed from prose: referral, Referral, ref and word-of-mouth are four different strings and one real answer. This is the column the referral rate is counted from.';
+
+create index if not exists b2b_leads_origin_idx on b2b_leads (origin);

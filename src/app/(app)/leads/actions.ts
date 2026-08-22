@@ -9,6 +9,7 @@
  */
 import { revalidatePath } from 'next/cache';
 
+import { LEAD_ORIGINS, type LeadOrigin } from '@/config/lead-origin';
 import { requireAdmin } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
@@ -36,6 +37,14 @@ function clean(value: FormDataEntryValue | null): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+/** A form value narrowed to the enum, defaulting rather than throwing. */
+function originOf(value: FormDataEntryValue | null): LeadOrigin {
+  return typeof value === 'string' &&
+    (LEAD_ORIGINS as readonly string[]).includes(value)
+    ? (value as LeadOrigin)
+    : 'unknown';
+}
+
 export async function createLead(formData: FormData): Promise<LeadResult> {
   await requireAdmin();
 
@@ -59,6 +68,15 @@ export async function createLead(formData: FormData): Promise<LeadResult> {
       email,
       phone,
       practice_name: clean(formData.get('practice_name')),
+      /*
+       * Where they came from, as one of five values.
+       *
+       * An unrecognised value falls back to 'unknown' rather than being
+       * rejected: the answer to "how did they come to us" is worth less than the
+       * lead itself, and losing a referral's phone number over a bad select
+       * value would be the wrong trade.
+       */
+      origin: originOf(formData.get('origin')),
       channel: clean(formData.get('channel')) ?? 'manual',
       campaign_name: clean(formData.get('campaign_name')),
       notes: clean(formData.get('notes')),

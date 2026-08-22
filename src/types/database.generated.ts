@@ -598,6 +598,7 @@ export type Database = {
           id: string
           name: string | null
           notes: string | null
+          origin: Database["public"]["Enums"]["lead_origin"]
           owner_user_id: string | null
           phone: string | null
           practice_name: string | null
@@ -618,6 +619,7 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          origin?: Database["public"]["Enums"]["lead_origin"]
           owner_user_id?: string | null
           phone?: string | null
           practice_name?: string | null
@@ -638,6 +640,7 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          origin?: Database["public"]["Enums"]["lead_origin"]
           owner_user_id?: string | null
           phone?: string | null
           practice_name?: string | null
