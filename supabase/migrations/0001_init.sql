@@ -2196,5 +2196,10 @@ where name in (
   'ADM Sales Account',
   'ADM Team Management',
   'ADM Team Reports',
-  'ADM Testing Grounds'
+  'ADM Testing Grounds',
+  -- Two more found the same way, once the agency accounts were out of the list
+  -- and the remaining names could be read: a vendor trial and a vendor demo.
+  -- Both paused, both with no bookings, charges or spend.
+  'CloseBot v2 Test',
+  'Pearl AI Dental Demo Account'
 );
