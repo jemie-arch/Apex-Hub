@@ -49,7 +49,6 @@ import { useState } from 'react';
 import { Logo } from '@/components/shell/Logo';
 import { ThemeToggle, type Theme } from '@/components/shell/ThemeToggle';
 import { permissionForPath } from '@/config/permissions';
-import { tenant } from '@/config/tenant.config';
 import { cn } from '@/lib/cn';
 
 interface NavItem {
@@ -361,11 +360,8 @@ export function Sidebar({
         beside the logo would say the same thing twice. The tagline stays,
         because the mark does not carry that.
       */}
-      <div className="px-5 py-5">
-        <Logo height={30} priority />
-        <p className="mt-1.5 truncate text-xs text-fg-subtle">
-          {tenant.company.tagline}
-        </p>
+      <div className="px-5 py-6">
+        <Logo height={48} priority />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pb-4">

@@ -2,7 +2,6 @@ import { Suspense } from 'react';
 
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Logo } from '@/components/shell/Logo';
-import { tenant } from '@/config/tenant.config';
 
 export const metadata = { title: 'Sign in' };
 
@@ -16,8 +15,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          <Logo height={34} priority />
-          <p className="mt-2 text-xs text-fg-subtle">{tenant.company.tagline}</p>
+          <Logo height={56} priority />
         </div>
 
         <Suspense

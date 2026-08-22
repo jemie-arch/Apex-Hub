@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 
 import { PortalNav } from '@/components/portal/PortalNav';
 import { Logo } from '@/components/shell/Logo';
-import { tenant } from '@/config/tenant.config';
 import { resolvePortal } from '@/lib/portal';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +43,7 @@ export default async function PortalLayout({
           <h1 className="text-2xl font-semibold tracking-tight text-fg">
             {portal.group.name}
           </h1>
-          <Logo height={24} />
+          <Logo height={32} />
         </header>
 
         <PortalNav token={params.token} />
