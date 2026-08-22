@@ -81,21 +81,34 @@ export function mapStatus(event: GhlAppointment): MappedStatus {
 export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
 
-  // Active sub-accounts whose business has not churned. Resolved as two
-  // queries and filtered in memory rather than an embedded join, so the shape
-  // stays obvious and the types stay exact.
-  const [clientRows, churnedGroups] = await Promise.all([
+  /*
+   * Active sub-accounts whose business has not churned, and which are practices.
+   *
+   * Resolved as two queries and filtered in memory rather than an embedded join,
+   * so the shape stays obvious and the types stay exact.
+   *
+   * Internal accounts are skipped because they can never hold a consultation and
+   * were making the one alert this sync raises useless. "Ten practices have no
+   * booking calendar" turned out to mean two practices and eight things that are
+   * not practices at all — Apex's own Pay Per Show System, a vendor demo, two
+   * accounts called PNW Survival Games, a client's recruitment account. An alert
+   * that is mostly noise is an alert nobody reads.
+   */
+  const [clientRows, skipGroups] = await Promise.all([
     db
       .from('clients')
       .select('id, name, group_id, crm_location_id, timezone')
       .not('crm_location_id', 'is', null)
       .eq('is_active', true),
-    db.from('client_groups').select('id').eq('status', 'churned'),
+    db
+      .from('client_groups')
+      .select('id')
+      .or('status.eq.churned,is_internal.eq.true'),
   ]);
   if (clientRows.error) throw clientRows.error;
-  if (churnedGroups.error) throw churnedGroups.error;
+  if (skipGroups.error) throw skipGroups.error;
 
-  const churned = new Set((churnedGroups.data ?? []).map((row) => row.id));
+  const churned = new Set((skipGroups.data ?? []).map((row) => row.id));
   const clients = {
     data: (clientRows.data ?? []).filter((row) => !churned.has(row.group_id)),
   };
@@ -432,17 +445,24 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   }
 
   /*
-   * A practice with no "… Booking Calendar" reads as a practice with no
-   * bookings, which is the most expensive kind of silence this sync can
-   * produce — the dashboard would simply show them at zero. Named, not
-   * counted, so the fix is obvious.
+   * How many mirror calendars were left unread.
+   *
+   * Recorded per run so the drop from 2,397 events to 323 has something standing
+   * behind it. It counts calendars rather than events on purpose: they are
+   * excluded before anything is fetched, so the events on them are never read and
+   * cannot be counted. The event-level check exists as a backstop and its counter
+   * should stay at zero — if it ever does not, a calendar is returning events
+   * that claim to belong to a different one.
    */
+  ctx.note('mirror_calendars_skipped', excludedCalendars.size);
+
   if (skippedByCalendar > 0) {
-    ctx.note('skipped_by_calendar', skippedByCalendar);
-    ctx.log(
-      `${skippedByCalendar} event(s) ignored: they sit on calendars that are ` +
-        'named like a booking calendar but are not one — mirrors, blocked ' +
-        'slots, call-back lists. See excluded_calendars.',
+    ctx.recordError(
+      `${skippedByCalendar} event(s) came back from a calendar that was ` +
+        'supposed to have been excluded before fetching. The calendar-level ' +
+        'filter is not holding, so check excluded_calendars against the ids on ' +
+        'those events.',
+      { events: skippedByCalendar },
     );
   }
 

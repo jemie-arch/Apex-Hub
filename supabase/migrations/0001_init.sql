@@ -2377,3 +2377,27 @@ from appointments_excluded
 where crm_calendar_id is not null
 order by crm_calendar_id, excluded_at desc
 on conflict (crm_calendar_id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Five more accounts that are not practices
+--
+-- Found by reading the one alert crm-appointments raises. "Ten practices have no
+-- booking calendar" turned out to mean two practices and eight things that are
+-- not practices: Apex's own Pay Per Show System, a vendor demo, two accounts
+-- called PNW Survival Games, and a client's recruitment account. An alert that is
+-- mostly noise is an alert nobody reads, so the sync now skips internal accounts
+-- and the alert names only practices.
+--
+-- Left alone: HIP Creative, Inc., Habib Dental Implants and Skyline Implants &
+-- Periodontics. All three are onboarding with no activity, and the first may be
+-- a real relationship rather than scaffolding -- not mine to decide.
+-- ---------------------------------------------------------------------------
+update client_groups
+set is_internal = true
+where name in (
+  'Pay Per Show System',
+  'Pearl AI',
+  'PNW Survival Games',
+  'PNW Survival Games 2',
+  'Singleton Smile [Hiring Account]'
+);
