@@ -319,7 +319,7 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <section className="mt-6 rounded-lg border border-high bg-surface p-4">
+      <section className="mt-6 rounded-lg border border-accent-subtle bg-surface p-4">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-fg">
           <AlertTriangle size={14} /> Not shown, and why
         </h2>

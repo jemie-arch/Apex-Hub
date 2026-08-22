@@ -28,7 +28,7 @@ export function SetPasswordLink({ url }: { url: string }) {
   }
 
   return (
-    <div className="mt-3 rounded-md border border-high bg-surface-sunken p-3">
+    <div className="mt-3 rounded-md border border-line-strong bg-surface-sunken p-3">
       <p className="flex items-center gap-1.5 text-xs font-medium text-fg">
         <AlertTriangle size={13} /> Single-use link — treat it like a password
       </p>
