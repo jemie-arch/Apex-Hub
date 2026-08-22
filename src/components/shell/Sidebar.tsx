@@ -35,6 +35,7 @@ import {
   Scale,
   Settings,
   Target,
+  UserCheck,
   UserCircle,
   Users,
   UsersRound,
@@ -102,6 +103,7 @@ const SECTIONS: NavSection[] = [
         label: 'Onboarding',
         icon: CalendarCheck,
         children: [
+          { href: '/onboarding/clients', label: 'Client Onboarding', icon: UserCheck },
           { href: '/onboarding-forms', label: 'Forms', icon: FileText },
         ],
       },

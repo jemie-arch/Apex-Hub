@@ -874,11 +874,16 @@ export type Database = {
           contact_phone: string | null
           country: string | null
           created_at: string
+          csm_user_id: string | null
           currency: string
           details_updated_at: string | null
           id: string
+          launch_call_at: string | null
           name: string
+          onboarding_added_at: string
+          onboarding_call_at: string | null
           onboarding_stage: string
+          onboarding_status: Database["public"]["Enums"]["onboarding_status"]
           opening_hours: Json
           portal_enabled: boolean
           portal_token: string
@@ -889,6 +894,8 @@ export type Database = {
           slug: string
           started_on: string | null
           status: Database["public"]["Enums"]["client_status"]
+          status_set_by: string | null
+          status_set_manually_at: string | null
           treatments: string[]
           updated_at: string
           website: string | null
@@ -903,11 +910,16 @@ export type Database = {
           contact_phone?: string | null
           country?: string | null
           created_at?: string
+          csm_user_id?: string | null
           currency?: string
           details_updated_at?: string | null
           id?: string
+          launch_call_at?: string | null
           name: string
+          onboarding_added_at?: string
+          onboarding_call_at?: string | null
           onboarding_stage?: string
+          onboarding_status?: Database["public"]["Enums"]["onboarding_status"]
           opening_hours?: Json
           portal_enabled?: boolean
           portal_token?: string
@@ -918,6 +930,8 @@ export type Database = {
           slug: string
           started_on?: string | null
           status?: Database["public"]["Enums"]["client_status"]
+          status_set_by?: string | null
+          status_set_manually_at?: string | null
           treatments?: string[]
           updated_at?: string
           website?: string | null
@@ -932,11 +946,16 @@ export type Database = {
           contact_phone?: string | null
           country?: string | null
           created_at?: string
+          csm_user_id?: string | null
           currency?: string
           details_updated_at?: string | null
           id?: string
+          launch_call_at?: string | null
           name?: string
+          onboarding_added_at?: string
+          onboarding_call_at?: string | null
           onboarding_stage?: string
+          onboarding_status?: Database["public"]["Enums"]["onboarding_status"]
           opening_hours?: Json
           portal_enabled?: boolean
           portal_token?: string
@@ -947,11 +966,28 @@ export type Database = {
           slug?: string
           started_on?: string | null
           status?: Database["public"]["Enums"]["client_status"]
+          status_set_by?: string | null
+          status_set_manually_at?: string | null
           treatments?: string[]
           updated_at?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "client_groups_csm_user_id_fkey"
+            columns: ["csm_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_groups_status_set_by_fkey"
+            columns: ["status_set_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_notes: {
         Row: {
@@ -1476,6 +1512,126 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_activity: {
+        Row: {
+          actor_name: string | null
+          actor_user_id: string | null
+          client_group_id: string
+          created_at: string
+          detail: string
+          id: string
+          kind: string
+        }
+        Insert: {
+          actor_name?: string | null
+          actor_user_id?: string | null
+          client_group_id: string
+          created_at?: string
+          detail: string
+          id?: string
+          kind: string
+        }
+        Update: {
+          actor_name?: string | null
+          actor_user_id?: string | null
+          client_group_id?: string
+          created_at?: string
+          detail?: string
+          id?: string
+          kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_activity_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_activity_client_group_id_fkey"
+            columns: ["client_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_step_state: {
+        Row: {
+          asset_url: string | null
+          client_group_id: string
+          done_at: string | null
+          done_by: string | null
+          note: string | null
+          step_key: string
+          updated_at: string
+        }
+        Insert: {
+          asset_url?: string | null
+          client_group_id: string
+          done_at?: string | null
+          done_by?: string | null
+          note?: string | null
+          step_key: string
+          updated_at?: string
+        }
+        Update: {
+          asset_url?: string | null
+          client_group_id?: string
+          done_at?: string | null
+          done_by?: string | null
+          note?: string | null
+          step_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_step_state_client_group_id_fkey"
+            columns: ["client_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_step_state_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_step_template: {
+        Row: {
+          automated: boolean
+          group_key: string
+          group_label: string
+          is_active: boolean
+          label: string
+          sort_order: number
+          step_key: string
+        }
+        Insert: {
+          automated?: boolean
+          group_key: string
+          group_label: string
+          is_active?: boolean
+          label: string
+          sort_order: number
+          step_key: string
+        }
+        Update: {
+          automated?: boolean
+          group_key?: string
+          group_label?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+          step_key?: string
+        }
+        Relationships: []
       }
       project_notes: {
         Row: {
@@ -2060,6 +2216,14 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       generate_portal_token: { Args: never; Returns: string }
+      onboarding_status_for: {
+        Args: { p_group: string }
+        Returns: Database["public"]["Enums"]["onboarding_status"]
+      }
+      refresh_onboarding_status: {
+        Args: { p_group: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
@@ -2108,6 +2272,13 @@ export type Database = {
         | "spam"
       lead_quality: "high" | "medium" | "low" | "unusable"
       notification_kind: "info" | "success" | "warning" | "error"
+      onboarding_status:
+        | "new_signup"
+        | "onboarding_form"
+        | "kickoff_form"
+        | "waiting_on_team"
+        | "waiting_on_client"
+        | "launch_ready"
       project_status:
         | "idea"
         | "planned"
@@ -2313,6 +2484,14 @@ export const Constants = {
       ],
       lead_quality: ["high", "medium", "low", "unusable"],
       notification_kind: ["info", "success", "warning", "error"],
+      onboarding_status: [
+        "new_signup",
+        "onboarding_form",
+        "kickoff_form",
+        "waiting_on_team",
+        "waiting_on_client",
+        "launch_ready",
+      ],
       project_status: [
         "idea",
         "planned",
