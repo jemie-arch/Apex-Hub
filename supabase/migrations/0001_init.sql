@@ -2047,3 +2047,37 @@ $fn$;
 
 revoke all on function refresh_client_statuses() from public;
 grant execute on function refresh_client_statuses() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Which sheet a tracker lead came from
+--
+-- The Client Fulfilment Tracker keeps two lead sheets: "Leads Data", which is
+-- the live one, and "Leads Data Old", which holds everything before it. Their
+-- row numbers both start at 2, so source_row alone is not an identity and the
+-- unique constraint on it silently blocked the older sheet from being imported
+-- at all. Only the live sheet was in here, which is why the Hub knew about 11
+-- days of leads and 37 days of ad spend and quietly divided one by the other.
+--
+-- The two sheets overlap for one day at the handover, 11 August, and they
+-- disagree: the old sheet records 57 leads that day and the live one 11. Every
+-- company in the live sheet's 11 appears in the old sheet's 57 with a count at
+-- least as large, and 57 sits on the ~50/day trend while 11 does not -- so the
+-- old sheet holds the whole day and the live sheet holds a re-recorded tail of
+-- it. The old sheet owns 11 August and everything before; the live sheet owns
+-- 12 August onward. The live sheet's 11 duplicate rows for 11 August were
+-- removed, and the old sheet's 5 rows for 12 August were never imported, for
+-- the same reason in the other direction.
+--
+-- Anything re-importing either sheet has to keep that boundary or the handover
+-- day gets counted twice.
+-- ---------------------------------------------------------------------------
+alter table tracker_leads
+  add column if not exists source_tab text not null default 'Leads Data';
+
+alter table tracker_leads drop constraint if exists tracker_leads_source_row_key;
+
+create unique index if not exists tracker_leads_source_tab_row_key
+  on tracker_leads (source_tab, source_row);
+
+comment on column tracker_leads.source_tab is
+  'Which sheet of the Client Fulfilment Tracker the row came from. "Leads Data" and "Leads Data Old" have overlapping row numbers, so the row number alone is not an identity.';

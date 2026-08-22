@@ -2316,6 +2316,7 @@ export type Database = {
           lead_name: string | null
           received_on: string | null
           source_row: number
+          source_tab: string
         }
         Insert: {
           ad_external_id?: string | null
@@ -2332,6 +2333,7 @@ export type Database = {
           lead_name?: string | null
           received_on?: string | null
           source_row: number
+          source_tab?: string
         }
         Update: {
           ad_external_id?: string | null
@@ -2348,6 +2350,7 @@ export type Database = {
           lead_name?: string | null
           received_on?: string | null
           source_row?: number
+          source_tab?: string
         }
         Relationships: [
           {
