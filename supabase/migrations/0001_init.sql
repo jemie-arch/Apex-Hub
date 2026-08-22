@@ -1443,3 +1443,99 @@ alter table appointments
 alter table appointments
   add column if not exists showed_source text
     check (showed_source is null or showed_source in ('crm', 'client'));
+
+
+-- ===========================================================================
+-- TRACKER IMPORT
+--
+-- The Client Fulfilment Tracker spreadsheet, brought across as history.
+--
+-- These live in their own tables rather than in `appointments` and `leads`
+-- because a sheet row carries no GoHighLevel appointment id. Merging them into
+-- the synced tables would create a second population that can never be deduped
+-- against the live sync — every re-sync would look like new bookings. Kept apart,
+-- they can be reconciled on name and date, and the reconciliation can be wrong
+-- without corrupting anything.
+--
+-- Worth importing for one reason above the others: the sheet has campaign ids on
+-- almost every row and the synced appointments have them on none, so this is
+-- currently the only place ad spend can be joined to a booking.
+-- ===========================================================================
+
+create table tracker_appointments (
+  id                   uuid primary key default gen_random_uuid(),
+
+  -- Row number in the sheet. The natural key, so re-importing corrects a row
+  -- rather than duplicating it — the sheet has no id of its own.
+  source_row           integer not null unique,
+
+  -- The practice as the sheet spells it, kept verbatim. client_id is the match
+  -- we made, and stays null when the name matched nothing rather than guessing.
+  location_name        text not null,
+  client_id            uuid references clients (id) on delete set null,
+
+  patient_name         text,
+  patient_email        text,
+
+  -- Two dates that are easy to conflate: when the lead came in, and when the
+  -- appointment is actually for.
+  created_on           date,
+  booked_for           date,
+
+  campaign_external_id text,
+  adset_external_id    text,
+  ad_external_id       text,
+  offer_name           text,
+
+  -- Free text, straight from the sheet. Deliberately not the appointment_status
+  -- enum: the sheet holds values that enum has no room for, and coercing them
+  -- would lose the thing worth importing.
+  appointment_status   text,
+  status_if_showed     text,
+
+  amount_spent_cents   integer,
+
+  imported_at          timestamptz not null default now()
+);
+
+create index tracker_appointments_client_idx on tracker_appointments (client_id);
+create index tracker_appointments_booked_idx on tracker_appointments (booked_for desc);
+create index tracker_appointments_campaign_idx on tracker_appointments (campaign_external_id)
+  where campaign_external_id is not null;
+
+create table tracker_leads (
+  id                   uuid primary key default gen_random_uuid(),
+  source_row           integer not null unique,
+
+  company_name         text not null,
+  client_id            uuid references clients (id) on delete set null,
+
+  received_on          date,
+  lead_name            text,
+
+  -- The sheet's own count column. Usually 1; occasionally a row stands for
+  -- several, which is why it is stored rather than assumed.
+  lead_count           integer,
+
+  -- Both ids and names, because the sheet has both and the names are what makes
+  -- a report readable without a second lookup.
+  campaign_external_id text,
+  campaign_name        text,
+  adset_external_id    text,
+  adset_name           text,
+  ad_external_id       text,
+  ad_name              text,
+
+  imported_at          timestamptz not null default now()
+);
+
+create index tracker_leads_client_idx on tracker_leads (client_id);
+create index tracker_leads_received_idx on tracker_leads (received_on desc);
+create index tracker_leads_campaign_idx on tracker_leads (campaign_external_id)
+  where campaign_external_id is not null;
+
+alter table tracker_appointments enable row level security;
+alter table tracker_leads        enable row level security;
+
+create policy admin_all on tracker_appointments for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on tracker_leads        for all using (auth_is_admin()) with check (auth_is_admin());
