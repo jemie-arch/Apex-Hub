@@ -75,11 +75,35 @@ export async function resolvePortal(
  * anybody opens this link.
  */
 export const PORTAL_PAGES: ReadonlyArray<{ href: string; label: string }> = [
-  { href: '', label: 'Results' },
-  { href: '/appointments', label: 'Consultations' },
-  { href: '/onboarding', label: 'Launch progress' },
-  { href: '/creatives', label: 'Your ads' },
+  { href: '', label: 'Dashboard' },
+  { href: '/appointments', label: 'Post consultation' },
+  { href: '/creatives', label: 'Ads Creative' },
+  { href: '/onboarding', label: 'Onboarding' },
   { href: '/agency-appointments', label: 'Calls with us' },
-  { href: '/update-info', label: 'Practice details' },
-  { href: '/invite-request', label: 'Add a colleague' },
+  { href: '/account', label: 'Account' },
 ];
+
+/*
+ * Not in the nav yet, because the pages do not exist:
+ *
+ *   /consultations — upcoming appointments. Distinct from /appointments, which
+ *                    is the outcome form for ones that have happened.
+ *   /support       — tickets, a thread with images, and booking a call. Would
+ *                    absorb "Calls with us", which is the booking half already.
+ *
+ * Listing them here as tabs before they exist would give a client two dead
+ * links, which is worse than a shorter menu.
+ *
+ * /update-info and /invite-request are gone from the nav but their pages still
+ * work: /account supersedes both, and an old link somebody bookmarked should not
+ * 404.
+ */
+
+/**
+ * The GoHighLevel form that collects card details.
+ *
+ * A form id rather than a card form of our own, deliberately. The fields render
+ * inside GoHighLevel's iframe, so a card number never touches this app — no PCI
+ * scope, and no chance of a CVV being written to a column. See CardDetailsForm.
+ */
+export const CARD_DETAILS_FORM_ID = 'KbkpELbls32iZqQ004BH';

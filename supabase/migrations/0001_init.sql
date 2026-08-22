@@ -1443,3 +1443,156 @@ alter table appointments
 alter table appointments
   add column if not exists showed_source text
     check (showed_source is null or showed_source in ('crm', 'client'));
+
+
+-- ===========================================================================
+-- TRACKER IMPORT
+--
+-- The Client Fulfilment Tracker spreadsheet, brought across as history.
+--
+-- These live in their own tables rather than in `appointments` and `leads`
+-- because a sheet row carries no GoHighLevel appointment id. Merging them into
+-- the synced tables would create a second population that can never be deduped
+-- against the live sync — every re-sync would look like new bookings. Kept apart,
+-- they can be reconciled on name and date, and the reconciliation can be wrong
+-- without corrupting anything.
+--
+-- Worth importing for one reason above the others: the sheet has campaign ids on
+-- almost every row and the synced appointments have them on none, so this is
+-- currently the only place ad spend can be joined to a booking.
+-- ===========================================================================
+
+create table tracker_appointments (
+  id                   uuid primary key default gen_random_uuid(),
+
+  -- Row number in the sheet. The natural key, so re-importing corrects a row
+  -- rather than duplicating it — the sheet has no id of its own.
+  source_row           integer not null unique,
+
+  -- The practice as the sheet spells it, kept verbatim. client_id is the match
+  -- we made, and stays null when the name matched nothing rather than guessing.
+  location_name        text not null,
+  client_id            uuid references clients (id) on delete set null,
+
+  patient_name         text,
+  patient_email        text,
+
+  -- Two dates that are easy to conflate: when the lead came in, and when the
+  -- appointment is actually for.
+  created_on           date,
+  booked_for           date,
+
+  campaign_external_id text,
+  adset_external_id    text,
+  ad_external_id       text,
+  offer_name           text,
+
+  -- Free text, straight from the sheet. Deliberately not the appointment_status
+  -- enum: the sheet holds values that enum has no room for, and coercing them
+  -- would lose the thing worth importing.
+  appointment_status   text,
+  status_if_showed     text,
+
+  amount_spent_cents   integer,
+
+  imported_at          timestamptz not null default now()
+);
+
+create index tracker_appointments_client_idx on tracker_appointments (client_id);
+create index tracker_appointments_booked_idx on tracker_appointments (booked_for desc);
+create index tracker_appointments_campaign_idx on tracker_appointments (campaign_external_id)
+  where campaign_external_id is not null;
+
+create table tracker_leads (
+  id                   uuid primary key default gen_random_uuid(),
+  source_row           integer not null unique,
+
+  company_name         text not null,
+  client_id            uuid references clients (id) on delete set null,
+
+  received_on          date,
+  lead_name            text,
+
+  -- The sheet's own count column. Usually 1; occasionally a row stands for
+  -- several, which is why it is stored rather than assumed.
+  lead_count           integer,
+
+  -- Both ids and names, because the sheet has both and the names are what makes
+  -- a report readable without a second lookup.
+  campaign_external_id text,
+  campaign_name        text,
+  adset_external_id    text,
+  adset_name           text,
+  ad_external_id       text,
+  ad_name              text,
+
+  imported_at          timestamptz not null default now()
+);
+
+create index tracker_leads_client_idx on tracker_leads (client_id);
+create index tracker_leads_received_idx on tracker_leads (received_on desc);
+create index tracker_leads_campaign_idx on tracker_leads (campaign_external_id)
+  where campaign_external_id is not null;
+
+alter table tracker_appointments enable row level security;
+alter table tracker_leads        enable row level security;
+
+create policy admin_all on tracker_appointments for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on tracker_leads        for all using (auth_is_admin()) with check (auth_is_admin());
+
+
+-- ===========================================================================
+-- ONBOARDING FORM SUBMISSIONS
+--
+-- The onboarding forms live in a GoHighLevel sub-account of their own (ADM
+-- Client Onboarding Account), and their submissions arrive almost anonymous:
+-- the practice's answers are stored against 20-character custom-field ids, so
+-- the payload looks like it holds no name and no company. It holds both. The
+-- clinic name is under "Clinic Friendly Name" or "Clinic Name" on 139 of 141
+-- submissions; the person's name usually is not, and comes from the contact
+-- record instead — the onboarding sub-account first, then the sales sub-account
+-- matched on email or phone.
+--
+-- These columns record not just what was resolved but how, because a name
+-- arrived at by matching a phone number is a weaker fact than one typed on the
+-- form, and a reader deserves to know which they are looking at.
+-- ===========================================================================
+
+alter table form_submissions
+  -- Which sub-account the form belongs to. Not a client: these are Apex's own.
+  add column source_location_id  text,
+
+  -- The practice as the form spells it, kept verbatim so a bad match can be
+  -- re-judged later against what was actually typed.
+  add column clinic_name         text,
+
+  add column contact_crm_id      text,
+  add column person_name         text,
+  add column contact_email       text,
+  add column contact_phone       text,
+
+  -- Stated by the practice on its own onboarding form, which makes it better
+  -- evidence than the billing sync's name-guessing.
+  add column stripe_customer_id  text,
+
+  -- How client_group_id was arrived at: 'exact', 'contains', 'ambiguous',
+  -- 'suggested', 'none', 'no_clinic_name' or 'test_data'. Only 'exact' and
+  -- 'contains' set client_group_id; the rest leave it null on purpose. A
+  -- clinic name matching several groups equally is recorded as 'ambiguous'
+  -- rather than resolved by picking the longest, which is a coin toss wearing
+  -- the costume of a match.
+  add column match_method        text,
+
+  -- Where person_name came from: 'onboarding' or 'sales_account'.
+  add column name_source         text,
+
+  -- The closest group when nothing was confident enough to link. A prompt for
+  -- a human, never used as if it were a match.
+  add column suggested_group_id  uuid references client_groups (id) on delete set null,
+
+  -- Staff testing the form. Kept rather than deleted, so counts reconcile with
+  -- GoHighLevel, but excluded from anything that reads as a client.
+  add column is_test             boolean not null default false;
+
+create index form_submissions_submitted_idx on form_submissions (submitted_at desc);
+create index form_submissions_clinic_idx on form_submissions (lower(clinic_name));

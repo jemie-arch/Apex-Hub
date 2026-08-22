@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { PortalSwitcher } from '@/components/shell/PortalSwitcher';
 import { Sidebar } from '@/components/shell/Sidebar';
 import type { Theme } from '@/components/shell/ThemeToggle';
 import { currentCaller } from '@/lib/supabase/server';
@@ -23,18 +24,37 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const profile = await serviceClient()
     .from('user_profiles')
-    .select('permissions, theme')
+    .select('permissions, theme, role')
     .eq('id', caller.id)
     .maybeSingle();
 
   const permissions = profile.data?.permissions ?? [];
   const theme: Theme = profile.data?.theme === 'light' ? 'light' : 'dark';
 
+  /*
+   * Admins see every menu item, rather than only the keys stored on their row.
+   *
+   * Middleware already lets an admin reach any route, so the stored list was
+   * only ever deciding what they could *find*. That made adding a page a data
+   * migration: /billing shipped, worked when typed into the address bar, and was
+   * invisible in the menu because no existing row carried the new key. A page
+   * nobody can find is indistinguishable from a page that was never deployed.
+   */
+  const isAdmin = profile.data?.role === 'admin';
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
-      <Sidebar permissions={permissions} theme={theme} />
+      <Sidebar permissions={permissions} isAdmin={isAdmin} theme={theme} />
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1600px] px-8 py-8">{children}</div>
+        {/*
+          The switcher sits above the page rather than inside the sidebar: it
+          moves you between portals, which is a different kind of action from
+          moving between pages of one portal.
+        */}
+        <div className="mx-auto flex max-w-[1600px] justify-end px-8 pt-6">
+          <PortalSwitcher />
+        </div>
+        <div className="mx-auto max-w-[1600px] px-8 pb-8 pt-4">{children}</div>
       </main>
     </div>
   );
