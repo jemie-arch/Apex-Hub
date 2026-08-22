@@ -473,8 +473,17 @@ export async function listAppointments(
   locationId: string,
   from: Date,
   to: Date,
+  /**
+   * Which of the location's calendars to read. Omit for all of them.
+   *
+   * Applied BEFORE the cap below, which matters: slicing first and filtering
+   * second would silently drop the one calendar the caller asked for at any
+   * location with more than eight.
+   */
+  wanted?: (calendar: GhlCalendar) => boolean,
 ): Promise<GhlAppointment[]> {
-  const calendars = await listCalendars(clientId, locationId);
+  const all = await listCalendars(clientId, locationId);
+  const calendars = wanted ? all.filter(wanted) : all;
   if (calendars.length === 0) return [];
 
   const { accessToken } = await getToken(clientId);

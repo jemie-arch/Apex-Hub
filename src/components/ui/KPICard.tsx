@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { Sparkline } from '@/components/ui/Sparkline';
 import { cn } from '@/lib/cn';
 import { formatPercent } from '@/lib/format';
 
@@ -23,6 +24,16 @@ export interface KPICardProps {
    * without shouting, and it works even in a photograph of the screen.
    */
   hero?: boolean;
+  /**
+   * A series to draw beside the number, for its direction over time.
+   *
+   * Optional, so the fourteen pages already using this card are untouched. A
+   * shape next to a figure answers "and which way is it going" without needing
+   * a second tile, which is the one thing a bare number cannot say.
+   */
+  series?: number[];
+  /** Which way the sparkline reads. Defaults to the accent. */
+  seriesTone?: 'accent' | 'positive' | 'negative';
 }
 
 export function KPICard({
@@ -33,6 +44,8 @@ export function KPICard({
   hint,
   icon,
   hero = false,
+  series,
+  seriesTone = 'accent',
 }: KPICardProps) {
   const hasDelta = delta !== undefined && delta !== null;
   const flat = hasDelta && Math.abs(delta) < 0.005;
@@ -71,14 +84,31 @@ export function KPICard({
         ) : null}
       </div>
 
-      <p
-        className={cn(
-          'numeric mt-3 font-semibold tracking-tight',
-          hero ? 'text-hero text-invert-fg' : 'text-3xl text-fg',
-        )}
-      >
-        {value}
-      </p>
+      {/*
+        The sparkline sits beside the number rather than under it, so the tile
+        keeps its height whether or not a series was passed — a grid of cards
+        where some are taller than others reads as broken.
+      */}
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <p
+          className={cn(
+            'numeric font-semibold tracking-tight',
+            hero ? 'text-hero text-invert-fg' : 'text-3xl text-fg',
+          )}
+        >
+          {value}
+        </p>
+
+        {series && series.length > 0 && !hero ? (
+          <Sparkline
+            points={series}
+            tone={seriesTone}
+            width={100}
+            height={32}
+            className="shrink-0"
+          />
+        ) : null}
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         {hasDelta ? (

@@ -14,6 +14,7 @@ import type { AppointmentRow, AppointmentStatus } from '@/types/database';
 import {
   getContact,
   listAppointments,
+  listCalendars,
   type GhlAppointment,
 } from '@/lib/integrations/ghl';
 import { chunk, ID_LOOKUP_BATCH } from '@/lib/chunk';
@@ -24,6 +25,25 @@ import { serviceClient } from '@/lib/supabase/service';
 /** How far back and forward to look. Bounded so this cannot grow unbounded. */
 const LOOKBACK_DAYS = 45;
 const LOOKAHEAD_DAYS = 90;
+
+/**
+ * Only the practice's consultation calendar, named "<Location> Booking
+ * Calendar" by the snapshot that provisions every sub-account.
+ *
+ * This sync used to read every calendar a location had, and 1,026 of the 2,411
+ * appointments in the table — 42.6% — came from a second calendar rather than
+ * the booking one. Those are hygiene slots, recalls and PatientSync mirror
+ * calendars: real appointments, but not the new-patient consultations this
+ * funnel is about, and counting them inflated every show rate and every cost per
+ * booking on the dashboard.
+ *
+ * Matched on the suffix rather than the whole template, because the location
+ * name in GoHighLevel does not always equal the name we hold, and a mismatch
+ * there would silently return no appointments at all.
+ */
+export function isConsultationCalendar(calendar: { name: string | null }): boolean {
+  return /\bbooking calendar\s*$/i.test((calendar.name ?? '').trim());
+}
 
 /**
  * Contact lookups are one request each, so they are capped per run. New
@@ -85,6 +105,8 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   let contactLookups = 0;
   /** One shape note per run is enough; see ctx.note beside the lookup. */
   let shapeNoted = false;
+  /** Practices with no calendar matching the booking-calendar name. */
+  const missingCalendar: string[] = [];
 
   for (const client of clients.data ?? []) {
     if (!client.crm_location_id) continue;
@@ -96,6 +118,7 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         client.crm_location_id,
         from,
         to,
+        isConsultationCalendar,
       );
     } catch (error) {
       // One client's dead token must not stop the other twenty.
@@ -107,7 +130,25 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     }
 
     ctx.counts.read += events.length;
-    if (events.length === 0) continue;
+
+    if (events.length === 0) {
+      /*
+       * Nothing came back, and the two reasons are worth telling apart: a quiet
+       * fortnight, or no calendar named "… Booking Calendar" at all. Only asked
+       * for locations that returned nothing, so the extra request is paid where
+       * there is a problem rather than on every location every run.
+       */
+      try {
+        const calendars = await listCalendars(client.id, client.crm_location_id);
+        if (!calendars.some(isConsultationCalendar)) {
+          missingCalendar.push(client.name);
+        }
+      } catch {
+        // The listing already failed above if the token is dead; a failure here
+        // is not worth a second error against the same client.
+      }
+      continue;
+    }
 
     const ids = events.map((event) => event.id);
     const byCrmId = new Map<string, AppointmentRow>();
@@ -342,6 +383,22 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       `contact lookup cap of ${MAX_CONTACT_LOOKUPS} reached — ` +
         `${backlog.count ?? 'some'} booking(s) still await enrichment and are ` +
         'picked up on the next run',
+    );
+  }
+
+  /*
+   * A practice with no "… Booking Calendar" reads as a practice with no
+   * bookings, which is the most expensive kind of silence this sync can
+   * produce — the dashboard would simply show them at zero. Named, not
+   * counted, so the fix is obvious.
+   */
+  if (missingCalendar.length > 0) {
+    ctx.note('no_booking_calendar', missingCalendar);
+    ctx.recordError(
+      `${missingCalendar.length} practice(s) have no calendar whose name ends ` +
+        '"Booking Calendar", so no consultations were read for them. Either the ' +
+        'calendar was renamed or the snapshot never created it.',
+      { practices: missingCalendar },
     );
   }
 }
