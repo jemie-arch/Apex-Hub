@@ -97,7 +97,14 @@ const SECTIONS: NavSection[] = [
     heading: 'Clients',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/onboarding', label: 'Onboarding', icon: CalendarCheck },
+      {
+        href: '/onboarding',
+        label: 'Onboarding',
+        icon: CalendarCheck,
+        children: [
+          { href: '/onboarding-forms', label: 'Forms', icon: FileText },
+        ],
+      },
       {
         href: '/clients',
         label: 'Client Management',

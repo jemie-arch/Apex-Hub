@@ -22,6 +22,7 @@ export const PERMISSION_KEYS = [
   'ads_management',
   'compare',
   'fulfilment',
+  'onboarding_forms',
   // Patients
   'consultations',
   'calls',
@@ -53,6 +54,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   ads_management: 'Ads Management',
   compare: 'Client Results Tracker',
   fulfilment: 'Fulfilment',
+  onboarding_forms: 'Onboarding Forms',
   consultations: 'Consultations',
   calls: 'Call Center',
   meetings: 'Meetings',
@@ -98,6 +100,7 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/ads-performance', 'ads_management'],
     ['/compare', 'compare'],
     ['/fulfilment', 'fulfilment'],
+    ['/onboarding-forms', 'onboarding_forms'],
     ['/b2c', 'consultations'],
     ['/call-center', 'calls'],
     ['/meetings', 'meetings'],

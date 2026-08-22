@@ -1539,3 +1539,60 @@ alter table tracker_leads        enable row level security;
 
 create policy admin_all on tracker_appointments for all using (auth_is_admin()) with check (auth_is_admin());
 create policy admin_all on tracker_leads        for all using (auth_is_admin()) with check (auth_is_admin());
+
+
+-- ===========================================================================
+-- ONBOARDING FORM SUBMISSIONS
+--
+-- The onboarding forms live in a GoHighLevel sub-account of their own (ADM
+-- Client Onboarding Account), and their submissions arrive almost anonymous:
+-- the practice's answers are stored against 20-character custom-field ids, so
+-- the payload looks like it holds no name and no company. It holds both. The
+-- clinic name is under "Clinic Friendly Name" or "Clinic Name" on 139 of 141
+-- submissions; the person's name usually is not, and comes from the contact
+-- record instead — the onboarding sub-account first, then the sales sub-account
+-- matched on email or phone.
+--
+-- These columns record not just what was resolved but how, because a name
+-- arrived at by matching a phone number is a weaker fact than one typed on the
+-- form, and a reader deserves to know which they are looking at.
+-- ===========================================================================
+
+alter table form_submissions
+  -- Which sub-account the form belongs to. Not a client: these are Apex's own.
+  add column source_location_id  text,
+
+  -- The practice as the form spells it, kept verbatim so a bad match can be
+  -- re-judged later against what was actually typed.
+  add column clinic_name         text,
+
+  add column contact_crm_id      text,
+  add column person_name         text,
+  add column contact_email       text,
+  add column contact_phone       text,
+
+  -- Stated by the practice on its own onboarding form, which makes it better
+  -- evidence than the billing sync's name-guessing.
+  add column stripe_customer_id  text,
+
+  -- How client_group_id was arrived at: 'exact', 'contains', 'ambiguous',
+  -- 'suggested', 'none', 'no_clinic_name' or 'test_data'. Only 'exact' and
+  -- 'contains' set client_group_id; the rest leave it null on purpose. A
+  -- clinic name matching several groups equally is recorded as 'ambiguous'
+  -- rather than resolved by picking the longest, which is a coin toss wearing
+  -- the costume of a match.
+  add column match_method        text,
+
+  -- Where person_name came from: 'onboarding' or 'sales_account'.
+  add column name_source         text,
+
+  -- The closest group when nothing was confident enough to link. A prompt for
+  -- a human, never used as if it were a match.
+  add column suggested_group_id  uuid references client_groups (id) on delete set null,
+
+  -- Staff testing the form. Kept rather than deleted, so counts reconcile with
+  -- GoHighLevel, but excluded from anything that reads as a client.
+  add column is_test             boolean not null default false;
+
+create index form_submissions_submitted_idx on form_submissions (submitted_at desc);
+create index form_submissions_clinic_idx on form_submissions (lower(clinic_name));

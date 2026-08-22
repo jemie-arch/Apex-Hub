@@ -1280,35 +1280,68 @@ export type Database = {
         Row: {
           client_group_id: string | null
           client_id: string | null
+          clinic_name: string | null
+          contact_crm_id: string | null
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           crm_submission_id: string | null
           deal_id: string | null
           form_key: string
           id: string
+          is_test: boolean
+          match_method: string | null
+          name_source: string | null
           payload: Json
+          person_name: string | null
+          source_location_id: string | null
+          stripe_customer_id: string | null
           submitted_at: string
+          suggested_group_id: string | null
         }
         Insert: {
           client_group_id?: string | null
           client_id?: string | null
+          clinic_name?: string | null
+          contact_crm_id?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           crm_submission_id?: string | null
           deal_id?: string | null
           form_key: string
           id?: string
+          is_test?: boolean
+          match_method?: string | null
+          name_source?: string | null
           payload?: Json
+          person_name?: string | null
+          source_location_id?: string | null
+          stripe_customer_id?: string | null
           submitted_at?: string
+          suggested_group_id?: string | null
         }
         Update: {
           client_group_id?: string | null
           client_id?: string | null
+          clinic_name?: string | null
+          contact_crm_id?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           crm_submission_id?: string | null
           deal_id?: string | null
           form_key?: string
           id?: string
+          is_test?: boolean
+          match_method?: string | null
+          name_source?: string | null
           payload?: Json
+          person_name?: string | null
+          source_location_id?: string | null
+          stripe_customer_id?: string | null
           submitted_at?: string
+          suggested_group_id?: string | null
         }
         Relationships: [
           {
@@ -1330,6 +1363,13 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_suggested_group_id_fkey"
+            columns: ["suggested_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -1816,6 +1856,130 @@ export type Database = {
           },
         ]
       }
+      tracker_appointments: {
+        Row: {
+          ad_external_id: string | null
+          adset_external_id: string | null
+          amount_spent_cents: number | null
+          appointment_status: string | null
+          booked_for: string | null
+          campaign_external_id: string | null
+          client_id: string | null
+          created_on: string | null
+          id: string
+          imported_at: string
+          location_name: string
+          offer_name: string | null
+          patient_email: string | null
+          patient_name: string | null
+          source_row: number
+          status_if_showed: string | null
+        }
+        Insert: {
+          ad_external_id?: string | null
+          adset_external_id?: string | null
+          amount_spent_cents?: number | null
+          appointment_status?: string | null
+          booked_for?: string | null
+          campaign_external_id?: string | null
+          client_id?: string | null
+          created_on?: string | null
+          id?: string
+          imported_at?: string
+          location_name: string
+          offer_name?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          source_row: number
+          status_if_showed?: string | null
+        }
+        Update: {
+          ad_external_id?: string | null
+          adset_external_id?: string | null
+          amount_spent_cents?: number | null
+          appointment_status?: string | null
+          booked_for?: string | null
+          campaign_external_id?: string | null
+          client_id?: string | null
+          created_on?: string | null
+          id?: string
+          imported_at?: string
+          location_name?: string
+          offer_name?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          source_row?: number
+          status_if_showed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracker_leads: {
+        Row: {
+          ad_external_id: string | null
+          ad_name: string | null
+          adset_external_id: string | null
+          adset_name: string | null
+          campaign_external_id: string | null
+          campaign_name: string | null
+          client_id: string | null
+          company_name: string
+          id: string
+          imported_at: string
+          lead_count: number | null
+          lead_name: string | null
+          received_on: string | null
+          source_row: number
+        }
+        Insert: {
+          ad_external_id?: string | null
+          ad_name?: string | null
+          adset_external_id?: string | null
+          adset_name?: string | null
+          campaign_external_id?: string | null
+          campaign_name?: string | null
+          client_id?: string | null
+          company_name: string
+          id?: string
+          imported_at?: string
+          lead_count?: number | null
+          lead_name?: string | null
+          received_on?: string | null
+          source_row: number
+        }
+        Update: {
+          ad_external_id?: string | null
+          ad_name?: string | null
+          adset_external_id?: string | null
+          adset_name?: string | null
+          campaign_external_id?: string | null
+          campaign_name?: string | null
+          client_id?: string | null
+          company_name?: string
+          id?: string
+          imported_at?: string
+          lead_count?: number | null
+          lead_name?: string | null
+          received_on?: string | null
+          source_row?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           avatar_url: string | null
@@ -1890,9 +2054,8 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       generate_portal_token: { Args: never; Returns: string }
-      ghl_get: { Args: { p_location: string; p_path: string }; Returns: number }
-      ghl_get_agency: { Args: { p_path: string }; Returns: number }
-      stripe_get: { Args: { p_path: string }; Returns: number }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       appointment_outcome:
@@ -2158,4 +2321,3 @@ export const Constants = {
     },
   },
 } as const
-
