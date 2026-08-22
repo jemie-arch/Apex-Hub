@@ -34,11 +34,16 @@ export async function getMonthlyTrend(
   const db = serviceClient();
   const from = monthStart(months - 1, now);
 
+  // Same source as the cards above it, deliberately. Read from the synced
+  // appointments table this chart drew a "won" line that was zero in every
+  // month — not because nothing closed, but because that table has an outcome on
+  // none of its rows. A chart disagreeing with the number beside it is worse
+  // than either being wrong alone.
   const [appointments, snapshots] = await Promise.all([
     db
-      .from('appointments')
-      .select('scheduled_at, showed, outcome')
-      .gte('scheduled_at', from.toISOString()),
+      .from('tracker_appointments')
+      .select('booked_for, appointment_status, status_if_showed')
+      .gte('booked_for', from.toISOString().slice(0, 10)),
     db
       .from('ad_snapshots')
       .select('snapshot_on, spend_cents')
@@ -67,12 +72,13 @@ export async function getMonthlyTrend(
   }
 
   for (const row of appointments.data ?? []) {
-    const point = points.get(row.scheduled_at.slice(0, 7));
+    if (row.booked_for === null) continue;
+    const point = points.get(row.booked_for.slice(0, 7));
     if (!point) continue;
 
     point.booked += 1;
-    if (row.showed === true) point.showed += 1;
-    if (row.outcome === 'won') point.won += 1;
+    if (row.appointment_status === 'Showed') point.showed += 1;
+    if (row.status_if_showed === 'Closed') point.won += 1;
   }
 
   for (const row of snapshots.data ?? []) {

@@ -215,10 +215,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         />
 
         <KPICard
-          label={`${titleCase(booking.plural)} booked`}
+          label={`${titleCase(booking.plural)} from ads`}
           value={formatCount(current.booked)}
           delta={delta(current.booked, previous.booked)}
-          hint={`${formatCount(current.awaitingOutcome)} awaiting an outcome`}
+          hint={`${formatCount(current.awaitingOutcome)} awaiting an outcome · ${formatCount(current.liveBooked)} appointments of every kind`}
           icon={<CalendarCheck size={16} />}
         />
         <KPICard
@@ -233,26 +233,42 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           icon={<UserCheck size={16} />}
         />
         <KPICard
-          label="Converted"
+          label="Closed"
           value={formatPercent(conversionRate(current), 0)}
           delta={
             conversionRate(current) !== null && conversionRate(previous) !== null
               ? (conversionRate(current) ?? 0) - (conversionRate(previous) ?? 0)
               : null
           }
-          hint={`${formatCount(current.converted)} won`}
+          hint={`${formatCount(current.converted)} of those who showed`}
           icon={<CircleDollarSign size={16} />}
         />
         <KPICard
+          label="Leads"
+          value={formatCount(current.leads)}
+          delta={delta(current.leads, previous.leads)}
+          hint="recorded against a campaign"
+          icon={<MousePointerClick size={16} />}
+        />
+        <KPICard
           label="Ad spend"
-          value={formatMoneyCompact(current.spendCents)}
-          delta={delta(current.spendCents, previous.spendCents)}
+          // Nought spend is not a spend of nought. No ad platform is connected,
+          // so showing $0 would state as fact the one thing we do not know.
+          value={
+            current.spendCents === 0 ? '—' : formatMoneyCompact(current.spendCents)
+          }
+          delta={
+            current.spendCents === 0
+              ? null
+              : delta(current.spendCents, previous.spendCents)
+          }
           // More spend is not itself good news; it is only good next to revenue.
           higherIsBetter={false}
-          // Clicks, not leads: the ad platform reports no leads because the
-          // forms live in the CRM. Booked is the real downstream number.
-          hint={`${formatCount(current.clicks)} clicks`}
-          icon={<MousePointerClick size={16} />}
+          hint={
+            current.spendCents === 0
+              ? 'no ad account connected'
+              : `${formatCount(current.clicks)} clicks`
+          }
         />
         <KPICard
           label={`Cost per ${booking.singular}`}
@@ -276,9 +292,24 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               ? delta(roas(current) ?? 0, roas(previous) ?? 0)
               : null
           }
-          hint={`${formatMoneyCompact(current.revenueCents)} attributed`}
+          hint={
+            current.revenueCents === 0
+              ? 'needs spend and case values'
+              : `${formatMoneyCompact(current.revenueCents)} attributed`
+          }
         />
       </section>
+
+      <p className="mt-3 text-xs text-fg-subtle">
+        The funnel above comes from the Client Fulfilment Tracker, which records
+        the ad-sourced consultations Apex is paid on — 91% of its rows carry a
+        campaign id. GoHighLevel holds{' '}
+        {formatCount(current.liveBooked)} appointments of every kind for this
+        period, hygiene and recalls included, and an outcome on none of them, so
+        it cannot supply a funnel. The two are shown side by side rather than
+        added: they overlap in time, and summing them would count the same
+        consultation twice.
+      </p>
 
       <div className="mt-6">
         <GoalBar goal={goal} />

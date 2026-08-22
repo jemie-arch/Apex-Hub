@@ -8,7 +8,7 @@
  */
 import type { ClientGroupRow, ClientRow } from '@/types/database';
 
-import { bounds, dateBounds, type DateRange } from '@/lib/range';
+import { dateBounds, type DateRange } from '@/lib/range';
 import { serviceClient } from '@/lib/supabase/service';
 
 export interface ClientHealth {
@@ -51,7 +51,13 @@ export function clientHealth(
 ): ClientHealth {
   if (group.status === 'churned') return { level: 'idle', reason: 'Churned' };
   if (group.status === 'paused') return { level: 'idle', reason: 'Paused' };
-  if (group.status === 'onboarding') {
+
+  // A business still marked 'onboarding' that is taking consultations is not
+  // onboarding, whatever the column says — the status is set once at creation
+  // and never advanced, so it reads 'onboarding' for almost every client. Where
+  // there are bookings, judge on the bookings; only believe the label when
+  // there is nothing else to go on.
+  if (group.status === 'onboarding' && totals.booked === 0) {
     return { level: 'idle', reason: `Onboarding — ${group.onboarding_stage}` };
   }
 
@@ -93,17 +99,20 @@ export async function getGroupRollups(
   range: DateRange,
 ): Promise<GroupRollup[]> {
   const db = serviceClient();
-  const { start, end } = bounds(range.from, range.to);
   const { start: dateStart, end: dateEnd } = dateBounds(range.from, range.to);
 
   const [groups, locations, appointments, snapshots] = await Promise.all([
     db.from('client_groups').select('*').order('name'),
     db.from('clients').select('*').order('name'),
+    // The tracker, not the synced appointments table, for the same reason the
+    // dashboard uses it: this one records whether the consultation happened and
+    // whether it closed. Health is judged on outcomes, and every synced row's
+    // outcome still reads 'pending', which would rate every client identically.
     db
-      .from('appointments')
-      .select('client_id, showed, outcome, value_cents')
-      .gte('scheduled_at', start)
-      .lte('scheduled_at', end),
+      .from('tracker_appointments')
+      .select('client_id, appointment_status, status_if_showed')
+      .gte('booked_for', dateStart)
+      .lte('booked_for', dateEnd),
     db
       .from('ad_snapshots')
       .select('client_id, spend_cents, clicks')
@@ -154,19 +163,22 @@ export async function getGroupRollups(
   };
 
   for (const row of appointments.data ?? []) {
-    const groupId = groupIdByLocation.get(row.client_id);
-    // An appointment whose location has been deleted is not attributed to a
+    // A tracker row whose clinic name matched no practice is not attributed to a
     // guess; it is dropped from the rollup.
+    if (row.client_id === null) continue;
+    const groupId = groupIdByLocation.get(row.client_id);
     if (!groupId) continue;
 
     const bucket = bucketFor(groupId);
     bucket.booked += 1;
-    if (row.showed === true) bucket.showed += 1;
-    if (row.outcome === 'pending') bucket.awaitingOutcome += 1;
-    if (row.outcome === 'won') {
-      bucket.converted += 1;
-      bucket.revenueCents += row.value_cents ?? 0;
+
+    const attended = row.appointment_status === 'Showed';
+    if (attended) bucket.showed += 1;
+    if (row.status_if_showed === 'Closed') bucket.converted += 1;
+    else if (attended && row.status_if_showed === null) {
+      bucket.awaitingOutcome += 1;
     }
+    // No revenue: the sheet records that a case closed, never what it was worth.
   }
 
   for (const row of snapshots.data ?? []) {
@@ -189,8 +201,9 @@ export async function getGroupRollups(
       showRate: bucket.booked === 0 ? null : bucket.showed / bucket.booked,
       conversionRate:
         bucket.showed === 0 ? null : bucket.converted / bucket.showed,
+      // Null, not nought: no spend recorded means unknown cost, not free.
       costPerBookingCents:
-        bucket.booked === 0
+        bucket.booked === 0 || bucket.spendCents === 0
           ? null
           : Math.round(bucket.spendCents / bucket.booked),
       roas:
