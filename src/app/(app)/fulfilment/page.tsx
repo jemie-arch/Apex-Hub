@@ -22,14 +22,6 @@ function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-type Status =
-  | 'scheduled'
-  | 'confirmed'
-  | 'showed'
-  | 'no_show'
-  | 'cancelled'
-  | 'rescheduled';
-
 interface Row {
   clientId: string;
   name: string;
@@ -37,34 +29,38 @@ interface Row {
   booked: number;
   showed: number;
   noShow: number;
-  cancelled: number;
+  /** Date still ahead and no status yet. */
   upcoming: number;
-  caseValueCents: number;
+  /** Date passed with nobody marking it showed or missed. */
+  undecided: number;
+  closed: number;
   withOutcome: number;
   collectedCents: number;
   uncollectedCents: number;
 }
 
-/** Booked means an appointment happened as an event, not that it went ahead. */
-function isBooked(status: Status): boolean {
-  return status !== 'rescheduled';
-}
-
 /**
- * The fulfilment tracker, per client.
+ * Did we get paid for every consultation that showed up?
  *
- * The Google Sheet's Stats Dashboard rebuilt on the database, and it still shows
- * less than the sheet's column headings promise — see the panel at the foot,
- * which names each remaining gap and its cause rather than rendering a zero that
- * reads as a fact. A blank column invites someone to conclude the number is
- * nought; a stated gap invites them to go and fix it.
+ * That is the question this page exists for, and it is the one the whole
+ * pay-per-show arrangement turns on. Bookings and shows on the left, money
+ * collected and money still owed on the right, per practice, so a show with no
+ * charge against it is visible in the same row rather than in another report.
  *
- * This page counts EVERY appointment GoHighLevel holds, which is why its
- * bookings exceed the dashboard's. The dashboard counts the ad-sourced
- * consultations from the tracker, because only those have outcomes; this page
- * needs the synced table instead, because cancelled and upcoming are statuses
- * the spreadsheet does not record at all. Two questions, two sources, and the
- * difference is stated on the page rather than left for someone to trip over.
+ * How this differs from its neighbours, because three pages count consultations
+ * and the names alone do not say which is which:
+ *
+ *   Consultations   one row per patient. The record.
+ *   Fulfilment      one row per practice, bookings beside billing. The
+ *                   reconciliation.
+ *   Dashboard       one row of totals for the whole agency. The summary.
+ *
+ * Reads the Client Fulfilment Tracker, which is what the page is named after and
+ * what people reasonably expect. It used to read the synced appointments table,
+ * so its bookings disagreed with the dashboard's and there was no way to tell
+ * from the screen which was right. There is no cancelled column because the
+ * tracker does not record cancellations — Closed takes that slot, being the
+ * thing a pay-per-show arrangement is actually about.
  */
 export default async function FulfilmentPage({ searchParams }: PageProps) {
   const range = resolveRange({
@@ -76,13 +72,18 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
   const db = serviceClient();
   const fromIso = range.from.toISOString();
   const toIso = range.to.toISOString();
+  // The tracker stores a date, not a timestamp, so it is filtered on dates.
+  const fromDate = fromIso.slice(0, 10);
+  const toDate = toIso.slice(0, 10);
 
   const [appointments, clientRows, charges, coverage] = await Promise.all([
+    // The tracker, which is what this page is named after and what people
+    // expect it to be reading. It is also the only source with outcomes.
     db
-      .from('appointments')
-      .select('client_id, status, showed, outcome, value_cents, scheduled_at')
-      .gte('booked_at', fromIso)
-      .lte('booked_at', toIso)
+      .from('tracker_appointments')
+      .select('client_id, appointment_status, status_if_showed, booked_for')
+      .gte('booked_for', fromDate)
+      .lte('booked_for', toDate)
       .limit(5000),
     db.from('clients').select('id, name, is_active').order('name'),
     db
@@ -129,9 +130,9 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
       booked: 0,
       showed: 0,
       noShow: 0,
-      cancelled: 0,
       upcoming: 0,
-      caseValueCents: 0,
+      undecided: 0,
+      closed: 0,
       withOutcome: 0,
       collectedCents: 0,
       uncollectedCents: 0,
@@ -140,35 +141,31 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
 
   let booked = 0;
   let showed = 0;
+  const today = new Date().toISOString().slice(0, 10);
 
   for (const appointment of appointments.data ?? []) {
     if (!appointment.client_id) continue;
     const row = rows.get(appointment.client_id);
     if (!row) continue;
 
-    const status = appointment.status as Status;
-    if (isBooked(status)) {
-      row.booked += 1;
-      booked += 1;
-    }
+    row.booked += 1;
+    booked += 1;
 
-    if (status === 'showed') {
+    if (appointment.appointment_status === 'Showed') {
       row.showed += 1;
       showed += 1;
-    } else if (status === 'no_show') {
+    } else if (appointment.appointment_status === 'No Show') {
       row.noShow += 1;
-    } else if (status === 'cancelled') {
-      row.cancelled += 1;
-    } else if (status === 'scheduled' || status === 'confirmed') {
+    } else if (appointment.booked_for !== null && appointment.booked_for > today) {
+      // No status yet and the date has not arrived: still to come, rather than
+      // an appointment nobody bothered to mark up.
       row.upcoming += 1;
+    } else {
+      row.undecided += 1;
     }
 
-    if (appointment.value_cents) row.caseValueCents += appointment.value_cents;
-    // 'pending' is the default the row was created with, so it is the absence of
-    // an answer rather than an answer.
-    if (appointment.outcome && appointment.outcome !== 'pending') {
-      row.withOutcome += 1;
-    }
+    if (appointment.status_if_showed !== null) row.withOutcome += 1;
+    if (appointment.status_if_showed === 'Closed') row.closed += 1;
   }
 
   let collectedCents = 0;
@@ -216,9 +213,11 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
       />
 
       <p className="mb-4 max-w-3xl text-xs text-fg-subtle">
-        Every appointment in GoHighLevel, of every kind — hygiene and recalls
-        included. The dashboard counts only the ad-sourced consultations, so its
-        bookings figure is smaller than this one on purpose.
+        From the Client Fulfilment Tracker, so these figures agree with the
+        dashboard. <span className="text-fg-muted">Consultations</span> lists the
+        same appointments one patient per row; this page groups them by practice
+        and puts the billing beside them, so a consultation that showed up and
+        was never charged for is visible in the same row.
       </p>
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -250,7 +249,7 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
                   <th className="px-4 py-3 text-right font-medium">Booked</th>
                   <th className="px-4 py-3 text-right font-medium">Showed</th>
                   <th className="px-4 py-3 text-right font-medium">No show</th>
-                  <th className="px-4 py-3 text-right font-medium">Cancelled</th>
+                  <th className="px-4 py-3 text-right font-medium">Closed</th>
                   <th className="px-4 py-3 text-right font-medium">Upcoming</th>
                   <th className="px-4 py-3 text-right font-medium">Show rate</th>
                   <th className="px-4 py-3 text-right font-medium">Collected</th>
@@ -288,7 +287,7 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
                         {row.noShow || '—'}
                       </td>
                       <td className="numeric px-4 py-3 text-right text-fg-muted">
-                        {row.cancelled || '—'}
+                        {row.closed || '—'}
                       </td>
                       <td className="numeric px-4 py-3 text-right text-fg-muted">
                         {row.upcoming || '—'}
