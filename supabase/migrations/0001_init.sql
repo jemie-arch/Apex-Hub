@@ -2229,3 +2229,109 @@ comment on column b2b_leads.origin is
   'Where the lead came from, as one of five values rather than free text. The channel column is still free text and still useful for the detail ("Dr Patel at the Boston study club"), but a rate cannot be computed from prose: referral, Referral, ref and word-of-mouth are four different strings and one real answer. This is the column the referral rate is counted from.';
 
 create index if not exists b2b_leads_origin_idx on b2b_leads (origin);
+
+-- ---------------------------------------------------------------------------
+-- Attributing Stripe charges by the consultations they billed for
+--
+-- 107 of 127 charges belonged to nobody -- 84% of the money, $22k of $65k --
+-- which made every per-client revenue figure on the Hub a guess. The cause is
+-- not a bug: Stripe customers are named after the practice owner, so matching a
+-- customer called "Zubad Newaz" to a practice called anything else was never
+-- going to work, and the sync said so honestly.
+--
+-- What it did not use is the evidence already on the row. A charge lists the
+-- consultations it covers, and those patients are attached to a practice. So the
+-- charge can be attributed on that instead of on a name, and one identified
+-- customer then attributes every charge it ever made -- including the ones
+-- carrying no consultation names at all, which is where most of the remaining
+-- money was.
+--
+-- Unanimity is required at both steps. A patient name appearing under two
+-- practices resolves nothing, and a customer whose charges point at two
+-- practices is left alone. Two practices sharing a patient name is rare; billing
+-- one for the other's consultation would not be a rare kind of wrong.
+--
+-- Called at the end of stripe-charges, after the charges are written, because it
+-- works on what is in the table. Idempotent.
+-- ---------------------------------------------------------------------------
+create or replace function attribute_billing_charges()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_customers integer;
+  v_by_customer integer;
+  v_by_patient integer;
+begin
+  create temp table pc on commit drop as
+  select distinct lower(btrim(patient_name)) as patient, client_id
+  from tracker_appointments
+  where client_id is not null and coalesce(btrim(patient_name), '') <> ''
+  union
+  select distinct lower(btrim(patient_name)), client_id
+  from appointments
+  where client_id is not null and coalesce(btrim(patient_name), '') <> '';
+
+  create temp table charge_patient on commit drop as
+  select b.stripe_payment_intent_id as pi, b.stripe_customer_id as cust,
+         lower(btrim(n)) as patient
+  from billing_charges b, unnest(coalesce(b.consult_names, array[]::text[])) as n
+  where btrim(n) <> '';
+
+  with cust_map as (
+    select cp.cust, min(pc.client_id::text)::uuid as client_id
+    from charge_patient cp join pc on pc.patient = cp.patient
+    where cp.cust is not null
+    group by cp.cust
+    having count(distinct pc.client_id) = 1
+  ),
+  saved as (
+    insert into billing_customers (stripe_customer_id, client_id)
+    select cust, client_id from cust_map
+    on conflict (stripe_customer_id) do update
+      set client_id = coalesce(billing_customers.client_id, excluded.client_id)
+      where billing_customers.mapped_by_hand is not true
+    returning 1
+  )
+  select count(*) into v_customers from saved;
+
+  with upd as (
+    update billing_charges b
+    set client_id = c.client_id
+    from billing_customers c
+    where b.client_id is null
+      and c.stripe_customer_id = b.stripe_customer_id
+      and c.client_id is not null
+    returning 1
+  )
+  select count(*) into v_by_customer from upd;
+
+  with resolved as (
+    select cp.pi, min(pc.client_id::text)::uuid as client_id
+    from charge_patient cp join pc on pc.patient = cp.patient
+    join billing_charges b on b.stripe_payment_intent_id = cp.pi
+    where b.client_id is null
+    group by cp.pi
+    having count(distinct pc.client_id) = 1
+  ),
+  upd2 as (
+    update billing_charges b
+    set client_id = r.client_id
+    from resolved r
+    where b.stripe_payment_intent_id = r.pi and b.client_id is null
+    returning 1
+  )
+  select count(*) into v_by_patient from upd2;
+
+  return jsonb_build_object(
+    'customers_mapped', v_customers,
+    'charges_by_customer', v_by_customer,
+    'charges_by_patient', v_by_patient
+  );
+end;
+$fn$;
+
+revoke all on function attribute_billing_charges() from public;
+grant execute on function attribute_billing_charges() to service_role;

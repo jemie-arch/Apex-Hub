@@ -289,10 +289,45 @@ export async function syncStripeCharges(ctx: SyncContext): Promise<void> {
     );
   }
 
+  /*
+   * Attribute what the name matching could not.
+   *
+   * Stripe customers are named after the practice owner, so guessing from the
+   * name gets nowhere for most of them — it left 107 of 127 charges, 84% of the
+   * money, belonging to nobody. But a charge lists the consultations it covers,
+   * and those patients are already attached to a practice, so the charge can be
+   * attributed on evidence instead of on a name.
+   *
+   * Runs after the charges are written, because it works on what is in the
+   * table. Unanimity is required, so a patient seen at two practices resolves
+   * nothing rather than guessing.
+   */
+  const attributed = await db.rpc('attribute_billing_charges');
+
+  if (attributed.error) {
+    ctx.recordError('could not attribute charges by consultation', {
+      detail: attributed.error.message,
+    });
+  } else {
+    ctx.note('attribution', attributed.data);
+  }
+
+  const stillUnmapped = await db
+    .from('billing_charges')
+    .select('stripe_payment_intent_id', { count: 'exact', head: true })
+    .is('client_id', null);
+
+  if ((stillUnmapped.count ?? 0) > 0) {
+    ctx.log(
+      `${stillUnmapped.count} charge(s) still belong to nobody — most carry no ` +
+        'consultation names, so they can only be mapped by hand on /billing',
+    );
+  }
+
   if (unmapped > 0) {
     ctx.log(
-      `${unmapped} Stripe customer(s) are not mapped to a client — ` +
-        'map them on /billing so their charges are attributed',
+      `${unmapped} Stripe customer(s) could not be matched on name or email; ` +
+        'the consultation-based pass above may still have attributed their charges',
     );
   }
 }

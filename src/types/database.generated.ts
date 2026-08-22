@@ -2447,6 +2447,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attribute_billing_charges: { Args: never; Returns: Json }
       auth_group_id: { Args: never; Returns: string }
       auth_is_admin: { Args: never; Returns: boolean }
       auth_role: {
