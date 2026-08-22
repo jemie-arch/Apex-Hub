@@ -53,14 +53,18 @@ function isBooked(status: Status): boolean {
 /**
  * The fulfilment tracker, per client.
  *
- * This is the Google Sheet's Stats Dashboard rebuilt on the database, and it
- * deliberately shows less than the sheet's column headings promise. The sheet
- * has columns for cost per lead, cost per booking and best performing ad; the
- * data behind them does not exist yet — see the panel at the foot, which names
- * each gap and its cause rather than rendering a zero that reads as a fact.
+ * The Google Sheet's Stats Dashboard rebuilt on the database, and it still shows
+ * less than the sheet's column headings promise — see the panel at the foot,
+ * which names each remaining gap and its cause rather than rendering a zero that
+ * reads as a fact. A blank column invites someone to conclude the number is
+ * nought; a stated gap invites them to go and fix it.
  *
- * That distinction is the whole point. A blank column invites someone to
- * conclude the number is zero; a stated gap invites them to go and fix it.
+ * This page counts EVERY appointment GoHighLevel holds, which is why its
+ * bookings exceed the dashboard's. The dashboard counts the ad-sourced
+ * consultations from the tracker, because only those have outcomes; this page
+ * needs the synced table instead, because cancelled and upcoming are statuses
+ * the spreadsheet does not record at all. Two questions, two sources, and the
+ * difference is stated on the page rather than left for someone to trip over.
  */
 export default async function FulfilmentPage({ searchParams }: PageProps) {
   const range = resolveRange({
@@ -184,43 +188,22 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
     .filter((row) => row.booked > 0 || row.isActive)
     .sort((a, b) => b.booked - a.booked || a.name.localeCompare(b.name));
 
-  const outcomesRecorded = [...rows.values()].reduce(
-    (sum, row) => sum + row.withOutcome,
-    0,
-  );
-
   const client = tenant.vocabulary.client;
 
   const gaps = [
     {
-      metric: 'Best performing ad, for bookings from today',
-      cause: `No live appointment carries a campaign or ad id — ${formatCount(attributed.count ?? 0)} of ${formatCount(allAppointments.count ?? 0)}. The UTM template from the SOP is not reaching GoHighLevel's attribution. The spreadsheet history imported alongside this does carry ids on ${formatCount(trackerAttributed.count ?? 0)} bookings and ${formatCount(trackerLeads.count ?? 0)} leads, so the question is answerable for the past and not for the present — the capture, not the reporting, is what is broken.`,
+      metric: 'Attribution on bookings taken from today onward',
+      cause: `The tracker carries a campaign id on ${formatCount(trackerAttributed.count ?? 0)} bookings and ${formatCount(trackerLeads.count ?? 0)} leads, so spend can be joined to a booking for the imported period. The live GoHighLevel sync carries one on ${formatCount(attributed.count ?? 0)} of ${formatCount(allAppointments.count ?? 0)}, because the UTM template from the SOP is not reaching its attribution. So the spreadsheet answers this and the CRM does not, which means the answer stops the day someone stops maintaining the sheet.`,
     },
     {
-      metric: 'Cost per lead · cost per booking',
+      metric: 'Impressions · clicks · reach',
       cause:
-        'The spreadsheet has an Amount Spent column, but it is used two ways: on 43 practice-months one figure is repeated across every row, which is a monthly total, and on 36 it varies row to row. Summed it reads $1.34m, counted once per month $498k, and nothing in the sheet says which is meant. The column is imported verbatim and deliberately not divided by anything.',
+        'The tracker records spend and leads per ad per day but not impressions, clicks or reach, so click-through and cost per click cannot be worked out from it. Those need the ad platforms themselves, through Windsor.',
     },
     {
-      metric: 'Ad spend · impressions · clicks',
+      metric: 'Case value · revenue · return on ad spend',
       cause:
-        (adRows.count ?? 0) === 0
-          ? 'No ad data has been imported from the ad platforms. 44 active locations have no ad account mapped, and the Windsor sync returned nothing for the 20 that do.'
-          : `${formatCount(adRows.count ?? 0)} ad-day rows imported.`,
-    },
-    {
-      metric: 'Dials · pickup rate · speed to lead',
-      cause:
-        (callRows.count ?? 0) === 0
-          ? 'No call data has been imported. The HotProspector feed the SOP describes has no equivalent here yet, and the GoHighLevel calls sync has never run.'
-          : `${formatCount(callRows.count ?? 0)} calls imported.`,
-    },
-    {
-      metric: 'Close rate · case value',
-      cause:
-        outcomesRecorded === 0
-          ? 'No consultation has an outcome recorded. Every row still reads "pending", which is the default it was created with rather than an answer, so nothing can be counted as won or lost.'
-          : `${formatCount(outcomesRecorded)} consultations have an outcome recorded.`,
+        'The tracker records that a consultation closed but never what it was worth, and the synced appointments carry a case value on none of their rows. So close rate is now answerable and revenue is not — the missing figure is money, and no amount of joining fixes a number nobody wrote down.',
     },
   ];
 
@@ -231,6 +214,12 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
         description={`What each ${client.singular} got · ${range.label}`}
         actions={<DateRangePicker />}
       />
+
+      <p className="mb-4 max-w-3xl text-xs text-fg-subtle">
+        Every appointment in GoHighLevel, of every kind — hygiene and recalls
+        included. The dashboard counts only the ad-sourced consultations, so its
+        bookings figure is smaller than this one on purpose.
+      </p>
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard label="Booked" value={formatCount(booked)} />
@@ -335,9 +324,12 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
           <AlertTriangle size={14} /> Not shown, and why
         </h2>
         <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
-          The tracker this replaces has columns for these. They are absent rather
-          than zero — a blank column invites the conclusion that the number is
-          nought, which would be worse than saying nothing.
+          Absent rather than zero — a blank column invites the conclusion that
+          the number is nought, which would be worse than saying nothing. The
+          list is shorter than it was: {formatCount(adRows.count ?? 0)} ad-days
+          of spend and {formatCount(callRows.count ?? 0)} calls have since been
+          imported from tabs of the same spreadsheet, which is where they had
+          been all along.
         </p>
         <dl className="mt-4 space-y-3">
           {gaps.map((gap) => (
