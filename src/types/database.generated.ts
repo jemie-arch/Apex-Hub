@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Generated from the live database. Do not edit by hand.
  *
  * Regenerate after any migration; the app's Supabase clients are typed from
@@ -517,6 +517,132 @@ export type Database = {
             columns: ["owner_user_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_charges: {
+        Row: {
+          amount_cents: number
+          client_id: string | null
+          consult_count: number
+          consult_names: string[]
+          created_at: string
+          currency: string
+          decline_code: string | null
+          description: string | null
+          error_code: string | null
+          error_message: string | null
+          occurred_at: string
+          outcome: Database["public"]["Enums"]["billing_outcome"]
+          stripe_customer_id: string | null
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string
+          stripe_status: string
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          client_id?: string | null
+          consult_count?: number
+          consult_names?: string[]
+          created_at?: string
+          currency?: string
+          decline_code?: string | null
+          description?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          occurred_at: string
+          outcome: Database["public"]["Enums"]["billing_outcome"]
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id: string
+          stripe_status: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          client_id?: string | null
+          consult_count?: number
+          consult_names?: string[]
+          created_at?: string
+          currency?: string
+          decline_code?: string | null
+          description?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          occurred_at?: string
+          outcome?: Database["public"]["Enums"]["billing_outcome"]
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string
+          stripe_status?: string
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_charges_stripe_customer_id_fkey"
+            columns: ["stripe_customer_id"]
+            isOneToOne: false
+            referencedRelation: "billing_customers"
+            referencedColumns: ["stripe_customer_id"]
+          },
+        ]
+      }
+      billing_customers: {
+        Row: {
+          client_id: string | null
+          email: string | null
+          first_seen_at: string
+          group_id: string | null
+          mapped_by_hand: boolean
+          name: string | null
+          stripe_customer_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          email?: string | null
+          first_seen_at?: string
+          group_id?: string | null
+          mapped_by_hand?: boolean
+          name?: string | null
+          stripe_customer_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          email?: string | null
+          first_seen_at?: string
+          group_id?: string | null
+          mapped_by_hand?: boolean
+          name?: string | null
+          stripe_customer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_customers_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -1764,6 +1890,9 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       generate_portal_token: { Args: never; Returns: string }
+      ghl_get: { Args: { p_location: string; p_path: string }; Returns: number }
+      ghl_get_agency: { Args: { p_path: string }; Returns: number }
+      stripe_get: { Args: { p_path: string }; Returns: number }
     }
     Enums: {
       appointment_outcome:
@@ -1780,6 +1909,7 @@ export type Database = {
         | "no_show"
         | "cancelled"
         | "rescheduled"
+      billing_outcome: "succeeded" | "failed" | "pending" | "canceled"
       call_direction: "outbound" | "inbound"
       call_outcome:
         | "connected"
@@ -1971,6 +2101,7 @@ export const Constants = {
         "cancelled",
         "rescheduled",
       ],
+      billing_outcome: ["succeeded", "failed", "pending", "canceled"],
       call_direction: ["outbound", "inbound"],
       call_outcome: [
         "connected",
@@ -2027,3 +2158,4 @@ export const Constants = {
     },
   },
 } as const
+

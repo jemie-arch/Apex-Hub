@@ -35,6 +35,24 @@ const serverSchema = z.object({
   WINDSOR_API_KEY: z.string().min(1).optional(),
   WINDSOR_API_BASE: z.string().url().default('https://connectors.windsor.ai'),
 
+  /**
+   * Stripe restricted key, read scopes only — this is how the billing page
+   * learns which charges succeeded and which were declined.
+   *
+   * The `rk_` prefix is enforced rather than suggested. A secret key (sk_)
+   * would work identically for reads while also granting the ability to charge
+   * cards and issue refunds, and nothing in this app needs that. Pasting one in
+   * fails the deploy instead of quietly widening the blast radius.
+   */
+  STRIPE_RESTRICTED_KEY: z
+    .string()
+    .startsWith(
+      'rk_',
+      'must be a Stripe restricted key (rk_…). Secret keys (sk_…) grant write ' +
+        'access and are rejected on purpose',
+    )
+    .optional(),
+
   /** Shared secret the cron routes require. Long enough not to be guessed. */
   CRON_SECRET: z.string().min(24, 'use at least 24 characters'),
 
@@ -185,6 +203,28 @@ export function windsorCredentials(): WindsorCredentials {
   }
 
   return { apiKey: env.WINDSOR_API_KEY, apiBase: env.WINDSOR_API_BASE };
+}
+
+export interface StripeCredentials {
+  apiKey: string;
+}
+
+/**
+ * The Stripe restricted key, or a loud error. Same contract as the others:
+ * missing configuration stops the billing sync, never a boot.
+ */
+export function stripeCredentials(): StripeCredentials {
+  const env = serverEnv();
+
+  if (!env.STRIPE_RESTRICTED_KEY) {
+    throw new Error(
+      'Stripe is not configured: STRIPE_RESTRICTED_KEY is not set, so charge ' +
+        'outcomes cannot be read. Create a restricted key in Stripe with read ' +
+        'access to payment intents, charges, invoices and customers, then retry.',
+    );
+  }
+
+  return { apiKey: env.STRIPE_RESTRICTED_KEY };
 }
 
 /** The two values the browser is allowed to see. */

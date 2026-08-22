@@ -135,10 +135,27 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       // Enrich from the contact record: name, phone and the attribution that
       // makes /ads-performance mean anything.
       let contact = null;
+      /*
+       * Enrich once, not forever.
+       *
+       * This used to also re-request whenever utm_source was null, which read
+       * as "retry until we have attribution". But almost no contact here HAS
+       * attribution — see the contact_shape note below — so that condition was
+       * permanently true, and the lookup budget was spent re-fetching the same
+       * few hundred bookings on every run. 2,398 appointments had 200 names
+       * between them and were never going to gain more, while the run kept
+       * reporting that "the rest will be enriched on the next pass".
+       *
+       * patient_name is the right sentinel: any contact that exists has one, so
+       * its presence means this booking has already been through enrichment and
+       * a missing utm_source is the answer rather than a gap. Each run now
+       * spends its budget on bookings it has never looked at, and the backlog
+       * actually drains.
+       */
       const needsContact =
         event.contactId !== null &&
         contactLookups < MAX_CONTACT_LOOKUPS &&
-        (!current || current.patient_name === null || current.utm_source === null);
+        (!current || current.patient_name === null);
 
       if (needsContact && event.contactId) {
         try {
@@ -304,11 +321,27 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
 
   ctx.note('contact_lookups', contactLookups);
 
+  /*
+   * How much backlog is left.
+   *
+   * Recorded every run so "the rest catch up on the next pass" is a claim
+   * somebody can check rather than take on trust. If this number does not fall
+   * between runs, enrichment is stuck again and the reason will be a condition
+   * like the one that used to be here.
+   */
+  const backlog = await db
+    .from('appointments')
+    .select('id', { count: 'exact', head: true })
+    .is('patient_name', null);
+
+  if (!backlog.error) ctx.note('awaiting_contact_enrichment', backlog.count ?? 0);
+
   if (contactLookups >= MAX_CONTACT_LOOKUPS) {
     // Say so out loud rather than letting a partial enrichment look complete.
     ctx.recordError(
-      `contact lookup cap of ${MAX_CONTACT_LOOKUPS} reached — some bookings ` +
-        'are missing attribution and will be enriched on the next run',
+      `contact lookup cap of ${MAX_CONTACT_LOOKUPS} reached — ` +
+        `${backlog.count ?? 'some'} booking(s) still await enrichment and are ` +
+        'picked up on the next run',
     );
   }
 }

@@ -90,6 +90,7 @@ const SYNC_GROUPS: Record<string, string> = {
   'crm-deals': 'crm',
   'crm-calls': 'calls',
   'windsor-ads': 'ads',
+  'stripe-charges': 'billing',
 };
 
 /**

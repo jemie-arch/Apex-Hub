@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:verify": "tsx scripts/db-verify.ts",
     "sync:crm": "tsx scripts/sync-crm.ts",
-    "sync:ads": "tsx scripts/sync-ads.ts"
+    "sync:ads": "tsx scripts/sync-ads.ts",
+    "sync:billing": "tsx scripts/sync-billing.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
