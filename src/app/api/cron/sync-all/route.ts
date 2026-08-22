@@ -37,6 +37,11 @@ export const maxDuration = 300;
  */
 const ORDER = [
   'crm-clients',
+  // After clients so the agency token and location rows exist, and early enough
+  // that a scope granted this morning repairs the backlog today rather than
+  // waiting on somebody noticing a button.
+  'provision-pending',
+  'onboarding-calls',
   'crm-appointments',
   'crm-deals',
   'crm-calls',
