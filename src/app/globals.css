@@ -344,3 +344,19 @@ body > * {
     box-shadow: inset 2px 0 0 0 var(--accent);
   }
 }
+
+/* The wordmark is white on transparency, so it is invisible on a light
+   background. Inverting is safe only because it is monochrome — the same
+   trick on a colour logo would produce something unrecognisable. */
+.logo-mark {
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+:root[data-theme='light'] .logo-mark {
+  filter: invert(1);
+}
+
+a:hover > .logo-mark,
+button:hover > .logo-mark {
+  opacity: 0.85;
+}

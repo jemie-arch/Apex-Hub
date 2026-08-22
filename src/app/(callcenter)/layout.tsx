@@ -2,6 +2,7 @@ import { PhoneCall } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { Logo } from '@/components/shell/Logo';
 import { PortalSwitcher } from '@/components/shell/PortalSwitcher';
 import { currentCaller } from '@/lib/supabase/server';
 
@@ -32,7 +33,9 @@ export default async function CallCenterLayout({
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg">
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
+          <Logo width={112} height={28} priority />
+          <span className="h-6 w-px bg-line" aria-hidden />
           <span
             className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-contrast"
             aria-hidden

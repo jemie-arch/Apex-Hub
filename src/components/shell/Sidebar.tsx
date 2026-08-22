@@ -46,6 +46,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
+import { Logo } from '@/components/shell/Logo';
 import { ThemeToggle, type Theme } from '@/components/shell/ThemeToggle';
 import { permissionForPath } from '@/config/permissions';
 import { tenant } from '@/config/tenant.config';
@@ -217,7 +218,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={cn(
-        'mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
+        'mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 text-sm',
         'transition-all duration-200',
         active
           ? 'bg-accent-subtle font-medium text-accent shadow-[inset_2px_0_0_0_var(--accent)]'
@@ -355,24 +356,16 @@ export function Sidebar({
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-line bg-surface">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <span
-          className={cn(
-            'flex h-8 w-8 items-center justify-center rounded-md',
-            'bg-accent text-sm font-semibold text-accent-contrast',
-          )}
-          aria-hidden
-        >
-          {tenant.company.initial}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-fg">
-            {tenant.company.name}
-          </p>
-          <p className="truncate text-xs text-fg-subtle">
-            {tenant.company.tagline}
-          </p>
-        </div>
+      {/*
+        The wordmark carries the company name itself, so repeating it as text
+        beside the logo would say the same thing twice. The tagline stays,
+        because the mark does not carry that.
+      */}
+      <div className="px-5 py-5">
+        <Logo width={150} height={38} priority />
+        <p className="mt-1.5 truncate text-xs text-fg-subtle">
+          {tenant.company.tagline}
+        </p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pb-4">

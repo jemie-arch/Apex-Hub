@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { PortalNav } from '@/components/portal/PortalNav';
+import { Logo } from '@/components/shell/Logo';
 import { tenant } from '@/config/tenant.config';
 import { resolvePortal } from '@/lib/portal';
 
@@ -35,20 +36,15 @@ export default async function PortalLayout({
     <main className="min-h-screen bg-bg">
       <div className="mx-auto max-w-6xl px-6 py-10">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
-              {tenant.company.name}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-fg">
-              {portal.group.name}
-            </h1>
-          </div>
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-sm font-semibold text-accent-contrast"
-            aria-hidden
-          >
-            {tenant.company.initial}
-          </span>
+          {/*
+            The practice's own name is the heading here, not Apex's — this page
+            belongs to them. The wordmark says who is reporting, which is why it
+            sits opposite as a signature rather than above as a title.
+          */}
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            {portal.group.name}
+          </h1>
+          <Logo width={128} height={32} />
         </header>
 
         <PortalNav token={params.token} />
