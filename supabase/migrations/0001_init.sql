@@ -2081,3 +2081,22 @@ create unique index if not exists tracker_leads_source_tab_row_key
 
 comment on column tracker_leads.source_tab is
   'Which sheet of the Client Fulfilment Tracker the row came from. "Leads Data" and "Leads Data Old" have overlapping row numbers, so the row number alone is not an identity.';
+
+-- ---------------------------------------------------------------------------
+-- What GoHighLevel actually said the stage was
+--
+-- /opportunities/search returns pipelineStageId and no stage name, so the sync
+-- had nothing to match against its keyword list or the configured stage map.
+-- Every one of the 29 opportunities fell through to 'new', and the b2b board
+-- read as a pipeline full of untouched leads. The sync now resolves names from
+-- /opportunities/pipelines, and keeps the raw name and pipeline here beside the
+-- mapped stage so the next mapping failure is visible instead of silent.
+-- ---------------------------------------------------------------------------
+alter table deals
+  add column if not exists pipeline_name text,
+  add column if not exists stage_name text;
+
+comment on column deals.stage_name is
+  'The stage name GoHighLevel gave, kept beside the mapped deal_stage. /opportunities/search returns only a stage id, so this is resolved from the pipeline list -- without it a mapping failure is invisible and every deal reads "new".';
+comment on column deals.pipeline_name is
+  'Which pipeline in the b2b sub-account the opportunity sits in. That sub-account has more than one, and they mean different things.';

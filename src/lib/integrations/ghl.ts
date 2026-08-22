@@ -603,8 +603,13 @@ export interface GhlOpportunity {
   contactPhone: string | null;
   /** 'open' | 'won' | 'lost' | 'abandoned' in GoHighLevel's vocabulary. */
   status: string | null;
+  pipelineId: string | null;
   /** Pipeline stage id; names are per-pipeline and resolved by the sync. */
   stageId: string | null;
+  /**
+   * Only sometimes present. /opportunities/search returns the id and not the
+   * name, so the sync resolves it from listPipelines and this stays null.
+   */
   stageName: string | null;
   monetaryValue: number | null;
   assignedUserId: string | null;
@@ -618,19 +623,91 @@ export interface GhlOpportunity {
  * Which location that is comes from app_settings.b2b_location_id, because the
  * agency's pipeline is just another sub-account and only a human knows which.
  */
+export interface GhlPipeline {
+  id: string;
+  name: string;
+  stages: Array<{ id: string; name: string }>;
+}
+
+/**
+ * The pipelines in one location, with their stages.
+ *
+ * Needed because /opportunities/search returns pipelineStageId and no stage
+ * name. Without this the stage of every deal is an opaque id, which is how the
+ * whole b2b pipeline came to be filed under 'new'.
+ */
+export async function listPipelines(
+  clientId: string | null,
+  locationId: string,
+): Promise<GhlPipeline[]> {
+  const { accessToken } = await getToken(clientId);
+
+  const payload = await request<{ pipelines?: unknown[] }>(
+    accessToken,
+    '/opportunities/pipelines',
+    { locationId },
+  );
+
+  const rows = Array.isArray(payload.pipelines) ? payload.pipelines : [];
+
+  return rows.flatMap((row) => {
+    if (typeof row !== 'object' || row === null) return [];
+    const record = row as Record<string, unknown>;
+
+    const id = asString(record['id']);
+    if (!id) return [];
+
+    const stageRows = Array.isArray(record['stages']) ? record['stages'] : [];
+
+    return [
+      {
+        id,
+        name: asString(record['name']) ?? 'Unnamed pipeline',
+        stages: stageRows.flatMap((stage) => {
+          if (typeof stage !== 'object' || stage === null) return [];
+          const s = stage as Record<string, unknown>;
+          const stageId = asString(s['id']);
+          if (!stageId) return [];
+          return [{ id: stageId, name: asString(s['name']) ?? '' }];
+        }),
+      },
+    ];
+  });
+}
+
+/** Pages of 100, capped. A silent truncation is worse than a slow sync. */
+const OPPORTUNITY_PAGE_LIMIT = 100;
+const OPPORTUNITY_MAX_PAGES = 20;
+
 export async function listOpportunities(
   clientId: string | null,
   locationId: string,
 ): Promise<GhlOpportunity[]> {
   const { accessToken } = await getToken(clientId);
 
-  const payload = await request<{ opportunities?: unknown[] }>(
-    accessToken,
-    '/opportunities/search',
-    { location_id: locationId, limit: '100' },
-  );
+  /*
+   * Paged. The first version asked for one page of 100 and returned it as if it
+   * were the whole pipeline, so a pipeline with 101 opportunities would have
+   * reported 100 and nobody would have known which one was missing.
+   */
+  const rows: unknown[] = [];
 
-  const rows = Array.isArray(payload.opportunities) ? payload.opportunities : [];
+  for (let page = 1; page <= OPPORTUNITY_MAX_PAGES; page += 1) {
+    const payload = await request<{ opportunities?: unknown[] }>(
+      accessToken,
+      '/opportunities/search',
+      {
+        location_id: locationId,
+        limit: String(OPPORTUNITY_PAGE_LIMIT),
+        page: String(page),
+      },
+    );
+
+    const batch = Array.isArray(payload.opportunities) ? payload.opportunities : [];
+    rows.push(...batch);
+
+    if (batch.length < OPPORTUNITY_PAGE_LIMIT) break;
+  }
 
   return rows.flatMap((row) => {
     if (typeof row !== 'object' || row === null) return [];
@@ -660,6 +737,7 @@ export async function listOpportunities(
         contactEmail: asString(contact['email']),
         contactPhone: asString(contact['phone']),
         status: asString(record['status']),
+        pipelineId: asString(record['pipelineId']),
         stageId: asString(record['pipelineStageId']),
         stageName: asString(record['pipelineStageName']),
         monetaryValue:

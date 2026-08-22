@@ -1313,9 +1313,11 @@ export type Database = {
           next_follow_up_at: string | null
           origin: Database["public"]["Enums"]["lead_origin"]
           owner_user_id: string | null
+          pipeline_name: string | null
           practice_name: string
           source: string | null
           stage: Database["public"]["Enums"]["deal_stage"]
+          stage_name: string | null
           synced_at: string | null
           tags: string[]
           updated_at: string
@@ -1344,9 +1346,11 @@ export type Database = {
           next_follow_up_at?: string | null
           origin?: Database["public"]["Enums"]["lead_origin"]
           owner_user_id?: string | null
+          pipeline_name?: string | null
           practice_name: string
           source?: string | null
           stage?: Database["public"]["Enums"]["deal_stage"]
+          stage_name?: string | null
           synced_at?: string | null
           tags?: string[]
           updated_at?: string
@@ -1375,9 +1379,11 @@ export type Database = {
           next_follow_up_at?: string | null
           origin?: Database["public"]["Enums"]["lead_origin"]
           owner_user_id?: string | null
+          pipeline_name?: string | null
           practice_name?: string
           source?: string | null
           stage?: Database["public"]["Enums"]["deal_stage"]
+          stage_name?: string | null
           synced_at?: string | null
           tags?: string[]
           updated_at?: string

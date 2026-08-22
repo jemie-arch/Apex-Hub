@@ -16,7 +16,11 @@
  */
 import type { DealRow, DealStage } from '@/types/database';
 
-import { listOpportunities, type GhlOpportunity } from '@/lib/integrations/ghl';
+import {
+  listOpportunities,
+  listPipelines,
+  type GhlOpportunity,
+} from '@/lib/integrations/ghl';
 import { authoritative, humanOwned } from '@/lib/sync/merge';
 import { classifyOrigin } from '@/config/lead-origin';
 import { getContact } from '@/lib/integrations/ghl';
@@ -59,6 +63,7 @@ const DEFAULT_STAGE_KEYWORDS: ReadonlyArray<[string, DealStage]> = [
 
 function mapStage(
   opportunity: GhlOpportunity,
+  stageName: string | null,
   overrides: Record<string, string>,
 ): DealStage {
   // A closed opportunity is closed regardless of which stage it sits in.
@@ -66,7 +71,7 @@ function mapStage(
   if (status === 'won') return 'won';
   if (status === 'lost' || status === 'abandoned') return 'lost';
 
-  const name = (opportunity.stageName ?? '').toLowerCase();
+  const name = (stageName ?? '').toLowerCase();
 
   const override = overrides[name] ?? (opportunity.stageId ? overrides[opportunity.stageId] : undefined);
   if (override && isDealStage(override)) return override;
@@ -145,8 +150,38 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
     return;
   }
 
+  /*
+   * The stage names, which the opportunity itself does not carry.
+   *
+   * /opportunities/search returns pipelineStageId and no name, so every stage
+   * arrived as an opaque id, matched nothing in the keyword list or the
+   * configured map, and fell through to 'new'. That is why the entire b2b
+   * pipeline read as untouched new leads. A failure here is recorded rather than
+   * fatal: the deals are still worth importing with their stage unresolved, and
+   * the run says so instead of quietly filing them all under 'new' again.
+   */
+  const stageNameById = new Map<string, string>();
+  const pipelineNameByStageId = new Map<string, string>();
+
+  try {
+    for (const pipeline of await listPipelines(owner.data?.id ?? null, locationId)) {
+      for (const stage of pipeline.stages) {
+        stageNameById.set(stage.id, stage.name);
+        pipelineNameByStageId.set(stage.id, pipeline.name);
+      }
+    }
+  } catch (error) {
+    ctx.recordError('could not read the pipeline stages, so stages are unresolved', {
+      locationId,
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   ctx.counts.read = opportunities.length;
-  ctx.log(`${opportunities.length} opportunity(ies) from ${locationId}`);
+  ctx.log(
+    `${opportunities.length} opportunity(ies) from ${locationId}, ` +
+      `${stageNameById.size} stage(s) named`,
+  );
 
   const ids = opportunities.map((row) => row.id);
   const existing = ids.length
@@ -197,13 +232,18 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
   const originCounts = new Map<string, number>();
 
   for (const opportunity of opportunities) {
-    const stage = mapStage(opportunity, overrides);
-    if (
-      stage === 'new' &&
-      opportunity.stageName &&
-      !(opportunity.stageName.toLowerCase() in overrides)
-    ) {
-      unmappedStages.add(opportunity.stageName);
+    const stageName =
+      opportunity.stageName ??
+      (opportunity.stageId ? (stageNameById.get(opportunity.stageId) ?? null) : null);
+    const pipelineName = opportunity.stageId
+      ? (pipelineNameByStageId.get(opportunity.stageId) ?? null)
+      : null;
+
+    const stage = mapStage(opportunity, stageName, overrides);
+    if (stage === 'new' && (stageName ?? '').toLowerCase() !== 'new lead') {
+      // Named or not. An id with no name is the more serious case, so it is
+      // reported as one rather than skipped.
+      unmappedStages.add(stageName ?? `unnamed stage ${opportunity.stageId ?? '?'}`);
     }
 
     const valueCents =
@@ -225,6 +265,7 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
      * classified.
      */
     let tags: string[] = [];
+    let contactRead = false;
     let origin = classifyOrigin({
       tags: [],
       source: opportunity.source,
@@ -249,6 +290,7 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
           opportunity.contactId,
         );
         if (contact) {
+          contactRead = true;
           tags = contact.tags;
           origin = classifyOrigin({
             tags: contact.tags,
@@ -279,6 +321,8 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
       contact_email: opportunity.contactEmail,
       contact_phone: opportunity.contactPhone,
       stage,
+      stage_name: stageName,
+      pipeline_name: pipelineName,
       value_cents: valueCents,
       owner_user_id: ownerUserId,
       source: opportunity.source,
@@ -299,6 +343,10 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
           'contact_email',
           'contact_phone',
           'stage',
+          'stage_name',
+          'pipeline_name',
+          'tags',
+          'origin',
           'value_cents',
           'owner_user_id',
           'source',
@@ -328,10 +376,18 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
         'crm_contact_id',
         'practice_name',
         'stage',
+        'stage_name',
+        'pipeline_name',
         'value_cents',
         'owner_user_id',
         'synced_at',
       ]),
+      /*
+       * Only when the contact was actually read this run. With the lookup budget
+       * spent, the tag list is empty and the origin is a guess from the source field
+       * alone, and writing that would erase a referral somebody had tagged.
+       */
+      ...(contactRead ? authoritative(incoming, ['tags', 'origin']) : {}),
       // Contact details and the lost reason may have been typed by a person.
       ...humanOwned(current, incoming, [
         'contact_name',
