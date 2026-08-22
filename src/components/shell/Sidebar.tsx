@@ -362,7 +362,7 @@ export function Sidebar({
         because the mark does not carry that.
       */}
       <div className="px-5 py-5">
-        <Logo width={150} height={38} priority />
+        <Logo height={30} priority />
         <p className="mt-1.5 truncate text-xs text-fg-subtle">
           {tenant.company.tagline}
         </p>

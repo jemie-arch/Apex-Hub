@@ -6,41 +6,43 @@ import { cn } from '@/lib/cn';
 /**
  * The Apex wordmark.
  *
- * The asset is a white monochrome mark on transparency, which means it is
- * invisible on the light theme. Rather than ask for a second file, it is
- * inverted by CSS under light — safe precisely because it is monochrome, where
- * inverting a colour logo would produce something unrecognisable.
- *
  * Served from /public rather than hot-linked from the GoHighLevel CDN: the
- * header of every page should not depend on somebody else's uptime, and a local
- * file is cached alongside the rest of the app.
+ * header of every page should not depend on somebody else's uptime.
  *
- * The file carries a wide transparent margin of its own, so the box is sized to
- * the mark rather than the image and object-contain does the rest.
+ * The file supplied carried a wide transparent margin — the mark occupied about
+ * half the canvas — so setting a height made it render at half the size asked
+ * for. This is the same artwork with the empty alpha trimmed off, which is why
+ * the caller can now say "34px tall" and get 34 pixels of logo.
+ *
+ * It is a white monochrome mark, invisible on a light background, so
+ * `logo-mark` in globals.css inverts it under the light theme. Safe only because
+ * it is monochrome; inverting a colour logo would produce something
+ * unrecognisable.
  */
+
+/** The trimmed artwork's own proportions, so no caller has to do this sum. */
+const RATIO = 1759 / 629;
+
 export function Logo({
   className,
-  width = 132,
   height = 34,
   priority = false,
 }: {
   className?: string;
-  width?: number;
+  /** Rendered height in pixels. Width follows from the artwork's ratio. */
   height?: number;
   priority?: boolean;
 }) {
+  const width = Math.round(height * RATIO);
+
   return (
     <Image
-      src="/apex-logo.webp"
+      src="/apex-logo.png"
       alt={tenant.company.name}
       width={width}
       height={height}
       priority={priority}
-      // logo-mark is defined in globals.css and inverts under the light theme.
-      // Not a Tailwind `dark:` variant, because this app themes by a data-theme
-      // attribute rather than a class, so `dark:` would never fire.
-      className={cn('logo-mark h-auto w-auto object-contain', className)}
-      style={{ maxWidth: width, maxHeight: height }}
+      className={cn('logo-mark object-contain', className)}
     />
   );
 }

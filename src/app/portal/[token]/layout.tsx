@@ -44,7 +44,7 @@ export default async function PortalLayout({
           <h1 className="text-2xl font-semibold tracking-tight text-fg">
             {portal.group.name}
           </h1>
-          <Logo width={128} height={32} />
+          <Logo height={24} />
         </header>
 
         <PortalNav token={params.token} />

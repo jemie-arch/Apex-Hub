@@ -34,7 +34,7 @@ export default async function CallCenterLayout({
     <div className="flex h-screen flex-col overflow-hidden bg-bg">
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-3">
         <div className="flex items-center gap-3">
-          <Logo width={112} height={28} priority />
+          <Logo height={22} priority />
           <span className="h-6 w-px bg-line" aria-hidden />
           <span
             className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-contrast"

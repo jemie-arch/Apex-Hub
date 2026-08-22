@@ -16,7 +16,7 @@ export default function SetPasswordPage() {
     <main className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          <Logo width={170} height={44} priority />
+          <Logo height={34} priority />
           <p className="mt-2 text-xs text-fg-subtle">{tenant.company.tagline}</p>
         </div>
 
