@@ -296,14 +296,40 @@ export async function provisionFromSubmission(input: {
       scopeProblem: scope,
     });
 
+    /*
+     * The one failure worth naming, because it is structural rather than
+     * transient and no amount of retrying fixes it.
+     *
+     * Custom values are location scoped, so they need a token belonging to the
+     * new sub-account. That token is minted from the marketplace app's agency
+     * install — and the install covers a fixed set of sub-accounts, chosen when
+     * it was authorised. An account created seconds ago is not in that set, so
+     * the mint is refused with "accessToken does not have access to following",
+     * the fall-back to the agency credential is refused as out of scope, and the
+     * message that reaches the screen is "not authorized for this scope" —
+     * which reads as a missing permission and sends everyone to re-grant scopes
+     * that were never missing.
+     */
+    const mintRefused = detail.includes('no location token could be minted');
+
     return {
       ok: false,
       status: 'created',
       locationId,
-      message:
-        `The sub-account was created (${locationId}) but its custom values were ` +
-        `not written: ${detail}. Retry configures that same account rather than ` +
-        'creating another.',
+      message: mintRefused
+        ? `The sub-account was created (${locationId}), but its custom values ` +
+          'could not be written, and retrying will not change that. GoHighLevel ' +
+          'would not issue a token for the new account: the marketplace app is ' +
+          'installed on a fixed list of sub-accounts, and one created a moment ' +
+          'ago is not on it. Custom values are location scoped, so the agency ' +
+          'credential is refused there — which is why the underlying error says ' +
+          '"not authorized for this scope" when no scope is missing. Re-install ' +
+          'the app at agency level with every sub-account included, so accounts ' +
+          'made from now on can mint their own token; then press Retry and the ' +
+          `values go onto this same account. (${detail})`
+        : `The sub-account was created (${locationId}) but its custom values were ` +
+          `not written: ${detail}. Retry configures that same account rather than ` +
+          'creating another.',
     };
   }
 }
