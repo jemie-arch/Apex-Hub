@@ -38,6 +38,15 @@ export interface ProvisionOutcome {
 /** Answers keyed by the form field names in config/public-forms.ts. */
 export type Answers = Record<string, string | undefined>;
 
+/** A url-safe unique-ish slug. clients.slug and client_groups.slug are unique. */
+function slugify(name: string): string {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // Suffixed because two practices can share a name and the column is unique;
+  // a collision would fail the insert and read as a provisioning failure.
+  const suffix = Math.random().toString(36).slice(2, 7);
+  return `${base === '' ? 'practice' : base}-${suffix}`;
+}
+
 function pick(answers: Answers, field: string): string | undefined {
   const value = answers[field];
   return value === undefined || value.trim() === '' ? undefined : value.trim();
@@ -81,6 +90,8 @@ export async function provisionFromSubmission(input: {
    * from 'the private token is not accepted for this endpoint', and those have
    * opposite fixes.
    */
+  /** A non-fatal problem worth surfacing on the run row. */
+  let ctxNote: string | null = null;
   let authKind: AuthKind | null = null;
   try {
     authKind = (await writeAuth()).kind;
@@ -160,16 +171,84 @@ export async function provisionFromSubmission(input: {
     }
   }
 
-  // ---- 2. the custom values ----------------------------------------------
+  /*
+   * ---- 2. register it, so the token manager can mint for it ---------------
+   *
+   * Custom values are location scoped, so they need a token belonging to this
+   * sub-account, and the token manager keys those off a clients row. Creating the
+   * row here rather than waiting for the next crm-clients sync also means the
+   * practice appears in the Hub straight away, which is what anybody would
+   * expect after the form goes in.
+   *
+   * Idempotent on crm_location_id, so a retry finds the row instead of adding a
+   * second one.
+   */
+  let clientId: string | null = null;
+
+  try {
+    const existing = await db
+      .from('clients')
+      .select('id')
+      .eq('crm_location_id', locationId)
+      .maybeSingle();
+
+    if (existing.data) {
+      clientId = existing.data.id;
+    } else {
+      // A group to hang it on. Reuse the one the submission was attributed to
+      // when there is one, rather than creating a duplicate business.
+      let groupId = input.clientGroupId;
+
+      if (!groupId) {
+        const group = await db
+          .from('client_groups')
+          .insert({
+            name: clinicName,
+            slug: slugify(clinicName),
+            status: 'onboarding',
+            contact_name: pick(input.answers, 'doctor_name') ?? null,
+            contact_email: pick(input.answers, 'doctor_email') ?? null,
+            contact_phone: pick(input.answers, 'phone') ?? null,
+            website: pick(input.answers, 'website') ?? null,
+          })
+          .select('id')
+          .maybeSingle();
+
+        if (group.error) throw group.error;
+        groupId = group.data?.id ?? null;
+      }
+
+      if (groupId) {
+        const client = await db
+          .from('clients')
+          .insert({
+            group_id: groupId,
+            name: clinicName,
+            slug: slugify(clinicName),
+            crm_location_id: locationId,
+            timezone: pick(input.answers, 'timezone') ?? 'UTC',
+          })
+          .select('id')
+          .maybeSingle();
+
+        if (client.error) throw client.error;
+        clientId = client.data?.id ?? null;
+      }
+    }
+  } catch (error) {
+    // Not fatal. Without a row the custom values fall back to the agency
+    // credential, which is worth trying rather than stopping here.
+    ctxNote = error instanceof Error ? error.message : String(error);
+  }
+
+  // ---- 3. the custom values ----------------------------------------------
   const values = {
     ...valuesFor(clinicName, input.answers),
     ...derivedCustomValues(locationId),
   };
 
   try {
-    // Agency-level credential throughout: a location token for an account made
-    // seconds ago has not been minted yet.
-    const outcome = await setCustomValues(locationId, values);
+    const outcome = await setCustomValues(clientId, locationId, values);
 
     const status: ProvisionOutcome['status'] =
       outcome.failed.length > 0 || outcome.missing.length > 0
@@ -181,6 +260,13 @@ export async function provisionFromSubmission(input: {
       written: outcome.written,
       missing: outcome.missing,
       failed: outcome.failed,
+      // Recorded even on an otherwise clean run: if the clients row could not be
+      // created, the sub-account exists and the practice is still missing from
+      // the Hub, which nobody would notice from a green tick.
+      error:
+        ctxNote === null
+          ? undefined
+          : `Sub-account configured, but it could not be registered as a client: ${ctxNote}`,
     });
 
     return {

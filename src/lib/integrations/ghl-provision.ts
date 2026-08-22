@@ -32,7 +32,7 @@ const BASE = 'https://services.leadconnectorhq.com';
 const VERSION = '2021-07-28';
 
 /** Which credential a write went out under. Recorded so a failure is diagnosable. */
-export type AuthKind = 'private_integration' | 'oauth_app';
+export type AuthKind = 'private_integration' | 'oauth_app' | 'location_token';
 
 export interface WriteAuth {
   token: string;
@@ -198,10 +198,41 @@ export interface CustomValue {
   value: string | null;
 }
 
+/**
+ * The credential for a location-scoped endpoint, from the token manager.
+ *
+ * /locations/{id}/customValues is location scoped, and an agency credential is
+ * not necessarily accepted there — the likelier reading of a 401 that survives
+ * granting every agency scope. So this asks getToken() for a token belonging to
+ * that sub-account.
+ *
+ * Through the token manager rather than minting one inline, which is what this
+ * did first. The manager stores the token with its expiry, reuses it while it is
+ * valid, and takes a lease before refreshing — GoHighLevel invalidates a refresh
+ * token the moment it is used, so two callers refreshing at once leaves one
+ * holding a dead token. Minting a throwaway on every call sidesteps all of that
+ * and quietly burns a request each time.
+ *
+ * Needs a clients row, which is why provisioning registers the sub-account
+ * before configuring it. Falls back to the agency credential when there is no
+ * row, so nothing here can fail merely for want of one.
+ */
+async function locationAuth(clientId: string | null): Promise<WriteAuth> {
+  if (clientId === null) return writeAuth();
+
+  try {
+    const token = await getToken(clientId);
+    return { token: token.accessToken, kind: 'location_token', companyId: null };
+  } catch {
+    return writeAuth();
+  }
+}
+
 export async function listCustomValues(
+  clientId: string | null,
   locationId: string,
 ): Promise<CustomValue[]> {
-  const { token: accessToken } = await writeAuth();
+  const { token: accessToken } = await locationAuth(clientId);
 
   const payload = await call<{ customValues?: unknown[] }>(
     accessToken,
@@ -228,6 +259,9 @@ export async function listCustomValues(
 }
 
 export interface CustomValueResult {
+  /** Which credential the values went out under, which is not always the one
+   * that created the account — custom values are location scoped. */
+  auth: AuthKind;
   written: string[];
   /** Asked for but no custom value of that name exists in the sub-account. */
   missing: string[];
@@ -247,16 +281,17 @@ export interface CustomValueResult {
  * not consistent: it contains both "Landmark1" and "Landmark 2".
  */
 export async function setCustomValues(
+  clientId: string | null,
   locationId: string,
   values: Record<string, string>,
 ): Promise<CustomValueResult> {
-  const { token: accessToken } = await writeAuth();
-  const existing = await listCustomValues(locationId);
+  const { token: accessToken, kind } = await locationAuth(clientId);
+  const existing = await listCustomValues(clientId, locationId);
 
   const key = (name: string) => name.toLowerCase().replace(/\s+/g, '');
   const byKey = new Map(existing.map((row) => [key(row.name), row]));
 
-  const result: CustomValueResult = { written: [], missing: [], failed: [] };
+  const result: CustomValueResult = { auth: kind, written: [], missing: [], failed: [] };
 
   for (const [name, value] of Object.entries(values)) {
     if (value.trim() === '') continue;

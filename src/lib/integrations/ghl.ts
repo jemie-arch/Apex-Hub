@@ -227,6 +227,61 @@ export async function getToken(clientId: string | null): Promise<GhlToken> {
  * follow GoHighLevel's documented shape; confirm with one location before
  * trusting a bulk run.
  */
+/**
+ * A location-scoped token for a sub-account id, with no clients row needed.
+ *
+ * mintLocationToken below looks a client up first, which is right for the syncs
+ * but wrong for a sub-account created thirty seconds ago: it has no row yet, and
+ * the endpoint never needed one — /oauth/locationToken takes a companyId and a
+ * locationId and nothing else.
+ *
+ * This matters because location-scoped endpoints do not necessarily accept an
+ * agency credential. Writing custom values to a brand new sub-account is exactly
+ * that case, and it is not something more agency scopes can fix.
+ */
+export async function mintTokenForLocationId(
+  locationId: string,
+): Promise<string> {
+  const env = ghlCredentials();
+  const agency = await getToken(null);
+
+  if (!agency.companyId) {
+    throw new Error(
+      'The agency token has no companyId stored, which /oauth/locationToken ' +
+        'requires. Reconnect the agency install so the companyId is captured.',
+    );
+  }
+
+  const response = await fetch(`${env.apiBase}/oauth/locationToken`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${agency.accessToken}`,
+      Version: env.apiVersion,
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ companyId: agency.companyId, locationId }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(
+      `Could not mint a location token for ${locationId}: ` +
+        `${response.status} ${detail.slice(0, 300)}`,
+    );
+  }
+
+  const payload = (await response.json()) as { access_token?: string };
+  if (!payload.access_token) {
+    throw new Error(
+      `GoHighLevel returned no access_token when minting for ${locationId}.`,
+    );
+  }
+
+  return payload.access_token;
+}
+
 export async function mintLocationToken(clientId: string): Promise<GhlToken> {
   const db = serviceClient();
   const env = ghlCredentials();
