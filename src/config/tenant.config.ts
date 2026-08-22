@@ -105,7 +105,8 @@ export function titleCase(value: string): string {
  * line once it is confirmed.
  */
 export const UNCONFIRMED_TENANT_FIELDS: readonly string[] = [
-  'brand accent — globals.css still uses a placeholder indigo',
+  // The accent was the last one, and it is settled: the palette is Apex's
+  // spring teal on near-black, signed off with the Ads Management rebuild.
 ];
 
 /** True while any tenant value is unconfirmed. Surfaced in /settings. */
