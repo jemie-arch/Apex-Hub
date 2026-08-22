@@ -39,7 +39,9 @@ const PORTALS: Portal[] = [
     hint: 'Run the agency',
     href: '/dashboard',
     icon: Building2,
-    owns: (pathname) => !pathname.startsWith('/call-center'),
+    owns: (pathname) =>
+      !pathname.startsWith('/call-center') &&
+      !pathname.startsWith('/client-portal'),
   },
   {
     key: 'call-center',
@@ -52,12 +54,12 @@ const PORTALS: Portal[] = [
   {
     key: 'client',
     label: 'Client Portal',
-    hint: 'Per client — open from Client Management',
-    href: '/clients',
+    hint: 'Choose a client, then open theirs',
+    // Not a portal you can switch into — there is one per client and the URL is
+    // the credential, so the only honest destination is a page that asks which.
+    href: '/client-portal',
     icon: Users,
-    // Never "current": an internal user is never inside a client's portal, they
-    // only ever open a specific client's link from elsewhere.
-    owns: () => false,
+    owns: (pathname) => pathname.startsWith('/client-portal'),
   },
 ];
 

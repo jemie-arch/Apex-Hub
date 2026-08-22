@@ -89,6 +89,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/dashboard', 'overview'],
     ['/onboarding', 'onboarding'],
     ['/clients', 'client_management'],
+    // The index of client portals. Same audience as client management, so it
+    // shares the key rather than inventing one nobody has been granted.
+    ['/client-portal', 'client_management'],
     ['/ads', 'ads_management'],
     ['/ads-performance', 'ads_management'],
     ['/compare', 'compare'],
