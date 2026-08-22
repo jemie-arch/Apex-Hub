@@ -236,6 +236,163 @@ export type Database = {
           },
         ]
       }
+      appointment_ledger: {
+        Row: {
+          amount_cents: number | null
+          appointment_at: string | null
+          attempt_number: number
+          billed_at: string | null
+          billing_hold_reason: string | null
+          billing_state: Database["public"]["Enums"]["ledger_billing_state"]
+          booked_at: string | null
+          booked_by_name: string | null
+          calendar_seen_at: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          client_calendar_checked_at: string | null
+          client_calendar_state: string | null
+          client_id: string
+          confirmation_channel: string | null
+          confirmed_at: string | null
+          created_at: string
+          crm_appointment_id: string | null
+          dispositioned_at: string | null
+          hp_appointment_id: string | null
+          id: string
+          last_seen_in_crm_at: string | null
+          missing_since: string | null
+          outcome: Database["public"]["Enums"]["ledger_outcome"]
+          outcome_at: string | null
+          outcome_defaulted: boolean
+          outcome_due_at: string | null
+          outcome_source:
+            | Database["public"]["Enums"]["ledger_outcome_source"]
+            | null
+          patient_email: string | null
+          patient_name: string | null
+          patient_phone: string | null
+          raw_disposition: string | null
+          reschedule_of: string | null
+          seen_in: Json
+          source: Database["public"]["Enums"]["ledger_source"]
+          stripe_payment_intent_id: string | null
+          tracker_source_row: number | null
+          tracker_source_tab: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          appointment_at?: string | null
+          attempt_number?: number
+          billed_at?: string | null
+          billing_hold_reason?: string | null
+          billing_state?: Database["public"]["Enums"]["ledger_billing_state"]
+          booked_at?: string | null
+          booked_by_name?: string | null
+          calendar_seen_at?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_calendar_checked_at?: string | null
+          client_calendar_state?: string | null
+          client_id: string
+          confirmation_channel?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          crm_appointment_id?: string | null
+          dispositioned_at?: string | null
+          hp_appointment_id?: string | null
+          id?: string
+          last_seen_in_crm_at?: string | null
+          missing_since?: string | null
+          outcome?: Database["public"]["Enums"]["ledger_outcome"]
+          outcome_at?: string | null
+          outcome_defaulted?: boolean
+          outcome_due_at?: string | null
+          outcome_source?:
+            | Database["public"]["Enums"]["ledger_outcome_source"]
+            | null
+          patient_email?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          raw_disposition?: string | null
+          reschedule_of?: string | null
+          seen_in?: Json
+          source?: Database["public"]["Enums"]["ledger_source"]
+          stripe_payment_intent_id?: string | null
+          tracker_source_row?: number | null
+          tracker_source_tab?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number | null
+          appointment_at?: string | null
+          attempt_number?: number
+          billed_at?: string | null
+          billing_hold_reason?: string | null
+          billing_state?: Database["public"]["Enums"]["ledger_billing_state"]
+          booked_at?: string | null
+          booked_by_name?: string | null
+          calendar_seen_at?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_calendar_checked_at?: string | null
+          client_calendar_state?: string | null
+          client_id?: string
+          confirmation_channel?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          crm_appointment_id?: string | null
+          dispositioned_at?: string | null
+          hp_appointment_id?: string | null
+          id?: string
+          last_seen_in_crm_at?: string | null
+          missing_since?: string | null
+          outcome?: Database["public"]["Enums"]["ledger_outcome"]
+          outcome_at?: string | null
+          outcome_defaulted?: boolean
+          outcome_due_at?: string | null
+          outcome_source?:
+            | Database["public"]["Enums"]["ledger_outcome_source"]
+            | null
+          patient_email?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          raw_disposition?: string | null
+          reschedule_of?: string | null
+          seen_in?: Json
+          source?: Database["public"]["Enums"]["ledger_source"]
+          stripe_payment_intent_id?: string | null
+          tracker_source_row?: number | null
+          tracker_source_tab?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_reschedule_of_fkey"
+            columns: ["reschedule_of"]
+            isOneToOne: false
+            referencedRelation: "appointment_exceptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_reschedule_of_fkey"
+            columns: ["reschedule_of"]
+            isOneToOne: false
+            referencedRelation: "appointment_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           ad_external_id: string | null
@@ -2476,7 +2633,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      appointment_exceptions: {
+        Row: {
+          amount_cents: number | null
+          appointment_at: string | null
+          billing_state:
+            | Database["public"]["Enums"]["ledger_billing_state"]
+            | null
+          client_id: string | null
+          exception: string | null
+          id: string | null
+          outcome: Database["public"]["Enums"]["ledger_outcome"] | null
+          outcome_due_at: string | null
+          outcome_source:
+            | Database["public"]["Enums"]["ledger_outcome_source"]
+            | null
+          patient_name: string | null
+          practice: string | null
+          severity: number | null
+          source: Database["public"]["Enums"]["ledger_source"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       attribute_billing_charges: { Args: never; Returns: Json }
@@ -2546,6 +2732,27 @@ export type Database = {
         | "spam"
       lead_origin: "referral" | "organic" | "paid" | "outbound" | "unknown"
       lead_quality: "high" | "medium" | "low" | "unusable"
+      ledger_billing_state:
+        | "pending"
+        | "billable"
+        | "billed"
+        | "waived"
+        | "disputed"
+        | "on_hold"
+      ledger_outcome:
+        | "pending"
+        | "showed"
+        | "no_show"
+        | "cancelled"
+        | "rescheduled"
+      ledger_outcome_source:
+        | "survey"
+        | "crm"
+        | "portal"
+        | "staff"
+        | "tracker"
+        | "defaulted"
+      ledger_source: "isr" | "direct" | "client" | "unknown"
       notification_kind: "info" | "success" | "warning" | "error"
       onboarding_status:
         | "new_signup"
@@ -2760,6 +2967,30 @@ export const Constants = {
       ],
       lead_origin: ["referral", "organic", "paid", "outbound", "unknown"],
       lead_quality: ["high", "medium", "low", "unusable"],
+      ledger_billing_state: [
+        "pending",
+        "billable",
+        "billed",
+        "waived",
+        "disputed",
+        "on_hold",
+      ],
+      ledger_outcome: [
+        "pending",
+        "showed",
+        "no_show",
+        "cancelled",
+        "rescheduled",
+      ],
+      ledger_outcome_source: [
+        "survey",
+        "crm",
+        "portal",
+        "staff",
+        "tracker",
+        "defaulted",
+      ],
+      ledger_source: ["isr", "direct", "client", "unknown"],
       notification_kind: ["info", "success", "warning", "error"],
       onboarding_status: [
         "new_signup",
