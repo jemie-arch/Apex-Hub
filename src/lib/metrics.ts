@@ -189,15 +189,22 @@ async function collectPeriod(
     .lte('snapshot_on', dateEnd);
   if (locationIds) snapshotQuery = snapshotQuery.in('client_id', locationIds);
 
-  // Derived from whether the business has a live sub-account, not from
-  // client_groups.status. That column says 'onboarding' for 64 of 73 businesses
-  // and 'active' for none, because it is set when a row is created and never
-  // advanced — 33 of those 64 have taken bookings in the last 60 days. Counting
-  // it literally reports nought active clients to an agency with dozens.
+  /*
+   * Back to reading the status column, because it is now maintained.
+   *
+   * It used to say 'onboarding' for 64 of 73 businesses and 'active' for none —
+   * set when a row was created and never advanced — so this derived activity from
+   * live sub-accounts instead. That got the dashboard off nought but counted 64,
+   * including two dozen practices with no bookings, no charges and no ad spend.
+   *
+   * refresh_client_statuses() now maintains the column from that same evidence at
+   * the end of every clients sync, so the honest answer and the stored answer are
+   * the same one: 40 trading, 24 still onboarding, 9 paused.
+   */
   const activeQuery = db
-    .from('clients')
-    .select('group_id')
-    .eq('is_active', true);
+    .from('client_groups')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active');
 
   const signedQuery = db
     .from('client_groups')
@@ -257,9 +264,7 @@ async function collectPeriod(
     // campaign. Adding them would inflate a single lead into two.
   }
 
-  totals.activeClients = groupId
-    ? 1
-    : new Set((active.data ?? []).map((row) => row.group_id)).size;
+  totals.activeClients = groupId ? 1 : (active.count ?? 0);
   totals.signedInRange = signed.count ?? 0;
 
   return totals;

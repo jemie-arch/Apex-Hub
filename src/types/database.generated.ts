@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Generated from the live database. Do not edit by hand.
  *
  * Regenerate after any migration; the app's Supabase clients are typed from
@@ -376,6 +376,141 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      appointments_excluded: {
+        Row: {
+          ad_external_id: string | null
+          address: string | null
+          attribution_source: string | null
+          booked_at: string | null
+          booked_by_name: string | null
+          booked_by_user_id: string | null
+          calendar_name: string | null
+          campaign_external_id: string | null
+          cancelled_at: string | null
+          client_id: string
+          created_at: string
+          crm_appointment_id: string | null
+          crm_calendar_id: string | null
+          crm_contact_id: string | null
+          excluded_at: string
+          financing_approved: boolean | null
+          funnel: Database["public"]["Enums"]["funnel"]
+          id: string
+          lead_quality: Database["public"]["Enums"]["lead_quality"] | null
+          notes: string | null
+          outcome: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_updated_at: string | null
+          patient_email: string | null
+          patient_name: string | null
+          patient_phone: string | null
+          reason: string
+          reschedule_count: number
+          rescheduled_from: string | null
+          scheduled_at: string
+          scheduled_end_at: string | null
+          showed: boolean | null
+          showed_source: string | null
+          source: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          synced_at: string | null
+          updated_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+          value_cents: number | null
+        }
+        Insert: {
+          ad_external_id?: string | null
+          address?: string | null
+          attribution_source?: string | null
+          booked_at?: string | null
+          booked_by_name?: string | null
+          booked_by_user_id?: string | null
+          calendar_name?: string | null
+          campaign_external_id?: string | null
+          cancelled_at?: string | null
+          client_id: string
+          created_at?: string
+          crm_appointment_id?: string | null
+          crm_calendar_id?: string | null
+          crm_contact_id?: string | null
+          excluded_at?: string
+          financing_approved?: boolean | null
+          funnel?: Database["public"]["Enums"]["funnel"]
+          id?: string
+          lead_quality?: Database["public"]["Enums"]["lead_quality"] | null
+          notes?: string | null
+          outcome?: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_updated_at?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          reason: string
+          reschedule_count?: number
+          rescheduled_from?: string | null
+          scheduled_at: string
+          scheduled_end_at?: string | null
+          showed?: boolean | null
+          showed_source?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          synced_at?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+          value_cents?: number | null
+        }
+        Update: {
+          ad_external_id?: string | null
+          address?: string | null
+          attribution_source?: string | null
+          booked_at?: string | null
+          booked_by_name?: string | null
+          booked_by_user_id?: string | null
+          calendar_name?: string | null
+          campaign_external_id?: string | null
+          cancelled_at?: string | null
+          client_id?: string
+          created_at?: string
+          crm_appointment_id?: string | null
+          crm_calendar_id?: string | null
+          crm_contact_id?: string | null
+          excluded_at?: string
+          financing_approved?: boolean | null
+          funnel?: Database["public"]["Enums"]["funnel"]
+          id?: string
+          lead_quality?: Database["public"]["Enums"]["lead_quality"] | null
+          notes?: string | null
+          outcome?: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_updated_at?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          reason?: string
+          reschedule_count?: number
+          rescheduled_from?: string | null
+          scheduled_at?: string
+          scheduled_end_at?: string | null
+          showed?: boolean | null
+          showed_source?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          synced_at?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+          value_cents?: number | null
+        }
+        Relationships: []
       }
       b2b_ad_days: {
         Row: {
@@ -2302,12 +2437,14 @@ export type Database = {
         Args: { p_group: string }
         Returns: Database["public"]["Enums"]["onboarding_status"]
       }
+      refresh_client_statuses: { Args: never; Returns: number }
       refresh_onboarding_status: {
         Args: { p_group: string }
         Returns: undefined
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      squash_practice_name: { Args: { t: string }; Returns: string }
     }
     Enums: {
       appointment_outcome:

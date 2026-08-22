@@ -1977,3 +1977,73 @@ create table appointments_excluded (
 alter table appointments_excluded enable row level security;
 create policy admin_all on appointments_excluded
   for all using (auth_is_admin()) with check (auth_is_admin());
+
+-- ---------------------------------------------------------------------------
+-- Keeping client_groups.status true
+--
+-- The column was set when a row was created and never touched again, so it
+-- said 'onboarding' for 64 of 73 businesses and 'active' for none of them --
+-- including practices that had been booking consultations for a year. Every
+-- client count on the dashboard was wrong for as long as that was the case.
+--
+-- This decides it from evidence instead: a live sub-account, plus a booking, a
+-- charge, or any ad spend in the last 90 days. Called at the end of the
+-- crm-clients sync, so the stored answer is never older than the last run.
+--
+-- 'churned' and 'paused' are left alone on purpose. Those are decisions
+-- somebody made, not observations, and quiet is not the same as gone.
+-- ---------------------------------------------------------------------------
+create or replace function refresh_client_statuses()
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_changed integer;
+begin
+  with evidence as (
+    select
+      g.id,
+      (
+        exists (
+          select 1 from clients c
+          where c.group_id = g.id and c.is_active
+        )
+        and (
+          exists (
+            select 1 from tracker_appointments t
+            join clients c on c.id = t.client_id
+            where c.group_id = g.id
+              and t.booked_for >= current_date - 90
+          )
+          or exists (
+            select 1 from billing_charges b
+            join clients c on c.id = b.client_id
+            where c.group_id = g.id
+              and b.occurred_at >= now() - interval '90 days'
+          )
+          or exists (
+            select 1 from ad_snapshots s
+            join clients c on c.id = s.client_id
+            where c.group_id = g.id
+              and s.spend_cents > 0
+          )
+        )
+      ) as trading
+    from client_groups g
+    where g.status in ('active', 'onboarding')
+  )
+  update client_groups g
+  set status = (case when e.trading then 'active' else 'onboarding' end)::client_status
+  from evidence e
+  where e.id = g.id
+    and g.status <> (case when e.trading then 'active' else 'onboarding' end)::client_status;
+
+  get diagnostics v_changed = row_count;
+  return v_changed;
+end;
+$fn$;
+
+revoke all on function refresh_client_statuses() from public;
+grant execute on function refresh_client_statuses() to service_role;

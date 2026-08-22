@@ -190,4 +190,27 @@ export async function syncCrmClients(ctx: SyncContext): Promise<void> {
         'Merge any that belong to the same practice by hand.',
     );
   }
+
+  /*
+   * Bring client_groups.status back in line with the evidence.
+   *
+   * The column used to be written once, when the row was created, and never
+   * again: 64 of 73 businesses read 'onboarding' and none read 'active',
+   * including practices that had been booking consultations for a year. The
+   * dashboard's client count was wrong for as long as that was true.
+   *
+   * refresh_client_statuses() decides it from live sub-accounts plus a booking,
+   * a charge or ad spend in the last 90 days, and leaves 'churned' and 'paused'
+   * alone, because those are somebody's decision rather than an observation.
+   * Running it here means the answer is never older than the last sync.
+   */
+  const refreshed = await db.rpc('refresh_client_statuses');
+
+  if (refreshed.error) {
+    ctx.recordError('could not refresh client statuses', {
+      detail: refreshed.error.message,
+    });
+  } else if ((refreshed.data ?? 0) > 0) {
+    ctx.log(`${refreshed.data} business(es) changed status.`);
+  }
 }
