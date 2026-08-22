@@ -102,7 +102,10 @@ export async function getGroupRollups(
   const { start: dateStart, end: dateEnd } = dateBounds(range.from, range.to);
 
   const [groups, locations, appointments, snapshots] = await Promise.all([
-    db.from('client_groups').select('*').order('name'),
+    // Practices only. The agency's own sub-accounts — the sales pipeline, the
+    // onboarding account, the snapshot holders — are real locations that would
+    // otherwise be scored for health alongside clients and rate nothing.
+    db.from('client_groups').select('*').eq('is_internal', false).order('name'),
     db.from('clients').select('*').order('name'),
     // The tracker, not the synced appointments table, for the same reason the
     // dashboard uses it: this one records whether the consultation happened and

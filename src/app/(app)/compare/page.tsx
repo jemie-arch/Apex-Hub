@@ -76,6 +76,10 @@ export default async function ComparePage({ searchParams }: PageProps) {
       .from('client_groups')
       .select('id, name, status, currency')
       .neq('status', 'churned')
+      // The agency's own sub-accounts are not practices. Listing "ADM Testing
+      // Grounds" in a comparison of client performance, with a dash in every
+      // month, teaches people the page is padded.
+      .eq('is_internal', false)
       .order('name'),
     db.from('clients').select('id, group_id'),
     db

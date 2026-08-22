@@ -2165,3 +2165,36 @@ update tracker_appointments t
 set client_id = r.client_id
 from resolved r
 where t.client_id is null and t.location_name = r.tracker_name;
+
+-- ---------------------------------------------------------------------------
+-- The agency's own sub-accounts are not clients
+--
+-- Seven of the 73 businesses are Apex's own: the sales pipeline, the client
+-- onboarding account, snapshot and template holders, a testing ground. They were
+-- appearing in lists of clients -- "ADM Testing Grounds" sat in the month over
+-- month comparison with a dash in every column, and each was scored for client
+-- health it could never have.
+--
+-- Marked rather than deleted, because two of them are load-bearing:
+-- app_settings.b2b_location_id points at ADM Sales Account, and onboarding-calls
+-- reads ADM Client Onboarding Account. All seven are already 'paused' with no
+-- bookings, charges or spend, so no headline number moves -- this is about a
+-- list of clients containing only clients.
+-- ---------------------------------------------------------------------------
+alter table client_groups
+  add column if not exists is_internal boolean not null default false;
+
+comment on column client_groups.is_internal is
+  'The agency''s own sub-accounts rather than practices: the sales pipeline, the onboarding account, snapshot and template holders, testing grounds. They are real locations and some are load-bearing -- app_settings points at two of them -- so they are marked rather than deleted, and left out of anything that presents a list of clients.';
+
+update client_groups
+set is_internal = true
+where name in (
+  'ADM Client Onboarding Account',
+  'ADM Ortho Snapshot',
+  'ADM Push Updates',
+  'ADM Sales Account',
+  'ADM Team Management',
+  'ADM Team Reports',
+  'ADM Testing Grounds'
+);
