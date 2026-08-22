@@ -2,16 +2,19 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/sync/crm-appointments",
+      "path": "/api/cron/sync-all",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/sync/windsor-ads",
-      "schedule": "30 6 * * *"
+      "path": "/api/sync/crm-appointments",
+      "schedule": "0 18 * * *"
     }
   ],
   "functions": {
     "src/app/api/sync/**/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/cron/**/route.ts": {
       "maxDuration": 300
     }
   }

@@ -9,29 +9,12 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { serverEnv } from '@/lib/env';
+import { authorisedCron as authorised } from '@/lib/cron';
 import { findSync, PLANNED_SYNCS } from '@/lib/sync/registry';
 import { runSync } from '@/lib/sync/runner';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
-
-function authorised(request: NextRequest): boolean {
-  const header = request.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return false;
-
-  const provided = header.slice('Bearer '.length);
-  const expected = serverEnv().CRON_SECRET;
-
-  // Length-independent compare is overkill for a cron secret, but constant
-  // work costs nothing here.
-  if (provided.length !== expected.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < provided.length; index += 1) {
-    mismatch |= provided.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  return mismatch === 0;
-}
 
 export async function GET(
   request: NextRequest,

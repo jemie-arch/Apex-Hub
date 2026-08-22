@@ -82,8 +82,35 @@ deployment. On Pro, the schedule this app actually wants is:
 | `windsor-ads` | daily, early morning |
 | `stripe-charges` | daily |
 
-Until then, the remaining syncs are run from the **Run now** buttons in
-`/settings`, which call the identical functions.
+Two entries cannot cover six syncs, and the previous arrangement scheduled the
+two that seemed most important and left `crm-clients`, `crm-deals`, `crm-calls`
+and `stripe-charges` with no schedule at all — which meant they ran only when
+somebody remembered, which meant they did not run.
+
+So one cron points at **`/api/cron/sync-all`**, which runs every sync in the
+registry in order:
+
+1. `crm-clients` first — it creates the client rows everything else joins to
+2. `crm-appointments`
+3. `crm-deals`, `crm-calls`, `windsor-ads`
+4. `stripe-charges` last — cheapest and least urgent, so it is the right thing
+   to lose if time runs out
+
+Sequential, not parallel: these share a GoHighLevel token and rate limit, and
+appointments depend on clients existing first.
+
+It stops *starting* new syncs at 240s, because the function is killed at 300s and
+a sync killed mid-write leaves its `sync_runs` row saying `running` forever.
+Anything not started is named in the response with the reason, and runs on the
+next cycle. `crm-appointments` alone has taken 182s on a full import, so this is
+a real limit rather than a theoretical one.
+
+The second entry runs `crm-appointments` again at 18:00. Appointments change most,
+and the contact-enrichment backlog drains one page per run.
+
+Adding a seventh sync is now a change to the registry, not a fight with the plan
+limit. Every sync also still has a **Run now** button in `/settings`, which calls
+the identical function.
 
 ### Alerts
 
