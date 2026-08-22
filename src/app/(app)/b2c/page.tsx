@@ -1,24 +1,12 @@
-import { BadgeDollarSign } from 'lucide-react';
-import Link from 'next/link';
-
+import {
+  ConsultationsTable,
+  type ConsultationRow,
+} from '@/components/b2c/ConsultationsTable';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { KPICard } from '@/components/ui/KPICard';
 import { PageHeader } from '@/components/ui/PageHeader';
-import {
-  StatusPill,
-  appointmentStatusTone,
-  outcomeTone,
-} from '@/components/ui/StatusPill';
 import { tenant, titleCase } from '@/config/tenant.config';
-import {
-  formatCount,
-  formatDateTimeInZone,
-  formatMoney,
-  formatMoneyCompact,
-  formatPercent,
-  zoneAbbreviation,
-} from '@/lib/format';
+import { formatCount, formatMoneyCompact, formatPercent } from '@/lib/format';
 import { bounds, resolveRange } from '@/lib/range';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -120,6 +108,33 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
     if (row.showed === true) showedByDay[index] = (showedByDay[index] ?? 0) + 1;
   }
 
+  /*
+   * Flattened for the client component: the practice and its timezone resolved
+   * here rather than passing three lookup maps across the boundary, which would
+   * serialise every location and group to the browser to read a handful.
+   */
+  const tableRows: ConsultationRow[] = rows.map((row) => {
+    const location = locationById.get(row.client_id);
+    const group = location ? groupById.get(location.group_id) : null;
+
+    return {
+      id: row.id,
+      clientId: row.client_id,
+      patientName: row.patient_name,
+      scheduledAt: row.scheduled_at,
+      status: row.status,
+      showed: row.showed,
+      outcome: row.outcome,
+      valueCents: row.value_cents,
+      bookedByName: row.booked_by_name,
+      attributionSource: row.attribution_source,
+      clientName: location?.name ?? 'Unknown location',
+      groupId: group?.id ?? null,
+      groupName: group?.name ?? location?.name ?? 'Unknown',
+      timezone: location?.timezone ?? tenant.defaultTimezone,
+    };
+  });
+
   return (
     <>
       <PageHeader
@@ -130,9 +145,12 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
         }}
         title="Who came in, and what happened"
         description={
-          `${range.label} · every ${patient.singular} ${booking.singular} across all ` +
-          `${tenant.vocabulary.client.plural}, one per row. Fulfilment groups the same ` +
-          `${booking.plural} by practice.`
+          <>
+            {range.label} · <span className="text-accent">{formatCount(showed)}</span>{' '}
+            of {formatCount(rows.length)} attended. Every {patient.singular}{' '}
+            {booking.singular} across all {tenant.vocabulary.client.plural}, one per
+            row — Fulfilment groups the same {booking.plural} by practice.
+          </>
         }
         actions={<DateRangePicker />}
       />
@@ -167,89 +185,12 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
         />
       </section>
 
-      {rows.length === 0 ? (
-        <EmptyState
-          title={`No ${booking.plural} in this period`}
-          description="Widen the date range, or run the CRM sync if nothing has come in yet."
-          icon={<BadgeDollarSign size={22} />}
-        />
-      ) : (
-        <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
-                  <th className="px-4 py-3 font-medium">When</th>
-                  <th className="px-4 py-3 font-medium">{titleCase(patient.singular)}</th>
-                  <th className="px-4 py-3 font-medium">{titleCase(tenant.vocabulary.client.singular)}</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Outcome</th>
-                  <th className="px-4 py-3 font-medium">Booked by</th>
-                  <th className="px-4 py-3 text-right font-medium">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const location = locationById.get(row.client_id);
-                  const group = location ? groupById.get(location.group_id) : null;
-                  const zone = location?.timezone ?? tenant.defaultTimezone;
-
-                  return (
-                    <tr
-                      key={row.id}
-                      className="border-b border-line last:border-0 hover:bg-surface-hover"
-                    >
-                      <td className="numeric px-4 py-3 text-fg-muted">
-                        {formatDateTimeInZone(row.scheduled_at, zone, 'd MMM, HH:mm')}
-                        <span className="ml-1.5 text-xs text-fg-subtle">
-                          {zoneAbbreviation(zone)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-fg">
-                        {row.patient_name ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-fg-muted">
-                        {group ? (
-                          <Link
-                            href={`/clients/${group.id}`}
-                            className="hover:text-accent"
-                          >
-                            {group.name}
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
-                        {location && location.name !== group?.name ? (
-                          <span className="block text-xs text-fg-subtle">
-                            {location.name}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusPill
-                          value={row.status}
-                          tone={appointmentStatusTone(row.status)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusPill value={row.outcome} tone={outcomeTone(row.outcome)} />
-                      </td>
-                      <td className="px-4 py-3 text-fg-muted">
-                        {row.booked_by_name ?? row.attribution_source ?? '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-fg-muted">
-                        {row.value_cents === null
-                          ? '—'
-                          : formatMoney(row.value_cents, group?.currency ?? 'USD')}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <ConsultationsTable
+        rows={tableRows}
+        patientNoun={titleCase(patient.singular)}
+        clientNoun={titleCase(tenant.vocabulary.client.singular)}
+        bookingPlural={booking.plural}
+      />
 
       <p className="mt-4 text-xs text-fg-subtle">
         Newest 400 in the range. Outcomes and treatment values are entered by

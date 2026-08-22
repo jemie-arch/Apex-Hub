@@ -1,8 +1,7 @@
-import { AlertTriangle, ClipboardList } from 'lucide-react';
-import Link from 'next/link';
+import { AlertTriangle } from 'lucide-react';
 
+import { FulfilmentTable } from '@/components/fulfilment/FulfilmentTable';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { KPICard } from '@/components/ui/KPICard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
@@ -258,8 +257,22 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
         }}
         title="Did we get paid for every show?"
         description={
-          `${range.label} · ${formatCount(showed)} of ${formatCount(booked)} ` +
-          `booked consultations showed up, and ${formatMoney(collectedCents)} was collected`
+          <>
+            {range.label} · {formatCount(showed)} of {formatCount(booked)} booked
+            consultations showed up, and{' '}
+            <span className="text-accent">{formatMoney(collectedCents)}</span> was
+            collected
+            {uncollectedTotal > 0 ? (
+              <>
+                {' '}
+                with{' '}
+                <span className="text-negative">
+                  {formatMoney(uncollectedTotal)}
+                </span>{' '}
+                refused
+              </>
+            ) : null}
+          </>
         }
         actions={<DateRangePicker />}
       />
@@ -304,92 +317,8 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
         />
       </section>
 
-      {table.length === 0 ? (
-        <EmptyState
-          title="Nothing booked in this period"
-          description="Widen the date range, or check that the appointments sync has run."
-          icon={<ClipboardList size={22} />}
-        />
-      ) : (
-        <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
-                  <th className="px-4 py-3 font-medium">
-                    {titleCase(client.singular)}
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium">Booked</th>
-                  <th className="px-4 py-3 text-right font-medium">Showed</th>
-                  <th className="px-4 py-3 text-right font-medium">No show</th>
-                  <th className="px-4 py-3 text-right font-medium">Closed</th>
-                  <th className="px-4 py-3 text-right font-medium">Upcoming</th>
-                  <th className="px-4 py-3 text-right font-medium">Show rate</th>
-                  <th className="px-4 py-3 text-right font-medium">Collected</th>
-                  <th className="px-4 py-3 text-right font-medium">Uncollected</th>
-                </tr>
-              </thead>
-              <tbody>
-                {table.map((row) => {
-                  const settled = row.showed + row.noShow;
-                  const rate = settled > 0 ? row.showed / settled : null;
+      <FulfilmentTable rows={table} clientNoun={titleCase(client.plural)} />
 
-                  return (
-                    <tr
-                      key={row.clientId}
-                      className="border-b border-line last:border-0 hover:bg-surface-hover"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/clients/${row.clientId}`}
-                          className="text-fg hover:text-accent"
-                        >
-                          {row.name}
-                        </Link>
-                        {!row.isActive ? (
-                          <span className="ml-2 text-xs text-fg-subtle">paused</span>
-                        ) : null}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-fg">
-                        {row.booked || '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-positive">
-                        {row.showed || '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-fg-muted">
-                        {row.noShow || '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-fg-muted">
-                        {row.closed || '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-fg-muted">
-                        {row.upcoming || '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-fg-muted">
-                        {rate === null ? '—' : formatPercent(rate)}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right text-positive">
-                        {row.collectedCents > 0
-                          ? formatMoney(row.collectedCents)
-                          : '—'}
-                      </td>
-                      <td className="numeric px-4 py-3 text-right">
-                        {row.uncollectedCents > 0 ? (
-                          <span className="text-negative">
-                            {formatMoney(row.uncollectedCents)}
-                          </span>
-                        ) : (
-                          <span className="text-fg-subtle">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       <section className="mt-6 rounded-lg border border-accent-subtle bg-surface p-4">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-fg">

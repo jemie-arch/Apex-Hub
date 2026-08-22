@@ -4,8 +4,14 @@ import { cn } from '@/lib/cn';
 
 export interface PageHeaderProps {
   title: string;
-  /** One line saying what this page answers. Not decoration. */
-  description?: string;
+  /**
+   * One line saying what this page answers. Not decoration.
+   *
+   * ReactNode rather than string so a page can pick out the figure that matters
+   * in the accent colour, which is what makes the line read as a finding rather
+   * than a caption.
+   */
+  description?: ReactNode;
   /** Filters, date range, primary action. */
   actions?: ReactNode;
   /**

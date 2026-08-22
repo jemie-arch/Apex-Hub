@@ -195,9 +195,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         }}
         title="How the book looks"
         description={
-          `${range.label}, against the preceding period · ` +
-          `${formatCount(current.booked)} ${booking.plural} from ads, ` +
-          `${formatCount(current.showed)} showed up`
+          <>
+            {range.label}, against the preceding period ·{' '}
+            <span className="text-accent">{formatCount(current.booked)}</span>{' '}
+            {booking.plural} from ads, {formatCount(current.showed)} showed up
+          </>
         }
         actions={<DateRangePicker />}
       />

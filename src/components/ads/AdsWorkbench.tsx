@@ -20,6 +20,9 @@ import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterPills } from '@/components/ui/FilterPills';
+import { KPICard } from '@/components/ui/KPICard';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { cn } from '@/lib/cn';
 import { formatCount, formatMoney, formatMoneyCompact, formatPercent } from '@/lib/format';
@@ -94,35 +97,6 @@ function DeltaTag({ value }: { value: number | null }) {
   );
 }
 
-function SummaryTile({
-  label,
-  value,
-  hint,
-  series,
-  tone = 'accent',
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  series: number[];
-  tone?: 'accent' | 'positive' | 'negative';
-}) {
-  return (
-    <div className="surface-3d rounded-lg border border-line bg-surface p-4">
-      <p className="text-xs font-medium text-fg-muted">{label}</p>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="numeric text-2xl font-semibold tracking-tight text-fg">
-            {value}
-          </p>
-          <p className="mt-1 text-[11px] text-fg-subtle">{hint}</p>
-        </div>
-        <Sparkline points={series} tone={tone} width={104} height={34} />
-      </div>
-    </div>
-  );
-}
-
 export function AdsWorkbench({
   rows,
   days,
@@ -182,17 +156,7 @@ export function AdsWorkbench({
   if (rows.length === 0) {
     return (
       <>
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-              Ads
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-fg">
-              Nothing ran in this period
-            </h1>
-          </div>
-          {controls}
-        </header>
+        <PageHeader eyebrow="Ads" title="Nothing ran in this period" actions={controls} />
         <EmptyState
           title="No ad spend and no bookings"
           description="Widen the range, or check that the ad data has been imported."
@@ -204,53 +168,43 @@ export function AdsWorkbench({
 
   return (
     <>
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-            Ads
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-positive-subtle px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-positive">
-              <span className="h-1.5 w-1.5 rounded-full bg-positive" aria-hidden />
-              {formatCount(spendingCount)} spending
-            </span>
-          </p>
-
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-fg">
-            What&rsquo;s actually working
-          </h1>
-
-          <p className="mt-1.5 text-sm text-fg-muted">
+      {/*
+        The shared header, not a copy of it. This page invented the treatment, so
+        leaving it hand-rolled here meant the one page everything else was matched
+        against was the one page not using the component.
+      */}
+      <PageHeader
+        eyebrow="Ads"
+        pill={{ label: `${formatCount(spendingCount)} spending`, tone: 'positive' }}
+        title="What's actually working"
+        description={
+          <>
             {rangeLabel} · {formatCount(rows.length)} practices ·{' '}
             <span className="text-accent">
               {formatMoney(totals.spendCents)} spent
             </span>{' '}
             for {formatCount(totals.booked)} bookings
-            {overallCost !== null ? (
-              <>
-                {' '}
-                at {formatMoney(overallCost)} each
-              </>
-            ) : null}
-          </p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">{controls}</div>
-      </header>
+            {overallCost !== null ? <> at {formatMoney(overallCost)} each</> : null}
+          </>
+        }
+        actions={controls}
+      />
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryTile
+        <KPICard
           label="Ad spend"
           value={formatMoneyCompact(totals.spendCents)}
           hint={`${formatCount(spendingCount)} practices with spend`}
           series={totals.dailySpend}
         />
-        <SummaryTile
+        <KPICard
           label="Bookings"
           value={formatCount(totals.booked)}
           hint={`${formatCount(totals.showed)} showed up`}
           series={rows.map((row) => row.booked).slice(0, 24)}
-          tone="positive"
+          seriesTone="positive"
         />
-        <SummaryTile
+        <KPICard
           label="Cost per booking"
           value={overallCost === null ? '—' : formatMoney(overallCost)}
           hint={
@@ -304,29 +258,19 @@ export function AdsWorkbench({
               </p>
             </div>
 
-            <div className="flex rounded-md border border-line p-0.5">
-              {(
-                [
-                  ['all', 'All'],
-                  ['spending', 'Spending'],
-                  ['quiet', 'No spend'],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setFilter(key)}
-                  className={cn(
-                    'rounded px-2.5 py-1 text-xs transition-colors',
-                    filter === key
-                      ? 'bg-accent-subtle font-medium text-accent'
-                      : 'text-fg-muted hover:text-fg',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <FilterPills
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { key: 'all', label: 'All', count: rows.length },
+                { key: 'spending', label: 'Spending', count: spendingCount },
+                {
+                  key: 'quiet',
+                  label: 'No spend',
+                  count: rows.length - spendingCount,
+                },
+              ]}
+            />
           </header>
 
           <div className="overflow-x-auto">
