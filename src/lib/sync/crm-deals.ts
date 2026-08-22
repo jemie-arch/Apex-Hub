@@ -39,11 +39,11 @@ const MAX_CONTACT_LOOKUPS = 150;
 /**
  * Keyword -> stage. First match wins, so order matters.
  *
- * The stages that actually exist in the b2b sub-account, read off its three
- * pipelines: New Lead, Replied, In Contact, Demo Booked, Demo Showed, Sent
- * Email, No Answer AM, No Answer PM. Not the set this list was first written
- * against — that came from a description of the funnel rather than from the
- * pipelines, and "booked call" and "showed call" are in none of them.
+ * The new-business pipeline is Advertising, and its six stages are New Lead,
+ * In Contact, Demo Booked, Demo Showed, Closed, Nurture — the same funnel as the
+ * one described as new lead / follow up / booked call / showed call / closed /
+ * nurture, in different words. Every one of them is in app_settings.b2b_stage_map
+ * by its real name; this list is the fallback for a stage nobody has mapped yet.
  *
  * 'closed' and 'nurture' sit at the top because they must be tested before
  * anything looser matches. There was also a 'demo' -> call_showed entry, which
@@ -56,8 +56,7 @@ const DEFAULT_STAGE_KEYWORDS: ReadonlyArray<[string, DealStage]> = [
   ['proposal', 'proposal'],
   ['contract', 'proposal'],
   ['showed', 'call_showed'],
-  // A reply is a contact in any pipeline. It is also the only stage in the b2b
-  // sub-account with anything in it, and it read as 'new' until now.
+  // A reply is a contact, wherever it happens.
   ['replied', 'contacted'],
   ['booked', 'call_booked'],
   ['scheduled', 'call_booked'],
@@ -107,10 +106,25 @@ function isDealStage(value: string): value is DealStage {
 export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
 
-  const [locationSetting, mapSetting] = await Promise.all([
+  const [locationSetting, mapSetting, pipelineSetting] = await Promise.all([
     db.from('app_settings').select('value').eq('key', 'b2b_location_id').maybeSingle(),
     db.from('app_settings').select('value').eq('key', 'b2b_stage_map').maybeSingle(),
+    db.from('app_settings').select('value').eq('key', 'b2b_pipeline_name').maybeSingle(),
   ]);
+
+  /*
+   * Which pipeline in that sub-account is the new-business one.
+   *
+   * It has three, and they are not alternatives: Advertising is where new
+   * business goes, and the other two are cold-outreach experiments. Reading all
+   * of them put 29 replies to a 2024 cold-email list into the b2b funnel as if
+   * they were live opportunities. Unset means read every pipeline, which is the
+   * old behaviour and still the right default for an agency with one.
+   */
+  const pipelineName =
+    typeof pipelineSetting.data?.value === 'string'
+      ? pipelineSetting.data.value.trim().toLowerCase()
+      : null;
 
   const locationId =
     typeof locationSetting.data?.value === 'string'
@@ -169,12 +183,20 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
    */
   const stageNameById = new Map<string, string>();
   const pipelineNameByStageId = new Map<string, string>();
+  /** Stage ids belonging to the chosen pipeline. Empty means "no filter". */
+  const inScopeStageIds = new Set<string>();
+  let pipelineMatched = false;
 
   try {
     for (const pipeline of await listPipelines(owner.data?.id ?? null, locationId)) {
+      const isChosen =
+        pipelineName === null || pipeline.name.trim().toLowerCase() === pipelineName;
+      if (isChosen && pipelineName !== null) pipelineMatched = true;
+
       for (const stage of pipeline.stages) {
         stageNameById.set(stage.id, stage.name);
         pipelineNameByStageId.set(stage.id, pipeline.name);
+        if (isChosen) inScopeStageIds.add(stage.id);
       }
     }
   } catch (error) {
@@ -182,6 +204,21 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
       locationId,
       detail: error instanceof Error ? error.message : String(error),
     });
+  }
+
+  /*
+   * A configured pipeline that does not exist would silently filter everything
+   * out and report a clean run over an empty funnel, which is the failure this
+   * whole sync has already had once. So it fails loudly instead.
+   */
+  if (pipelineName !== null && !pipelineMatched) {
+    ctx.recordError(
+      `app_settings.b2b_pipeline_name is "${pipelineName}", and no pipeline in ` +
+        'this sub-account has that name. Nothing was imported, because reading ' +
+        'every pipeline instead would quietly count cold outreach as new business.',
+      { pipelines: [...new Set(pipelineNameByStageId.values())] },
+    );
+    return;
   }
 
   ctx.counts.read = opportunities.length;
@@ -238,7 +275,20 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
   let contactLookups = 0;
   const originCounts = new Map<string, number>();
 
+  let outOfScope = 0;
+
   for (const opportunity of opportunities) {
+    // Another pipeline in the same sub-account. Counted and skipped, so the run
+    // says how much it left alone rather than looking like a small pipeline.
+    if (
+      inScopeStageIds.size > 0 &&
+      (opportunity.stageId === null || !inScopeStageIds.has(opportunity.stageId))
+    ) {
+      outOfScope += 1;
+      ctx.counts.skipped += 1;
+      continue;
+    }
+
     const stageName =
       opportunity.stageName ??
       (opportunity.stageId ? (stageNameById.get(opportunity.stageId) ?? null) : null);
@@ -431,6 +481,13 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
     );
   }
   ctx.note('contact_lookups_used', contactLookups);
+
+  if (outOfScope > 0) {
+    ctx.log(
+      `${outOfScope} opportunity(ies) left alone: they are in another pipeline ` +
+        `in this sub-account, not "${pipelineName}".`,
+    );
+  }
 
   if (unmappedStages.size > 0) {
     // Silently filing these as 'new' would quietly distort the pipeline board,
