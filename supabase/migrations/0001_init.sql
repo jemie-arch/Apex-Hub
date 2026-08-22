@@ -2124,3 +2124,44 @@ comment on column appointments.second_consult_showed is
   'Did they attend the second consultation. From the Client Stat Sheet, column K: a practice books a second look before quoting, and treating that absence as a first-consult no-show understated the show rate.';
 comment on column appointments.cc_on_file is
   'Card on file at the time of booking. Column F of the Client Stat Sheet. Kept because it predicts attendance -- it is the practice''s own leading indicator, not a billing field.';
+
+-- ---------------------------------------------------------------------------
+-- Tracker practice names that never matched a client
+--
+-- Sixty-four tracker rows sat unattached because the spreadsheet writes a
+-- practice differently from the CRM. Six of the eight names resolve without
+-- ambiguity once looked at:
+--
+--   "Art of Smile"                  the CRM carries the full trading name
+--   "... Apex" suffixed             the tracker appends the agency's own name
+--   "Airway Orthodontics - GNV/NY"  airport-style abbreviations
+--   "Airway Orthodontics - VT"      three abbreviations against four locations,
+--                                   and Williston is the only one that is a real
+--                                   Vermont town. Ponte Vedra has no tracker
+--                                   rows at all, which is consistent.
+--
+-- Left alone: "Best Care Dental" and "Ofir Orthodontics", eight rows between
+-- them, with no candidate anywhere in the CRM. Neither has a close or any spend,
+-- so they look like practices that never onboarded. Guessing a client for them
+-- would put somebody else's consultations on a real practice's numbers.
+--
+-- Idempotent, and only fills nulls, so a re-import re-links rather than
+-- reassigning anything a human has since corrected.
+-- ---------------------------------------------------------------------------
+with alias(tracker_name, client_name) as (values
+  ('Art of Smile',                 'Art Of Smile: Center for Cosmetic Orthodontics'),
+  ('Team Dental N. Liberties Apex','Team Dental N. Liberties'),
+  ('Team Dental Swedesboro Apex',  'Team Dental Swedesboro'),
+  ('Airway Orthodontics - GNV',    'TMJ Sleep Airway Orthodontics - Gainesville'),
+  ('Airway Orthodontics - NY',     'TMJ Sleep Airway Orthodontics - New York'),
+  ('Airway Orthodontics - VT',     'TMJ Sleep Airway Orthodontics - Williston')
+),
+resolved as (
+  select a.tracker_name, c.id as client_id
+  from alias a
+  join clients c on c.name = a.client_name
+)
+update tracker_appointments t
+set client_id = r.client_id
+from resolved r
+where t.client_id is null and t.location_name = r.tracker_name;
