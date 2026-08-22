@@ -2337,6 +2337,7 @@ export type Database = {
         | "proposal"
         | "won"
         | "lost"
+        | "nurture"
       finance_kind: "revenue" | "cost"
       funnel: "b2b" | "b2c"
       lead_classification:
@@ -2547,6 +2548,7 @@ export const Constants = {
         "proposal",
         "won",
         "lost",
+        "nurture",
       ],
       finance_kind: ["revenue", "cost"],
       funnel: ["b2b", "b2c"],
