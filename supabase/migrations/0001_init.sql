@@ -1908,3 +1908,43 @@ alter table deals
 
 create index deals_origin_idx on deals (origin);
 create index deals_tags_idx on deals using gin (tags);
+
+-- ===========================================================================
+-- PRACTICE-NAME MATCHING
+--
+-- The rule used during the tracker import dropped everything from the first
+-- bracket onward. Right for the asides people type into a spreadsheet cell —
+-- "(move from Orthodynamo to Apex)", "(Please add this email as option 2)" —
+-- and wrong for "Village Dental of New England (General Dentistry)", which is a
+-- different practice from the plain one and got merged into it.
+--
+-- The distinction is length, not content. An aside is a sentence; a descriptor
+-- is two or three words. So a bracket of three words or fewer stays part of the
+-- name and anything longer is dropped as commentary, which separates every real
+-- case in the data.
+-- ===========================================================================
+
+create or replace function squash_practice_name(t text)
+returns text
+language sql
+immutable
+set search_path = pg_temp
+as $fn$
+  with lowered as (select lower(coalesce(t, '')) as v),
+  trimmed as (
+    select
+      case
+        when v ~ '\(' and array_length(
+               regexp_split_to_array(
+                 trim(regexp_replace(substring(v from position('(' in v)), '[()]', '', 'g')),
+                 '\s+'), 1) > 3
+          then substring(v from 1 for position('(' in v) - 1)
+        else v
+      end as v
+    from lowered
+  )
+  select regexp_replace(
+           regexp_replace(v, '\y(llc|inc|pc|dds|dmd|and)\y', ' ', 'g'),
+           '[^a-z0-9]+', '', 'g')
+  from trimmed;
+$fn$;
