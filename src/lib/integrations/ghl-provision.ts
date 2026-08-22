@@ -6,16 +6,23 @@
  * read-only and safe to call speculatively; nothing in this one is.
  *
  * ============================== SCOPES ==============================
- * These calls need an agency-level token with `locations.write`. The installed
- * marketplace app currently has `locations.readonly` — GET /locations/ and
- * GET /locations/{id} both answer 200 — but GET /snapshots/ answers 401, which
- * says the install was not granted the snapshot or write scopes.
+ * These calls need an agency-level credential with `locations.write` and
+ * `locations/customValues.write`.
  *
- * So the first real attempt may fail on authorisation rather than on anything in
- * this file. That is why every failure below carries the HTTP status and the
- * response body through to the caller instead of a generic message: "401
- * Unauthorized from POST /locations/" tells somebody to re-authorise the app,
- * and "could not create sub-account" does not.
+ * The marketplace app does not have them. Tested rather than assumed: GET
+ * /locations/ and GET /locations/{id} both answer 200, GET /snapshots/ answers
+ * 401, and a real POST /locations/ answered
+ *
+ *     401 {"message":"The token is not authorized for this scope."}
+ *
+ * which is GoHighLevel saying the scope was never granted rather than the call
+ * being wrong. Hence writeAuth() below and GHL_PRIVATE_TOKEN: a private
+ * integration's scopes are chosen in the GoHighLevel UI, so this is a minute's
+ * work instead of reinstalling the app across the agency.
+ *
+ * Every failure carries the HTTP status and body through to the caller for that
+ * reason — "401 from POST /locations/" sends somebody to the right screen, and
+ * "could not create sub-account" sends them nowhere.
  * ====================================================================
  */
 import { serverEnv } from '@/lib/env';
