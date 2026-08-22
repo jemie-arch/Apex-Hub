@@ -74,8 +74,14 @@ export class GhlWriteError extends Error {
   readonly body: string;
   readonly path: string;
 
+  /*
+   * 300 characters was not enough. The one error that explains why a new
+   * sub-account cannot be configured is a 401 with a reason appended, and the
+   * reason is the half that got cut -- so the message on screen stopped exactly
+   * where GoHighLevel started saying something useful.
+   */
   constructor(path: string, status: number, body: string) {
-    super(`${status} from ${path}: ${body.slice(0, 300)}`);
+    super(`${status} from ${path}: ${body.slice(0, 1200)}`);
     this.name = 'GhlWriteError';
     this.status = status;
     this.body = body;

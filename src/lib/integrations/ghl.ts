@@ -268,7 +268,7 @@ export async function mintTokenForLocationId(
     const detail = await response.text();
     throw new Error(
       `Could not mint a location token for ${locationId}: ` +
-        `${response.status} ${detail.slice(0, 300)}`,
+        `${response.status} ${detail.slice(0, 600)}`,
     );
   }
 
@@ -328,7 +328,7 @@ export async function mintLocationToken(clientId: string): Promise<GhlToken> {
     const detail = await response.text();
     throw new Error(
       `Could not mint a token for ${client.data.name} (${locationId}): ` +
-        `${response.status} ${detail.slice(0, 300)}`,
+        `${response.status} ${detail.slice(0, 600)}`,
     );
   }
 
