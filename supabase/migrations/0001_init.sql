@@ -1876,3 +1876,8 @@ create policy admin_all on provisioning_runs
 -- /locations/" cannot be told apart from "the private token is not accepted for
 -- this endpoint", and those two have opposite fixes.
 alter table provisioning_runs add column auth_kind text;
+
+-- Joshua's B2B pipeline has a Nurture stage — a lead parked deliberately, which
+-- is neither lost nor in progress. Without it the sync mapped Nurture to 'new'
+-- and reported held leads as fresh ones.
+alter type deal_stage add value if not exists 'nurture';

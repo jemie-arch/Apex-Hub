@@ -21,8 +21,18 @@ import { authoritative, humanOwned } from '@/lib/sync/merge';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
-/** Keyword -> stage. First match wins, so order matters. */
+/**
+ * Keyword -> stage. First match wins, so order matters.
+ *
+ * The live pipeline is: New lead, Follow up, Booked call, Showed call, Closed,
+ * Nurture. Two of those had no keyword here and would have fallen through to
+ * 'new' — Closed would have reported a won deal as a fresh lead, and Nurture a
+ * parked one. Both are now explicit, and both sit above the lead/new entries
+ * because 'Closed' and 'Nurture' must be tested before anything looser matches.
+ */
 const DEFAULT_STAGE_KEYWORDS: ReadonlyArray<[string, DealStage]> = [
+  ['closed', 'won'],
+  ['nurture', 'nurture'],
   ['proposal', 'proposal'],
   ['contract', 'proposal'],
   ['showed', 'call_showed'],
