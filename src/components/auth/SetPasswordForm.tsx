@@ -101,7 +101,7 @@ export function SetPasswordForm() {
 
   if (stage === 'checking') {
     return (
-      <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+      <div className="panel rounded-lg border border-line bg-surface p-6">
         <p className="text-sm text-fg-muted">Checking your link…</p>
       </div>
     );
@@ -109,7 +109,7 @@ export function SetPasswordForm() {
 
   if (stage === 'invalid') {
     return (
-      <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+      <div className="panel rounded-lg border border-line bg-surface p-6">
         <h1 className="text-sm font-semibold text-fg">This link has expired</h1>
         <p className="mt-2 text-sm text-fg-muted">
           Set-password links are single use and time limited. Ask whoever added
@@ -127,7 +127,7 @@ export function SetPasswordForm() {
 
   if (stage === 'saved') {
     return (
-      <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+      <div className="panel rounded-lg border border-line bg-surface p-6">
         <h1 className="flex items-center gap-2 text-sm font-semibold text-fg">
           <CheckCircle2 size={16} className="text-positive" /> Password set
         </h1>
@@ -137,7 +137,7 @@ export function SetPasswordForm() {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+    <div className="panel rounded-lg border border-line bg-surface p-6">
       <h1 className="flex items-center gap-2 text-sm font-semibold text-fg">
         <KeyRound size={16} /> Choose a password
       </h1>

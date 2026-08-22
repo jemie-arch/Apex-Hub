@@ -20,7 +20,7 @@ export default function LoginPage() {
 
         <Suspense
           fallback={
-            <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <div className="panel rounded-lg border border-line bg-surface p-6">
               <p className="text-sm text-fg-muted">Loading…</p>
             </div>
           }

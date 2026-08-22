@@ -152,7 +152,7 @@ export default async function PipelinePage() {
                       cards.map((deal) => (
                         <article
                           key={deal.id}
-                          className="rounded-md border border-line bg-surface p-3 shadow-sm"
+                          className="surface-interactive rounded-md border border-line bg-surface p-3"
                         >
                           <p className="truncate text-sm font-medium text-fg">
                             {deal.practice_name}

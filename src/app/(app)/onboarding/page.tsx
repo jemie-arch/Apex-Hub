@@ -121,7 +121,7 @@ export default async function OnboardingPage() {
                       return (
                         <article
                           key={group.id}
-                          className="rounded-md border border-line bg-surface p-3 shadow-sm"
+                          className="surface-interactive rounded-md border border-line bg-surface p-3"
                         >
                           <Link
                             href={`/clients/${group.id}`}

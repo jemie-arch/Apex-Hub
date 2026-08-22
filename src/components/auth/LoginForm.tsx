@@ -60,7 +60,7 @@ export function LoginForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-lg border border-line bg-surface p-6 shadow-sm"
+      className="panel rounded-lg border border-line bg-surface p-6"
     >
       <h1 className="text-lg font-semibold text-fg">Sign in</h1>
       <p className="mt-1 text-sm text-fg-muted">Internal access only.</p>

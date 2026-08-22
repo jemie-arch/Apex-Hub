@@ -70,7 +70,7 @@ export default async function MeetingsPage() {
             return (
               <article
                 key={row.id}
-                className="rounded-lg border border-line bg-surface p-5 shadow-sm"
+                className="surface-3d rounded-lg border border-line bg-surface p-5"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

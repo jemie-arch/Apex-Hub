@@ -88,7 +88,7 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
     db.from('clients').select('id, name, is_active').order('name'),
     db
       .from('billing_charges')
-      .select('client_id, amount_cents, outcome')
+      .select('client_id, amount_cents, outcome, occurred_at')
       .gte('occurred_at', fromIso)
       .lte('occurred_at', toIso)
       .limit(2000),
@@ -178,8 +178,52 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
     else if (charge.outcome === 'failed') row.uncollectedCents += charge.amount_cents;
   }
 
-  const decided = showed + [...rows.values()].reduce((sum, r) => sum + r.noShow, 0);
+  const noShowTotal = [...rows.values()].reduce((sum, r) => sum + r.noShow, 0);
+  const decided = showed + noShowTotal;
   const showRate = decided > 0 ? showed / decided : null;
+  const uncollectedTotal = [...rows.values()].reduce(
+    (sum, r) => sum + r.uncollectedCents,
+    0,
+  );
+
+  /*
+   * Daily series for the sparklines beside each figure.
+   *
+   * Built from the rows already fetched rather than three more queries: the same
+   * appointments are in memory, and a shape does not need its own round trip.
+   */
+  const dayKeys: string[] = [];
+  for (
+    const cursor = new Date(`${fromDate}T00:00:00.000Z`);
+    cursor.toISOString().slice(0, 10) <= toDate && dayKeys.length < 400;
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  ) {
+    dayKeys.push(cursor.toISOString().slice(0, 10));
+  }
+  const dayAt = new Map(dayKeys.map((day, index) => [day, index]));
+
+  const bookedByDay = new Array<number>(dayKeys.length).fill(0);
+  const showedByDay = new Array<number>(dayKeys.length).fill(0);
+  const collectedByDay = new Array<number>(dayKeys.length).fill(0);
+
+  for (const appointment of appointments.data ?? []) {
+    const index = appointment.booked_for
+      ? dayAt.get(appointment.booked_for)
+      : undefined;
+    if (index === undefined) continue;
+
+    bookedByDay[index] = (bookedByDay[index] ?? 0) + 1;
+    if (appointment.appointment_status === 'Showed') {
+      showedByDay[index] = (showedByDay[index] ?? 0) + 1;
+    }
+  }
+
+  for (const charge of charges.data ?? []) {
+    if (charge.outcome !== 'succeeded') continue;
+    const index = dayAt.get(charge.occurred_at.slice(0, 10));
+    if (index === undefined) continue;
+    collectedByDay[index] = (collectedByDay[index] ?? 0) + charge.amount_cents;
+  }
 
   const table = [...rows.values()]
     .filter((row) => row.booked > 0 || row.isActive)
@@ -207,8 +251,16 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
-        title="Fulfilment"
-        description={`What each ${client.singular} got · ${range.label}`}
+        eyebrow="Fulfilment"
+        pill={{
+          label: `${formatCount(table.length)} ${client.plural}`,
+          tone: 'accent',
+        }}
+        title="Did we get paid for every show?"
+        description={
+          `${range.label} · ${formatCount(showed)} of ${formatCount(booked)} ` +
+          `booked consultations showed up, and ${formatMoney(collectedCents)} was collected`
+        }
         actions={<DateRangePicker />}
       />
 
@@ -221,14 +273,35 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
       </p>
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard label="Booked" value={formatCount(booked)} />
-        <KPICard label="Showed" value={formatCount(showed)} />
+        <KPICard
+          label="Booked"
+          value={formatCount(booked)}
+          hint={`${formatCount(table.length)} practices`}
+          series={bookedByDay}
+        />
+        <KPICard
+          label="Showed"
+          value={formatCount(showed)}
+          hint={`${formatCount(noShowTotal)} did not`}
+          series={showedByDay}
+          seriesTone="positive"
+        />
         <KPICard
           label="Show rate"
           value={showRate === null ? '—' : formatPercent(showRate)}
-          hint="of consultations with a recorded outcome"
+          hint="of consultations already decided"
         />
-        <KPICard label="Collected" value={formatMoneyCompact(collectedCents)} />
+        <KPICard
+          label="Collected"
+          value={formatMoneyCompact(collectedCents)}
+          hint={
+            uncollectedTotal > 0
+              ? `${formatMoney(uncollectedTotal)} failed`
+              : 'nothing failed'
+          }
+          series={collectedByDay}
+          seriesTone={uncollectedTotal > 0 ? 'negative' : 'positive'}
+        />
       </section>
 
       {table.length === 0 ? (

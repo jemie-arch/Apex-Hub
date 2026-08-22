@@ -91,23 +91,80 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
   const booking = tenant.vocabulary.booking;
   const patient = tenant.vocabulary.endUser;
 
+  /*
+   * Daily shape for the two sparklines, from the rows already loaded.
+   *
+   * Note this list is capped at 400 rows, so the series describes what is on the
+   * page rather than the whole period. That is the right thing for a shape sitting
+   * beside a figure computed from the same 400.
+   */
+  const dayAt = new Map<string, number>();
+  const dayOrder: string[] = [];
+  for (const row of rows) {
+    const day = row.scheduled_at.slice(0, 10);
+    if (!dayAt.has(day)) {
+      dayAt.set(day, dayOrder.length);
+      dayOrder.push(day);
+    }
+  }
+  // The query sorts newest first; a chart reads left to right in time.
+  dayOrder.reverse();
+  dayOrder.forEach((day, index) => dayAt.set(day, index));
+
+  const bookedByDay = new Array<number>(dayOrder.length).fill(0);
+  const showedByDay = new Array<number>(dayOrder.length).fill(0);
+  for (const row of rows) {
+    const index = dayAt.get(row.scheduled_at.slice(0, 10));
+    if (index === undefined) continue;
+    bookedByDay[index] = (bookedByDay[index] ?? 0) + 1;
+    if (row.showed === true) showedByDay[index] = (showedByDay[index] ?? 0) + 1;
+  }
+
   return (
     <>
       <PageHeader
-        title="Consultations"
-        description={`Every ${patient.singular} ${booking.singular} across all ${tenant.vocabulary.client.plural} · ${range.label}`}
+        eyebrow="Consultations"
+        pill={{
+          label: `${formatCount(rows.length)} in period`,
+          tone: 'accent',
+        }}
+        title="Who came in, and what happened"
+        description={
+          `${range.label} · every ${patient.singular} ${booking.singular} across all ` +
+          `${tenant.vocabulary.client.plural}, one per row. Fulfilment groups the same ` +
+          `${booking.plural} by practice.`
+        }
         actions={<DateRangePicker />}
       />
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard label="Booked" value={formatCount(rows.length)} hint={`${formatCount(awaiting)} awaiting an outcome`} />
+        <KPICard
+          label="Booked"
+          value={formatCount(rows.length)}
+          hint={`${formatCount(awaiting)} awaiting an outcome`}
+          series={bookedByDay}
+        />
         <KPICard
           label="Attended"
           value={formatPercent(rows.length === 0 ? null : showed / rows.length, 0)}
           hint={`${formatCount(showed)} of ${formatCount(rows.length)}`}
+          series={showedByDay}
+          seriesTone="positive"
         />
-        <KPICard label="Started treatment" value={formatCount(won)} />
-        <KPICard label="Treatment value" value={formatMoneyCompact(revenueCents)} />
+        <KPICard
+          label="Started treatment"
+          value={formatCount(won)}
+          hint={
+            won === 0 && rows.length > 0
+              ? 'no outcome recorded on any row'
+              : `of ${formatCount(showed)} who attended`
+          }
+        />
+        <KPICard
+          label="Treatment value"
+          value={revenueCents === 0 ? '—' : formatMoneyCompact(revenueCents)}
+          hint={revenueCents === 0 ? 'no case value recorded' : 'on started treatments'}
+        />
       </section>
 
       {rows.length === 0 ? (

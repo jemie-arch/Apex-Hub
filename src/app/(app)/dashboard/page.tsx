@@ -12,6 +12,7 @@ import { BarChart } from '@/components/ui/BarChart';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { KPICard } from '@/components/ui/KPICard';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { tenant, titleCase } from '@/config/tenant.config';
 import { HEALTH_TONE, getGroupRollups } from '@/lib/client-metrics';
@@ -90,7 +91,7 @@ function GoalBar({ goal }: { goal: GoalProgress }) {
   const deadline = new Date(`${goal.deadline}T00:00:00.000Z`);
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-5 shadow-sm">
+    <div className="panel rounded-lg border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-fg">
           Road to {formatCount(goal.target)} {client.plural}
@@ -173,21 +174,33 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     .filter((rollup) => rollup.health.level === 'at_risk')
     .slice(0, 6);
 
+  /*
+   * Sparkline series, from the eight-month trend already fetched for the chart
+   * below. Monthly rather than daily, so a tile's shape and the bar chart under
+   * it are telling the same story at the same resolution — two different
+   * granularities on one screen invites the reader to compare them and be wrong.
+   */
+  const bookedTrend = trend.map((point) => point.booked);
+  const showedTrend = trend.map((point) => point.showed);
+  const wonTrend = trend.map((point) => point.won);
+  const spendTrend = trend.map((point) => point.spendCents);
+
   return (
     <>
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">
-            {firstName ? `Hello, ${firstName}` : 'Dashboard'}
-          </h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            {`${range.label} · versus the preceding period`}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <DateRangePicker />
-        </div>
-      </header>
+      <PageHeader
+        eyebrow={firstName ? `Hello, ${firstName}` : 'Dashboard'}
+        pill={{
+          label: `${formatCount(current.activeClients)} active ${client.plural}`,
+          tone: 'positive',
+        }}
+        title="How the book looks"
+        description={
+          `${range.label}, against the preceding period · ` +
+          `${formatCount(current.booked)} ${booking.plural} from ads, ` +
+          `${formatCount(current.showed)} showed up`
+        }
+        actions={<DateRangePicker />}
+      />
 
       {metrics.isEmpty ? (
         <EmptyState
@@ -220,6 +233,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           delta={delta(current.booked, previous.booked)}
           hint={`${formatCount(current.awaitingOutcome)} awaiting an outcome · ${formatCount(current.liveBooked)} appointments of every kind`}
           icon={<CalendarCheck size={16} />}
+          series={bookedTrend}
         />
         <KPICard
           label="Showed up"
@@ -231,6 +245,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           }
           hint={`${formatCount(current.showed)} of ${formatCount(current.booked)}`}
           icon={<UserCheck size={16} />}
+          series={showedTrend}
+          seriesTone="positive"
         />
         <KPICard
           label="Closed"
@@ -242,6 +258,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           }
           hint={`${formatCount(current.converted)} of those who showed`}
           icon={<CircleDollarSign size={16} />}
+          series={wonTrend}
+          seriesTone="positive"
         />
         <KPICard
           label="Leads"
@@ -264,6 +282,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           }
           // More spend is not itself good news; it is only good next to revenue.
           higherIsBetter={false}
+          // Only when there is spend: a flat line at nought looks like a
+          // measurement rather than the absence of one.
+          series={current.spendCents === 0 ? undefined : spendTrend}
           hint={
             current.spendCents === 0
               ? 'no ad account connected'
@@ -315,7 +336,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         <GoalBar goal={goal} />
       </div>
 
-      <section className="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+      <section className="mt-6 panel rounded-lg border border-line bg-surface p-6">
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-fg">
