@@ -7,6 +7,7 @@ import { syncCrmAppointments } from '@/lib/sync/crm-appointments';
 import { syncCrmCalls } from '@/lib/sync/crm-calls';
 import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
+import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import type { SyncFn } from '@/lib/sync/runner';
 import { syncStripeCharges } from '@/lib/sync/stripe-charges';
 import { syncWindsorAds } from '@/lib/sync/windsor-ads';
@@ -39,6 +40,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
     description:
       'GoHighLevel conversation calls into the call-centre leaderboard',
     run: syncCrmCalls,
+  },
+  'onboarding-calls': {
+    name: 'onboarding-calls',
+    description:
+      'Onboarding and launch calls from the ADM Client Onboarding sub-account ' +
+      'onto each practice',
+    run: syncOnboardingCalls,
   },
   'windsor-ads': {
     name: 'windsor-ads',
