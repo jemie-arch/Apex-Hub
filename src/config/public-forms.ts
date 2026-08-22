@@ -223,6 +223,15 @@ export const PUBLIC_FORMS: readonly PublicFormDefinition[] = [
               'Used so our messages refer to the doctor correctly. Say what you ' +
               'would like us to use.',
           },
+          { name: 'doctor_phone', label: 'Doctor phone', type: 'tel' },
+          {
+            name: 'doctor_type',
+            label: 'How the doctor should be described',
+            hint:
+              'Their credential as you want it written to patients — "Board ' +
+              'Certified Orthodontist", "Cosmetic Dentist". This goes into ad ' +
+              'copy and booking messages, so the exact wording matters.',
+          },
         ],
       },
       {
@@ -234,6 +243,28 @@ export const PUBLIC_FORMS: readonly PublicFormDefinition[] = [
             hint: 'Who patients will be told to ask for.',
           },
           { name: 'front_desk_email', label: 'Front desk email', type: 'email' },
+        ],
+      },
+      {
+        heading: 'Where confirmations go',
+        fields: [
+          {
+            name: 'confirmations_email',
+            label: 'Email for appointment confirmations',
+            type: 'email',
+            hint:
+              'Every booking, cancellation and reschedule is sent here. A shared ' +
+              'inbox is usually better than one person. Left blank, we use the ' +
+              'doctor email above.',
+          },
+          {
+            name: 'confirmations_phone',
+            label: 'Phone for appointment confirmations',
+            type: 'tel',
+            hint:
+              'Where the text alerts land — usually whoever runs the front desk ' +
+              'that day. Left blank, we use the main practice phone.',
+          },
         ],
       },
       {

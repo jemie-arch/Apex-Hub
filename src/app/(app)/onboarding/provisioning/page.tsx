@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill, type Tone } from '@/components/ui/StatusPill';
 import {
   ONBOARDING_SNAPSHOT_ID,
+  SETUP_ONLY_CUSTOM_VALUES,
   UNAVAILABLE_CUSTOM_VALUES,
 } from '@/config/provisioning';
 import { formatCount } from '@/lib/format';
@@ -309,6 +310,33 @@ export default async function ProvisioningPage() {
               <dd className="mt-0.5 max-w-3xl text-xs text-fg-muted">
                 {entry.note}
               </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-accent-subtle bg-surface p-4">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+          <AlertTriangle size={14} /> Three values the form cannot answer
+        </h2>
+        <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+          The snapshot marks five values as needing one per client. Two of them a
+          practice can answer, and the onboarding form now asks. These three come
+          from Apex, not from the practice — and a live sub-account was checked, so
+          this is not guesswork: it does not have these fields at all, which means
+          there is no existing client to copy a value from. They stay empty until
+          somebody says what they should hold.
+        </p>
+        <dl className="mt-3 space-y-3">
+          {SETUP_ONLY_CUSTOM_VALUES.map((entry) => (
+            <div key={entry.name}>
+              <dt className="text-sm font-medium text-fg">
+                {entry.name}{' '}
+                <span className="font-mono text-xs text-fg-subtle">
+                  {`{{custom_values.${entry.key}}}`}
+                </span>
+              </dt>
+              <dd className="mt-0.5 max-w-3xl text-xs text-fg-muted">{entry.note}</dd>
             </div>
           ))}
         </dl>

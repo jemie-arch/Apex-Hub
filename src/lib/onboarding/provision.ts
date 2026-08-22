@@ -71,6 +71,29 @@ export function valuesFor(clinicName: string, answers: Answers): Record<string, 
     if (answer !== undefined) values[customValueName] = answer;
   }
 
+  /*
+   * Where confirmations go, when nobody said.
+   *
+   * The snapshot marks both of these as needing a value per client, and a
+   * practice that leaves them blank does not mean "send confirmations nowhere"
+   * — it means they assumed we already knew. The doctor email and the main
+   * practice phone are the answers they would give if asked twice, and both are
+   * already required or near-required above.
+   *
+   * Only used as a fallback: an explicit answer always wins, including one that
+   * differs from the doctor email on purpose.
+   */
+  const fallbacks: ReadonlyArray<[string, string]> = [
+    ['*Email To Send Confirmations To', 'doctor_email'],
+    ['*Phone Number To Send Confirmations To', 'phone'],
+  ];
+
+  for (const [customValueName, sourceField] of fallbacks) {
+    if (values[customValueName] !== undefined) continue;
+    const fallback = pick(answers, sourceField);
+    if (fallback !== undefined) values[customValueName] = fallback;
+  }
+
   return values;
 }
 

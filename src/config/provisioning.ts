@@ -41,6 +41,11 @@ export const CONSTANT_CUSTOM_VALUES: Record<string, string> = {
 export const ONBOARDING_VALUE_MAP: Record<string, string> = {
   doctor_name: 'Doctor Name',
   doctor_email: 'Doctor Email',
+  doctor_gender: 'Doctor Gender',
+  doctor_phone: 'Doctor Phone',
+  doctor_type: 'Doctor Type',
+  confirmations_email: '*Email To Send Confirmations To',
+  confirmations_phone: '*Phone Number To Send Confirmations To',
   front_desk_name: 'Front Desk Name',
   front_desk_email: 'Front Desk Email',
   landmark: 'Landmark1',
@@ -58,6 +63,53 @@ export const ONBOARDING_VALUE_MAP: Record<string, string> = {
  * these get added to the snapshot, move them into the map above and they start
  * being written with no other change.
  */
+/**
+ * Values the snapshot marks as needing one per client, that no form answer can
+ * supply.
+ *
+ * The snapshot prefixes these with an asterisk, which is whoever built it saying
+ * "set this per client". Five carried that mark. Two of them a practice can
+ * answer, so the onboarding form now asks and they are mapped. The three below
+ * cannot come from a practice, and they cannot be inferred from how existing
+ * clients are set up either: a live sub-account was read directly, and it does
+ * not have these fields at all. They arrived with a newer snapshot, so there is
+ * no precedent anywhere to copy.
+ *
+ * Listed rather than guessed. A wrong Slack id or stats sheet points automation
+ * at somebody else's client, which is worse than an empty field somebody can
+ * see is empty.
+ */
+export const SETUP_ONLY_CUSTOM_VALUES: ReadonlyArray<{
+  name: string;
+  key: string;
+  note: string;
+}> = [
+  {
+    name: '*Slack ID',
+    key: 'slack_id',
+    note:
+      'Per client, and Apex-side: the channel or member id notifications post ' +
+      'to. Live accounts carry a different field instead — "Slack New Appt. ' +
+      'Notification Webhook", also empty — so it is worth settling which of the ' +
+      'two the automation actually reads before either is filled.',
+  },
+  {
+    name: '*Client Stats Sheet URL',
+    key: 'medi_stats_sheet_url',
+    note:
+      'Per client. Apex creates the sheet, so it cannot be asked for on the ' +
+      'form — it has to be written back once the sheet exists.',
+  },
+  {
+    name: '*Appointment Status Form',
+    key: 'appointment_status_form',
+    note:
+      'Unclear whether this is one form shared by every client or one each. If ' +
+      'it is shared it belongs in CONSTANT_CUSTOM_VALUES and is filled for ' +
+      'everybody in one line; if it is per client it needs the same treatment as ' +
+      'the stats sheet.',
+  },
+];
 export const UNAVAILABLE_CUSTOM_VALUES: ReadonlyArray<{
   brief: string;
   note: string;
@@ -65,9 +117,10 @@ export const UNAVAILABLE_CUSTOM_VALUES: ReadonlyArray<{
   {
     brief: 'Doctor Gender',
     note:
-      'No custom value of this name exists in the snapshot. The form still ' +
-      'collects it, so it is on the submission and can be written the moment ' +
-      'the field is added.',
+      'Absent from the snapshot, but live sub-accounts do have it — Abraham ' +
+      'Orthodontics carries doctor_gender, empty. So the snapshot is behind the ' +
+      'accounts built from earlier ones rather than the field being wrong. It is ' +
+      'mapped, and lands wherever it exists.',
   },
   {
     brief: 'Legal Business Name',
