@@ -1948,3 +1948,32 @@ as $fn$
            '[^a-z0-9]+', '', 'g')
   from trimmed;
 $fn$;
+
+-- ===========================================================================
+-- APPOINTMENTS THAT ARE NOT CONSULTATIONS
+--
+-- The appointments sync read every calendar a sub-account had, and only 329 of
+-- the 2,411 rows it collected were on a practice booking calendar. The rest:
+--
+--   1,995  "Do Not Book | ..." — PatientSync mirrors and blocked slots
+--      45  "Call Back Request [FOR APPT SETTERS ONLY]"
+--      17  "(PatientSync)"
+--      13  "Operatory 1's Personal Calendar"
+--      12  virtual, second-consultation and one doctor's own exam calendar
+--
+-- Moved here rather than deleted. They are real appointments in a real diary,
+-- just not the new-patient consultations this funnel measures, and keeping them
+-- makes the exclusion auditable and reversible instead of a number that changed
+-- one afternoon for reasons nobody recorded.
+-- ===========================================================================
+
+create table appointments_excluded (
+  like appointments including defaults,
+  calendar_name text,
+  excluded_at    timestamptz not null default now(),
+  reason         text not null
+);
+
+alter table appointments_excluded enable row level security;
+create policy admin_all on appointments_excluded
+  for all using (auth_is_admin()) with check (auth_is_admin());
