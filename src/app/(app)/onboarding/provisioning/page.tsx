@@ -54,7 +54,7 @@ export default async function ProvisioningPage() {
     db
       .from('provisioning_runs')
       .select(
-        'id, clinic_name, status, crm_location_id, values_written, values_missing, values_failed, error, scope_problem, created_at, submission_id',
+        'id, clinic_name, status, crm_location_id, values_written, values_missing, values_failed, error, scope_problem, auth_kind, created_at, submission_id',
       )
       .order('created_at', { ascending: false })
       .limit(100),
@@ -119,10 +119,21 @@ export default async function ProvisioningPage() {
             signature of a missing scope rather than a missing account.
           </p>
           <p className="mt-2 max-w-3xl text-xs text-fg-muted">
-            Re-authorise the app in GoHighLevel agency settings with{' '}
+            Two ways to fix it, and the second is faster. Either re-authorise the
+            marketplace app with{' '}
             <span className="numeric text-fg">locations.write</span> and{' '}
-            <span className="numeric text-fg">snapshots.readonly</span>, then press
-            Retry on any row below. Nothing was lost — every answer is saved.
+            <span className="numeric text-fg">snapshots.readonly</span> — which
+            means reinstalling it across the agency — or create a{' '}
+            <span className="text-fg">Private Integration</span> in agency
+            settings with those scopes and set its token as{' '}
+            <span className="numeric text-fg">GHL_PRIVATE_TOKEN</span> in Vercel.
+            Provisioning prefers the private token when one is present and falls
+            back to the app when it is not, so adding it changes nothing else.
+          </p>
+          <p className="mt-2 max-w-3xl text-xs text-fg-subtle">
+            Then press Retry on any row below. Nothing was lost — every answer is
+            saved, and each attempt records which credential it used so a second
+            refusal is diagnosable rather than baffling.
           </p>
         </section>
       ) : null}
@@ -207,6 +218,13 @@ export default async function ProvisioningPage() {
                     </div>
                     <p className="mt-0.5 text-xs text-fg-subtle">
                       {when(row.created_at)}
+                      {row.auth_kind
+                        ? ` · via ${
+                            row.auth_kind === 'private_integration'
+                              ? 'private integration'
+                              : 'marketplace app'
+                          }`
+                        : ''}
                       {row.crm_location_id ? (
                         <>
                           {' · '}

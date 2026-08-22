@@ -30,6 +30,28 @@ const serverSchema = z.object({
     .default('https://services.leadconnectorhq.com'),
   GHL_API_VERSION: z.string().default('2021-07-28'),
 
+  /**
+   * An agency-level Private Integration token, used only for provisioning.
+   *
+   * Optional and additive. When set, creating a sub-account and writing its
+   * custom values use this instead of the marketplace app's OAuth token; every
+   * read sync carries on using OAuth, because those rely on per-location tokens
+   * minted from the agency install and work today.
+   *
+   * Worth having for three reasons. Its scopes are chosen in the GoHighLevel UI,
+   * so granting locations.write takes a minute rather than a reinstall across
+   * the agency. It does not expire, so provisioning skips the refresh-token
+   * lease in integrations/ghl.ts entirely — GoHighLevel invalidates a refresh
+   * token the moment it is used, and two callers refreshing at once is a real
+   * failure mode there. And it can hold only the two scopes provisioning needs,
+   * rather than sharing the scope set every sync depends on.
+   *
+   * It is a long-lived static secret with no rotation, so it belongs in the
+   * environment and nowhere else: never in the database beside the OAuth rows,
+   * never logged, never returned to a browser.
+   */
+  GHL_PRIVATE_TOKEN: z.string().min(1).optional(),
+
   // Windsor.ai — the ad data source. One key covers every connected ad
   // account, so there is no per-account token to expire.
   WINDSOR_API_KEY: z.string().min(1).optional(),

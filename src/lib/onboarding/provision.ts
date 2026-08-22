@@ -21,6 +21,8 @@ import {
   GhlWriteError,
   createSubAccount,
   setCustomValues,
+  writeAuth,
+  type AuthKind,
 } from '@/lib/integrations/ghl-provision';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -73,6 +75,19 @@ export async function provisionFromSubmission(input: {
   const db = serviceClient();
   const clinicName = input.clinicName.trim();
 
+  /*
+   * Which credential this attempt used, resolved up front so it is recorded even
+   * when the very first call is refused. Without it, a 401 cannot be told apart
+   * from 'the private token is not accepted for this endpoint', and those have
+   * opposite fixes.
+   */
+  let authKind: AuthKind | null = null;
+  try {
+    authKind = (await writeAuth()).kind;
+  } catch {
+    // No credential at all. The create call reports it properly.
+  }
+
   if (clinicName === '') {
     return {
       ok: false,
@@ -104,6 +119,7 @@ export async function provisionFromSubmission(input: {
       values_failed: extra.failed ?? [],
       error: extra.error ?? null,
       scope_problem: extra.scopeProblem ?? false,
+      auth_kind: authKind,
       started_by: input.startedBy ?? null,
     });
   }
@@ -151,9 +167,9 @@ export async function provisionFromSubmission(input: {
   };
 
   try {
-    // Passed null so the AGENCY token is used: a location token for an account
-    // created seconds ago has not been minted yet.
-    const outcome = await setCustomValues(null, locationId, values);
+    // Agency-level credential throughout: a location token for an account made
+    // seconds ago has not been minted yet.
+    const outcome = await setCustomValues(locationId, values);
 
     const status: ProvisionOutcome['status'] =
       outcome.failed.length > 0 || outcome.missing.length > 0

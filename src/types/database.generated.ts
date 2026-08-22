@@ -1728,6 +1728,7 @@ export type Database = {
       }
       provisioning_runs: {
         Row: {
+          auth_kind: string | null
           client_group_id: string | null
           clinic_name: string
           created_at: string
@@ -1744,6 +1745,7 @@ export type Database = {
           values_written: string[]
         }
         Insert: {
+          auth_kind?: string | null
           client_group_id?: string | null
           clinic_name: string
           created_at?: string
@@ -1760,6 +1762,7 @@ export type Database = {
           values_written?: string[]
         }
         Update: {
+          auth_kind?: string | null
           client_group_id?: string | null
           clinic_name?: string
           created_at?: string

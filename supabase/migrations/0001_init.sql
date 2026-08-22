@@ -1871,3 +1871,8 @@ create index provisioning_runs_created_idx on provisioning_runs (created_at desc
 alter table provisioning_runs enable row level security;
 create policy admin_all on provisioning_runs
   for all using (auth_is_admin()) with check (auth_is_admin());
+
+-- Which credential the attempt went out under. Without it, "401 from
+-- /locations/" cannot be told apart from "the private token is not accepted for
+-- this endpoint", and those two have opposite fixes.
+alter table provisioning_runs add column auth_kind text;

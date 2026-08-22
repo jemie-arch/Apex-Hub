@@ -18,10 +18,49 @@
  * and "could not create sub-account" does not.
  * ====================================================================
  */
+import { serverEnv } from '@/lib/env';
 import { getToken } from '@/lib/integrations/ghl';
 
 const BASE = 'https://services.leadconnectorhq.com';
 const VERSION = '2021-07-28';
+
+/** Which credential a write went out under. Recorded so a failure is diagnosable. */
+export type AuthKind = 'private_integration' | 'oauth_app';
+
+export interface WriteAuth {
+  token: string;
+  kind: AuthKind;
+  /** The agency this token belongs to. Needed in the create-location body. */
+  companyId: string | null;
+}
+
+/**
+ * The credential to write with, preferring the private integration.
+ *
+ * Preferred rather than required: if GHL_PRIVATE_TOKEN is unset, or turns out not
+ * to be accepted for these endpoints, provisioning still runs on the OAuth token
+ * exactly as before. Adding the private token is a change that can only help, and
+ * removing it is a rollback with no migration.
+ */
+export async function writeAuth(): Promise<WriteAuth> {
+  const privateToken = serverEnv().GHL_PRIVATE_TOKEN;
+
+  if (privateToken) {
+    // A private integration carries no companyId of its own, so the agency id
+    // still comes from the stored OAuth row — the only place we know it.
+    let companyId: string | null = null;
+    try {
+      companyId = (await getToken(null)).companyId;
+    } catch {
+      // No OAuth row at all. createSubAccount says what is missing.
+    }
+
+    return { token: privateToken, kind: 'private_integration', companyId };
+  }
+
+  const oauth = await getToken(null);
+  return { token: oauth.accessToken, kind: 'oauth_app', companyId: oauth.companyId };
+}
 
 export class GhlWriteError extends Error {
   readonly status: number;
@@ -91,8 +130,8 @@ export interface NewSubAccount {
  */
 export async function createSubAccount(
   input: NewSubAccount,
-): Promise<{ locationId: string; raw: unknown }> {
-  const { accessToken, companyId } = await getToken(null);
+): Promise<{ locationId: string; raw: unknown; auth: AuthKind }> {
+  const { token: accessToken, kind, companyId } = await writeAuth();
 
   if (!companyId) {
     throw new Error(
@@ -143,7 +182,7 @@ export async function createSubAccount(
     );
   }
 
-  return { locationId, raw: created };
+  return { locationId, raw: created, auth: kind };
 }
 
 export interface CustomValue {
@@ -153,10 +192,9 @@ export interface CustomValue {
 }
 
 export async function listCustomValues(
-  clientId: string | null,
   locationId: string,
 ): Promise<CustomValue[]> {
-  const { accessToken } = await getToken(clientId);
+  const { token: accessToken } = await writeAuth();
 
   const payload = await call<{ customValues?: unknown[] }>(
     accessToken,
@@ -202,12 +240,11 @@ export interface CustomValueResult {
  * not consistent: it contains both "Landmark1" and "Landmark 2".
  */
 export async function setCustomValues(
-  clientId: string | null,
   locationId: string,
   values: Record<string, string>,
 ): Promise<CustomValueResult> {
-  const { accessToken } = await getToken(clientId);
-  const existing = await listCustomValues(clientId, locationId);
+  const { token: accessToken } = await writeAuth();
+  const existing = await listCustomValues(locationId);
 
   const key = (name: string) => name.toLowerCase().replace(/\s+/g, '');
   const byKey = new Map(existing.map((row) => [key(row.name), row]));
