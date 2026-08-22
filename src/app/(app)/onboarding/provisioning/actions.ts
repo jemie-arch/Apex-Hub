@@ -19,6 +19,43 @@ export interface RetryResult {
   message: string;
 }
 
+/**
+ * Provisions an onboarding submission that has never been attempted.
+ *
+ * Needed because of a real gap the first live test found: the submission saved,
+ * provisioning silently did not run, and with no attempt row there was nothing
+ * for Retry to act on — the answers were stranded in a table with no button
+ * anywhere that could use them.
+ */
+export async function provisionSubmission(input: {
+  submissionId: string;
+}): Promise<RetryResult> {
+  const caller = await requireAdmin();
+  const db = serviceClient();
+
+  const submission = await db
+    .from('form_submissions')
+    .select('id, payload, clinic_name, client_group_id')
+    .eq('id', input.submissionId)
+    .maybeSingle();
+
+  if (submission.error) return { ok: false, message: submission.error.message };
+  if (!submission.data) return { ok: false, message: 'No such submission.' };
+
+  const answers = (submission.data.payload ?? {}) as Record<string, string>;
+
+  const outcome = await provisionFromSubmission({
+    submissionId: submission.data.id,
+    clientGroupId: submission.data.client_group_id,
+    clinicName: submission.data.clinic_name ?? '',
+    answers,
+    startedBy: caller.id,
+  });
+
+  revalidatePath('/onboarding/provisioning');
+  return { ok: outcome.ok, message: outcome.message };
+}
+
 export async function retryProvisioning(input: {
   runId: string;
 }): Promise<RetryResult> {

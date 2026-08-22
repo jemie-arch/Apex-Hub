@@ -104,36 +104,34 @@ export async function submitPublicForm(
    * would just get us the same answers twice.
    */
   if (definition.key === 'client_onboarding') {
-    void provisionInBackground({
-      submissionId: written.data?.id ?? null,
-      clientGroupId: groupId,
-      clinicName: payload['clinic_name'] ?? '',
-      answers: payload,
-    });
+    /*
+     * Awaited, not fired and forgotten.
+     *
+     * This was `void provisionInBackground(...)` and it did nothing at all: on
+     * Vercel the function stops as soon as the action returns, so the promise was
+     * killed before it reached GoHighLevel. The first live test saved the
+     * submission and produced no provisioning row, which is exactly what that
+     * looks like — silence rather than an error.
+     *
+     * So the sender waits the couple of seconds it takes. They are told the form
+     * was received either way; what they are never told is whether provisioning
+     * worked, because that is ours to retry.
+     */
+    try {
+      await provisionFromSubmission({
+        submissionId: written.data?.id ?? null,
+        clientGroupId: groupId,
+        clinicName: payload['clinic_name'] ?? '',
+        answers: payload,
+      });
+    } catch {
+      // provisionFromSubmission records its own failures on the row. Anything
+      // escaping it must still not turn a saved submission into an error the
+      // sender sees.
+    }
   }
 
   return { ok: true, message: definition.thanks };
-}
-
-/**
- * Kicks off provisioning without making the sender wait for GoHighLevel.
- *
- * Every outcome is written to provisioning_runs, so nothing depends on this
- * promise being observed — which is the point, since the response has already
- * gone back by the time it settles.
- */
-async function provisionInBackground(input: {
-  submissionId: string | null;
-  clientGroupId: string | null;
-  clinicName: string;
-  answers: Record<string, string>;
-}): Promise<void> {
-  try {
-    await provisionFromSubmission(input);
-  } catch {
-    // provisionFromSubmission records its own failures. Anything escaping it is
-    // already on the row; swallowing here only stops an unhandled rejection.
-  }
 }
 
 /**

@@ -50,17 +50,35 @@ function when(iso: string): string {
 export default async function ProvisioningPage() {
   const db = serviceClient();
 
-  const runs = await db
-    .from('provisioning_runs')
-    .select(
-      'id, clinic_name, status, crm_location_id, values_written, values_missing, values_failed, error, scope_problem, created_at, submission_id',
-    )
-    .order('created_at', { ascending: false })
-    .limit(100);
+  const [runs, submissions] = await Promise.all([
+    db
+      .from('provisioning_runs')
+      .select(
+        'id, clinic_name, status, crm_location_id, values_written, values_missing, values_failed, error, scope_problem, created_at, submission_id',
+      )
+      .order('created_at', { ascending: false })
+      .limit(100),
+    // Onboarding submissions, so any with no attempt can be found. Without this
+    // an answer set with no attempt row was unreachable from every screen.
+    db
+      .from('form_submissions')
+      .select('id, clinic_name, person_name, submitted_at')
+      .eq('form_key', 'client_onboarding')
+      .eq('is_test', false)
+      .order('submitted_at', { ascending: false })
+      .limit(100),
+  ]);
 
   if (runs.error) throw runs.error;
+  if (submissions.error) throw submissions.error;
 
   const rows = runs.data ?? [];
+  const attempted = new Set(
+    rows.map((row) => row.submission_id).filter((id): id is string => id !== null),
+  );
+  const neverAttempted = (submissions.data ?? []).filter(
+    (row) => !attempted.has(row.id),
+  );
   const ready = rows.filter((row) => row.status === 'values_written').length;
   const needsWork = rows.filter(
     (row) => row.status === 'failed' || row.status === 'created',
@@ -123,13 +141,47 @@ export default async function ProvisioningPage() {
         />
       </section>
 
-      {rows.length === 0 ? (
+      {neverAttempted.length > 0 ? (
+        <section className="mb-6 panel rounded-lg border border-line bg-surface p-4">
+          <h2 className="text-sm font-semibold text-fg">
+            {formatCount(neverAttempted.length)} submission(s) never attempted
+          </h2>
+          <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+            The answers are saved and no sub-account was built from them. Press
+            Provision to build one now.
+          </p>
+
+          <ul className="mt-3 space-y-2">
+            {neverAttempted.map((row) => (
+              <li
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-surface-sunken px-3 py-2"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-fg">
+                    {row.clinic_name ?? 'No clinic name'}
+                  </span>
+                  <span className="block text-[11px] text-fg-subtle">
+                    {row.person_name ?? 'no name'} · {when(row.submitted_at)}
+                  </span>
+                </span>
+                <RetryProvisioning
+                  submissionId={row.id}
+                  disabled={row.clinic_name === null}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {rows.length === 0 && neverAttempted.length === 0 ? (
         <EmptyState
           title="Nothing has been provisioned yet"
           description="The first onboarding form submission builds its sub-account automatically, and lands here."
           icon={<Server size={22} />}
         />
-      ) : (
+      ) : rows.length === 0 ? null : (
         <div className="space-y-3">
           {rows.map((row) => {
             const failed = (row.values_failed ?? []) as Array<{
