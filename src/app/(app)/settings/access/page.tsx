@@ -1,7 +1,9 @@
 import { ShieldCheck } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import { isPrivileged, roleLabel } from '@/config/roles';
 
 import { AccessEditor } from '@/components/settings/AccessEditor';
+import { AddTeammate } from '@/components/settings/AddTeammate';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -24,7 +26,7 @@ export const metadata = { title: 'Access & Permissions' };
 export default async function AccessPage() {
   const caller = await currentCaller();
   if (!caller) redirect('/login');
-  if (caller.role !== 'admin') redirect('/dashboard');
+  if (!isPrivileged(caller.role)) redirect('/dashboard');
 
   const people = await serviceClient()
     .from('user_profiles')
@@ -43,6 +45,7 @@ export default async function AccessPage() {
       <PageHeader
         title="Access & Permissions"
         description={`Which of the ${PERMISSION_KEYS.length} pages each person sees`}
+        actions={<AddTeammate callerRole={caller.role} />}
       />
 
       {staff.length === 0 ? (
@@ -83,8 +86,8 @@ export default async function AccessPage() {
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill
-                        value={row.role}
-                        tone={row.role === 'admin' ? 'accent' : 'neutral'}
+                        value={roleLabel(row.role)}
+                        tone={isPrivileged(row.role) ? 'accent' : 'neutral'}
                       />
                     </td>
                     <td className="px-4 py-3 text-xs text-fg-muted">

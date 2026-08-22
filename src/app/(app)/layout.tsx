@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { isPrivileged } from '@/config/roles';
 
 import { PortalSwitcher } from '@/components/shell/PortalSwitcher';
 import { Sidebar } from '@/components/shell/Sidebar';
@@ -40,7 +41,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
    * invisible in the menu because no existing row carried the new key. A page
    * nobody can find is indistinguishable from a page that was never deployed.
    */
-  const isAdmin = profile.data?.role === 'admin';
+  const isAdmin = isPrivileged(profile.data?.role);
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">

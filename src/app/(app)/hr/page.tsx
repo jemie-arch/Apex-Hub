@@ -1,5 +1,6 @@
 import { UsersRound } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import { isPrivileged, roleLabel } from '@/config/roles';
 
 import {
   DecideTimeOff,
@@ -36,7 +37,7 @@ export default async function TeamPage() {
   const caller = await currentCaller();
   if (!caller) redirect('/login');
 
-  const isAdmin = caller.role === 'admin';
+  const isAdmin = isPrivileged(caller.role);
   const db = serviceClient();
 
   const [people, requests] = await Promise.all([
@@ -106,8 +107,8 @@ export default async function TeamPage() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill
-                      value={row.role}
-                      tone={row.role === 'admin' ? 'accent' : 'neutral'}
+                      value={roleLabel(row.role)}
+                      tone={isPrivileged(row.role) ? 'accent' : 'neutral'}
                     />
                   </td>
                   <td className="px-4 py-3 text-fg-muted">

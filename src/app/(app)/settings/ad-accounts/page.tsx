@@ -1,6 +1,7 @@
 import { Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { isPrivileged } from '@/config/roles';
 
 import {
   AdAccountPicker,
@@ -38,7 +39,7 @@ function isoDate(date: Date): string {
 export default async function AdAccountsPage() {
   const caller = await currentCaller();
   if (!caller) redirect('/login');
-  if (caller.role !== 'admin') redirect('/dashboard');
+  if (!isPrivileged(caller.role)) redirect('/dashboard');
 
   const db = serviceClient();
 

@@ -731,9 +731,11 @@ export type Database = {
           direction: Database["public"]["Enums"]["call_direction"]
           duration_seconds: number
           id: string
+          lead_created_at: string | null
           outcome: Database["public"]["Enums"]["call_outcome"] | null
           quality_score: number | null
           recording_url: string | null
+          speed_to_lead_minutes: number | null
           started_at: string
           synced_at: string | null
           user_id: string | null
@@ -749,9 +751,11 @@ export type Database = {
           direction?: Database["public"]["Enums"]["call_direction"]
           duration_seconds?: number
           id?: string
+          lead_created_at?: string | null
           outcome?: Database["public"]["Enums"]["call_outcome"] | null
           quality_score?: number | null
           recording_url?: string | null
+          speed_to_lead_minutes?: number | null
           started_at: string
           synced_at?: string | null
           user_id?: string | null
@@ -767,9 +771,11 @@ export type Database = {
           direction?: Database["public"]["Enums"]["call_direction"]
           duration_seconds?: number
           id?: string
+          lead_created_at?: string | null
           outcome?: Database["public"]["Enums"]["call_outcome"] | null
           quality_score?: number | null
           recording_url?: string | null
+          speed_to_lead_minutes?: number | null
           started_at?: string
           synced_at?: string | null
           user_id?: string | null
@@ -2120,7 +2126,17 @@ export type Database = {
         | "cancelled"
         | "no_show"
       time_off_kind: "vacation" | "sick" | "unpaid" | "parental" | "other"
-      user_role: "admin" | "isr" | "csr" | "client"
+      user_role:
+        | "admin"
+        | "isr"
+        | "csr"
+        | "client"
+        | "super_admin"
+        | "ceo"
+        | "tech"
+        | "media_buyer"
+        | "isa"
+        | "csm"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2317,7 +2333,18 @@ export const Constants = {
         "no_show",
       ],
       time_off_kind: ["vacation", "sick", "unpaid", "parental", "other"],
-      user_role: ["admin", "isr", "csr", "client"],
+      user_role: [
+        "admin",
+        "isr",
+        "csr",
+        "client",
+        "super_admin",
+        "ceo",
+        "tech",
+        "media_buyer",
+        "isa",
+        "csm",
+      ],
     },
   },
 } as const

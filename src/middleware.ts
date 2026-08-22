@@ -15,6 +15,7 @@
  */
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isPrivileged } from '@/config/roles';
 
 import { permissionForPath } from '@/config/permissions';
 
@@ -119,7 +120,7 @@ export async function middleware(request: NextRequest) {
 
   const role = (user.app_metadata?.['role'] as string | undefined) ?? 'client';
 
-  if (role === 'admin') {
+  if (isPrivileged(role)) {
     return response;
   }
 
@@ -178,6 +179,15 @@ export async function middleware(request: NextRequest) {
     return new NextResponse('Not found', { status: 404 });
   }
 
+  /*
+   * Any staff role with no rule above lands here.
+   *
+   * This 404 locked the owner out of the entire app once: the database gave them
+   * a new privileged role before the code that recognises it was deployed, and
+   * every path fell through to here. Roles are defined in config/roles.ts, so a
+   * new one must be added to PRIVILEGED_ROLES or handled explicitly above
+   * BEFORE it is assigned to anybody.
+   */
   return new NextResponse('Not found', { status: 404 });
 }
 

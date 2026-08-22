@@ -8,6 +8,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+import { isPrivileged } from '@/config/roles';
 import { publicEnv } from '@/lib/env';
 import type { Database, UserRole } from '@/types/database';
 
@@ -79,7 +80,7 @@ export async function currentCaller(): Promise<Caller | null> {
  */
 export async function requireAdmin(): Promise<Caller> {
   const caller = await currentCaller();
-  if (!caller || caller.role !== 'admin') {
+  if (!caller || !isPrivileged(caller.role)) {
     throw new Error('Not authorised.');
   }
   return caller;
