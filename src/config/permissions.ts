@@ -115,6 +115,32 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/settings', 'settings'],
   ];
 
+/**
+ * Somewhere sensible to land, given what this person holds.
+ *
+ * Sign-in used to send anyone without the `overview` key to their call-centre
+ * performance page, which is the right answer for a caller and meaningless for a
+ * media buyer or a tech. This walks the routes in menu order and returns the
+ * first one they can actually open.
+ */
+export function firstAllowedRoute(granted: readonly string[]): string | null {
+  const held = new Set(granted);
+
+  // Menu order, so the landing page is the top of what they can see rather than
+  // whichever route happens to sort first.
+  const preferred = ['/dashboard', '/pipeline', '/ads', '/clients', '/fulfilment'];
+  for (const route of preferred) {
+    const key = permissionForPath(route);
+    if (key !== null && held.has(key)) return route;
+  }
+
+  for (const [route, key] of ROUTE_PERMISSIONS) {
+    if (held.has(key) && route !== '/account') return route;
+  }
+
+  return held.has('account') ? '/account' : null;
+}
+
 /** The key a path requires, or null if no rule covers it. */
 export function permissionForPath(pathname: string): PermissionKey | null {
   let bestPrefix = '';

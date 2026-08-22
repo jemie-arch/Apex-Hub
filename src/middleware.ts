@@ -2,11 +2,14 @@
  * Route authorisation. This is the only place roles are enforced — a component
  * may style itself differently per role, but it never decides access.
  *
- * The three roles:
- *   admin      every route
- *   isr / csr  their own performance page, plus whichever pages an admin
- *              has granted them in user_profiles.permissions
- *   client     bounced to their own portal; they do not get the internal app
+ * Roles, as three kinds rather than a list — see config/roles.ts:
+ *   privileged   super_admin and admin. Every route.
+ *   staff        every other job role. Whichever pages an admin granted them
+ *                in user_profiles.permissions, plus their own call-centre page.
+ *   client       bounced to their own portal; they do not get the internal app.
+ *
+ * Matched by predicate, never by naming roles. A role named here and nowhere
+ * else is a role that 404s on every page the day somebody is given it.
  *
  * /portal/[token] is deliberately unauthenticated. It is safe because the page
  * resolves the token to exactly one client server-side and scopes every query
@@ -15,9 +18,9 @@
  */
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isPrivileged } from '@/config/roles';
+import { isCallerRole, isPrivileged, isStaffRole } from '@/config/roles';
 
-import { permissionForPath } from '@/config/permissions';
+import { firstAllowedRoute, permissionForPath } from '@/config/permissions';
 
 /** Reachable without a session. */
 const PUBLIC_PREFIXES = [
@@ -134,15 +137,22 @@ export async function middleware(request: NextRequest) {
   }
 
   /*
-   * Both call-centre roles always get their own performance page, and beyond
-   * that exactly the pages an admin has granted them. The grant is read from
-   * the profile rather than the JWT: a revoked page has to stop working now,
-   * not whenever the token next refreshes.
+   * Every other member of staff: exactly the pages an admin has granted them,
+   * and their own call-centre performance page. The grant is read from the
+   * profile rather than the JWT, because a revoked page has to stop working now
+   * and not whenever the token next refreshes.
    *
-   * One rule survives regardless of grants — a rep never reaches a colleague's
+   * One rule survives regardless of grants — nobody reaches a colleague's
    * drill-down, because that page is about a named individual.
+   *
+   * This deliberately covers ALL non-privileged staff rather than naming roles.
+   * It used to test for isr and csr only, which meant the five job roles added
+   * for hiring — ceo, tech, media_buyer, isa, csm — would each have fallen
+   * through to the 404 below and been locked out of the whole app on their first
+   * sign-in. That is the second time the same shape of bug has bitten: a role
+   * existing in the database that the routing has never heard of.
    */
-  if (role === 'isr' || role === 'csr') {
+  if (isStaffRole(role)) {
     const ownPage = `/call-center/${user.id}`;
 
     if (pathname === ownPage || pathname.startsWith(`${ownPage}/`)) {
@@ -163,10 +173,14 @@ export async function middleware(request: NextRequest) {
     const granted: string[] = profile.data?.permissions ?? [];
 
     // The landing page depends on what they hold, so nobody arrives at a 404
-    // by signing in.
+    // by signing in. A caller goes to their own performance page; everybody else
+    // goes to the first page they can actually open, which for a media buyer or
+    // a tech is not the call centre.
     if (pathname === '/') {
+      const isCaller = isCallerRole(role);
       const home = request.nextUrl.clone();
-      home.pathname = granted.includes('overview') ? '/dashboard' : ownPage;
+      home.pathname =
+        firstAllowedRoute(granted) ?? (isCaller ? ownPage : '/account');
       home.search = '';
       return NextResponse.redirect(home);
     }

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { isCallerRole } from '@/config/roles';
 
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { KPICard } from '@/components/ui/KPICard';
@@ -54,7 +55,9 @@ export default async function RepPage({ params, searchParams }: PageProps) {
   if (!profile.data) notFound();
 
   // Only the two call-centre roles have a performance page.
-  if (profile.data.role !== 'isr' && profile.data.role !== 'csr') notFound();
+  // Any caller, not just the two original role names. An ISA would otherwise
+  // 404 on their own performance page.
+  if (!isCallerRole(profile.data.role)) notFound();
 
   const [stat, calls, appointments] = await Promise.all([
     getRepStat(range, params.userId),
@@ -79,7 +82,7 @@ export default async function RepPage({ params, searchParams }: PageProps) {
   if (calls.error) throw calls.error;
   if (appointments.error) throw appointments.error;
 
-  const isCsr = profile.data.role === 'csr';
+  const isCsr = profile.data.role === 'csr' || profile.data.role === 'csm';
   const roleNoun = isCsr ? tenant.vocabulary.csr : tenant.vocabulary.isr;
   const booking = tenant.vocabulary.booking;
   const zone = tenant.defaultTimezone;

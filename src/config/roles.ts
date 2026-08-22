@@ -86,6 +86,21 @@ export function isUserRole(value: string): value is UserRole {
 }
 
 /**
+ * Staff who are not privileged: everybody whose access is decided by their
+ * permission keys.
+ *
+ * Written as "a known role that is neither privileged nor a client" rather than
+ * as a list, so adding a role to USER_ROLES cannot leave routing unaware of it.
+ * The previous version named isr and csr explicitly, and every job role added
+ * afterwards was routed to a 404 on every page.
+ */
+export function isStaffRole(role: string | null | undefined): boolean {
+  if (role == null) return false;
+  if (!isUserRole(role)) return false;
+  return role !== 'client' && !isPrivileged(role);
+}
+
+/**
  * Whether this role reaches everything.
  *
  * Every `role === 'admin'` comparison in the app was replaced by a call to
@@ -100,6 +115,16 @@ export function isPrivileged(role: string | null | undefined): boolean {
 export function canAssign(callerRole: string, target: UserRole): boolean {
   if (target === 'super_admin') return callerRole === 'super_admin';
   return isPrivileged(callerRole);
+}
+
+/**
+ * Roles that work the phones, so have a call-centre performance page.
+ *
+ * isr and csr are the former names of isa and csm; all four belong here, which
+ * is why this is a helper and not two equality checks at each call site.
+ */
+export function isCallerRole(role: string | null | undefined): boolean {
+  return role === 'isa' || role === 'csm' || role === 'isr' || role === 'csr';
 }
 
 export function roleLabel(role: string | null | undefined): string {

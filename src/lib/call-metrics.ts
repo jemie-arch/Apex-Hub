@@ -38,6 +38,19 @@ export interface RepStats {
 
 const CONNECTED_OUTCOMES = new Set(['connected', 'booked']);
 
+/**
+ * The two call-centre views, and every role that belongs in each.
+ *
+ * 'isr' and 'csr' are the view names as well as the original role names, which
+ * is why this map exists rather than a comparison: isa and csm are the current
+ * names for the same jobs, and filtering on the old pair alone made every
+ * newly hired caller invisible on the call-centre page.
+ */
+const ROLES_IN_VIEW = {
+  isr: ['isr', 'isa'],
+  csr: ['csr', 'csm'],
+} as const;
+
 export async function getRepStats(
   range: DateRange,
   role?: 'isr' | 'csr',
@@ -48,7 +61,10 @@ export async function getRepStats(
   const profileQuery = db
     .from('user_profiles')
     .select('id, full_name, email, role')
-    .in('role', role ? [role] : ['isr', 'csr'])
+    .in(
+      'role',
+      role ? [...ROLES_IN_VIEW[role]] : [...ROLES_IN_VIEW.isr, ...ROLES_IN_VIEW.csr],
+    )
     .eq('is_active', true)
     .order('full_name');
 
@@ -139,7 +155,10 @@ export async function getRepStats(
 
   return [...stats.values()].sort((a, b) => {
     // ISRs rank by what they produced, CSRs by how they handled calls.
-    if (a.role === 'csr' && b.role === 'csr') {
+    const bothCsr =
+      (a.role === 'csr' || a.role === 'csm') &&
+      (b.role === 'csr' || b.role === 'csm');
+    if (bothCsr) {
       return (b.avgQuality ?? -1) - (a.avgQuality ?? -1);
     }
     return b.bookingsSet - a.bookingsSet || b.dials - a.dials;
