@@ -2335,3 +2335,45 @@ $fn$;
 
 revoke all on function attribute_billing_charges() from public;
 grant execute on function attribute_billing_charges() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Calendars that pass the name test and still are not consultations
+--
+-- The consultation filter is a name rule: a calendar ending "Booking Calendar".
+-- That is the right rule and it is not enough. Fifteen calendars satisfy it and
+-- hold no consultations -- PatientSync mirrors, blocked slots, an appointment
+-- setter's call-back list, somebody's personal calendar -- and between them they
+-- carried 2,068 of the 2,397 events the sync reads. One practice's mirrors alone
+-- outnumbered every real booking in the agency.
+--
+-- They were cleared out by hand into appointments_excluded, which recorded what
+-- was removed but not the decision. The sync knew nothing about it, so the next
+-- run re-imported all 2,068 and the clear-out would have lasted until the
+-- following evening. This table is the decision, in a form the sync reads.
+--
+-- Checked before seeding: no calendar appears in both the excluded set and the
+-- kept set, so nothing here costs a real booking.
+-- ---------------------------------------------------------------------------
+create table if not exists excluded_calendars (
+  crm_calendar_id text primary key,
+  client_id       uuid references clients(id) on delete cascade,
+  calendar_name   text,
+  reason          text not null,
+  excluded_at     timestamptz not null default now()
+);
+
+alter table excluded_calendars enable row level security;
+drop policy if exists admin_all on excluded_calendars;
+create policy admin_all on excluded_calendars
+  for all using (auth_is_admin()) with check (auth_is_admin());
+
+comment on table excluded_calendars is
+  'GoHighLevel calendars whose events are not consultations, kept so the decision survives the next sync. Every one is named "... Booking Calendar" and so passes the name test -- they are PatientSync mirrors, blocked slots, call-back lists and personal calendars. Without this the nightly sync re-imports 2,068 of them and the consultation count goes back to being seven times too high.';
+
+insert into excluded_calendars (crm_calendar_id, client_id, calendar_name, reason)
+select distinct on (crm_calendar_id)
+       crm_calendar_id, client_id, calendar_name, reason
+from appointments_excluded
+where crm_calendar_id is not null
+order by crm_calendar_id, excluded_at desc
+on conflict (crm_calendar_id) do nothing;

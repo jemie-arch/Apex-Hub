@@ -108,6 +108,29 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   /** Practices with no calendar matching the booking-calendar name. */
   const missingCalendar: string[] = [];
 
+  /*
+   * Calendars that pass the name test and still are not consultations.
+   *
+   * Every one of them is called "... Booking Calendar", so the name rule lets
+   * them through: they are PatientSync mirrors, blocked slots, an appointment
+   * setter call-back list, somebody's personal calendar. Fifteen of them held
+   * 2,068 of the 2,397 events this sync reads -- one practice's mirrors alone
+   * dwarfed every real booking in the agency.
+   *
+   * They were cleared out by hand once. Without reading that decision back
+   * here the next run simply re-imported them, so the clear-out lasted until
+   * the following evening and the consultation count went back to being seven
+   * times too high.
+   */
+  const excluded = await db.from('excluded_calendars').select('crm_calendar_id');
+  if (excluded.error) throw excluded.error;
+
+  const excludedCalendars = new Set(
+    (excluded.data ?? []).map((row) => row.crm_calendar_id),
+  );
+
+  let skippedByCalendar = 0;
+
   for (const client of clients.data ?? []) {
     if (!client.crm_location_id) continue;
 
@@ -128,6 +151,15 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       });
       continue;
     }
+
+    const admissible = events.filter(
+      (event) =>
+        event.calendarId === null || !excludedCalendars.has(event.calendarId),
+    );
+
+    skippedByCalendar += events.length - admissible.length;
+    ctx.counts.skipped += events.length - admissible.length;
+    events = admissible;
 
     ctx.counts.read += events.length;
 
@@ -392,6 +424,15 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
    * produce — the dashboard would simply show them at zero. Named, not
    * counted, so the fix is obvious.
    */
+  if (skippedByCalendar > 0) {
+    ctx.note('skipped_by_calendar', skippedByCalendar);
+    ctx.log(
+      `${skippedByCalendar} event(s) ignored: they sit on calendars that are ` +
+        'named like a booking calendar but are not one — mirrors, blocked ' +
+        'slots, call-back lists. See excluded_calendars.',
+    );
+  }
+
   if (missingCalendar.length > 0) {
     ctx.note('no_booking_calendar', missingCalendar);
     ctx.recordError(

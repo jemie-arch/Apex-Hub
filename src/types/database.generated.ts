@@ -1424,6 +1424,38 @@ export type Database = {
           },
         ]
       }
+      excluded_calendars: {
+        Row: {
+          calendar_name: string | null
+          client_id: string | null
+          crm_calendar_id: string
+          excluded_at: string
+          reason: string
+        }
+        Insert: {
+          calendar_name?: string | null
+          client_id?: string | null
+          crm_calendar_id: string
+          excluded_at?: string
+          reason: string
+        }
+        Update: {
+          calendar_name?: string | null
+          client_id?: string | null
+          crm_calendar_id?: string
+          excluded_at?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_entries: {
         Row: {
           amount_cents: number
