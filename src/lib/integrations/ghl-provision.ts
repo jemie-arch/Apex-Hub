@@ -217,14 +217,31 @@ export interface CustomValue {
  * before configuring it. Falls back to the agency credential when there is no
  * row, so nothing here can fail merely for want of one.
  */
-async function locationAuth(clientId: string | null): Promise<WriteAuth> {
-  if (clientId === null) return writeAuth();
+async function locationAuth(
+  clientId: string | null,
+): Promise<WriteAuth & { fellBackBecause?: string }> {
+  if (clientId === null) {
+    return { ...(await writeAuth()), fellBackBecause: 'no clients row for this sub-account' };
+  }
 
   try {
     const token = await getToken(clientId);
     return { token: token.accessToken, kind: 'location_token', companyId: null };
-  } catch {
-    return writeAuth();
+  } catch (error) {
+    /*
+     * Why the fall-back happened, carried forward rather than swallowed.
+     *
+     * The first version caught this and said nothing, so a sub-account the
+     * marketplace app is not installed on -- which cannot mint a location token
+     * at all -- produced the same "not authorized for this scope" 401 as a
+     * missing scope, and the fix for one is nothing like the fix for the other.
+     */
+    return {
+      ...(await writeAuth()),
+      fellBackBecause:
+        'no location token could be minted: ' +
+        (error instanceof Error ? error.message : String(error)),
+    };
   }
 }
 
@@ -262,6 +279,12 @@ export interface CustomValueResult {
   /** Which credential the values went out under, which is not always the one
    * that created the account — custom values are location scoped. */
   auth: AuthKind;
+  /**
+   * Set when the sub-account's own token was unavailable and an agency
+   * credential was used instead. Present on success too: it is the reason a
+   * location-scoped write is being attempted with the wrong kind of token.
+   */
+  authFellBackBecause?: string;
   written: string[];
   /** Asked for but no custom value of that name exists in the sub-account. */
   missing: string[];
@@ -285,13 +308,40 @@ export async function setCustomValues(
   locationId: string,
   values: Record<string, string>,
 ): Promise<CustomValueResult> {
-  const { token: accessToken, kind } = await locationAuth(clientId);
-  const existing = await listCustomValues(clientId, locationId);
+  const { token: accessToken, kind, fellBackBecause } = await locationAuth(clientId);
+
+  /*
+   * Read the existing values first -- the write is an update, so it needs their
+   * ids. A refusal here is the same refusal the write would get, and it is worth
+   * saying which credential was refused and why that credential was the one
+   * used, because "not authorized for this scope" on an agency token that holds
+   * the scope means the token is the wrong kind, not the wrong scope.
+   */
+  let existing: CustomValue[];
+  try {
+    existing = await listCustomValues(clientId, locationId);
+  } catch (error) {
+    if (fellBackBecause === undefined || !(error instanceof GhlWriteError)) throw error;
+
+    // Same failure, same status -- with the credential and the reason it was
+    // chosen appended, so the message points at the actual fix.
+    throw new GhlWriteError(
+      error.path,
+      error.status,
+      `${error.body} — sent with the ${kind.replace(/_/g, ' ')}, because ${fellBackBecause}`,
+    );
+  }
 
   const key = (name: string) => name.toLowerCase().replace(/\s+/g, '');
   const byKey = new Map(existing.map((row) => [key(row.name), row]));
 
-  const result: CustomValueResult = { auth: kind, written: [], missing: [], failed: [] };
+  const result: CustomValueResult = {
+    auth: kind,
+    ...(fellBackBecause === undefined ? {} : { authFellBackBecause: fellBackBecause }),
+    written: [],
+    missing: [],
+    failed: [],
+  };
 
   for (const [name, value] of Object.entries(values)) {
     if (value.trim() === '') continue;
