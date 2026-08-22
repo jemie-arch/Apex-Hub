@@ -28,15 +28,6 @@ import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
 /**
- * Keyword -> stage. First match wins, so order matters.
- *
- * The live pipeline is: New lead, Follow up, Booked call, Showed call, Closed,
- * Nurture. Two of those had no keyword here and would have fallen through to
- * 'new' — Closed would have reported a won deal as a fresh lead, and Nurture a
- * parked one. Both are now explicit, and both sit above the lead/new entries
- * because 'Closed' and 'Nurture' must be tested before anything looser matches.
- */
-/**
  * Contact lookups per run, for the tags that identify a referral.
  *
  * One request each, so it is capped. Deals with no origin yet are done first, so
@@ -45,13 +36,29 @@ import { serviceClient } from '@/lib/supabase/service';
  */
 const MAX_CONTACT_LOOKUPS = 150;
 
+/**
+ * Keyword -> stage. First match wins, so order matters.
+ *
+ * The stages that actually exist in the b2b sub-account, read off its three
+ * pipelines: New Lead, Replied, In Contact, Demo Booked, Demo Showed, Sent
+ * Email, No Answer AM, No Answer PM. Not the set this list was first written
+ * against — that came from a description of the funnel rather than from the
+ * pipelines, and "booked call" and "showed call" are in none of them.
+ *
+ * 'closed' and 'nurture' sit at the top because they must be tested before
+ * anything looser matches. There was also a 'demo' -> call_showed entry, which
+ * matched "Demo Booked" and promoted a booking to an attendance; it is gone, and
+ * "Demo Booked" now falls to 'booked' where it belongs.
+ */
 const DEFAULT_STAGE_KEYWORDS: ReadonlyArray<[string, DealStage]> = [
   ['closed', 'won'],
   ['nurture', 'nurture'],
   ['proposal', 'proposal'],
   ['contract', 'proposal'],
   ['showed', 'call_showed'],
-  ['demo', 'call_showed'],
+  // A reply is a contact in any pipeline. It is also the only stage in the b2b
+  // sub-account with anything in it, and it read as 'new' until now.
+  ['replied', 'contacted'],
   ['booked', 'call_booked'],
   ['scheduled', 'call_booked'],
   ['appointment', 'call_booked'],
