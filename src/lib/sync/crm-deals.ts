@@ -18,6 +18,8 @@ import type { DealRow, DealStage } from '@/types/database';
 
 import { listOpportunities, type GhlOpportunity } from '@/lib/integrations/ghl';
 import { authoritative, humanOwned } from '@/lib/sync/merge';
+import { classifyOrigin } from '@/config/lead-origin';
+import { getContact } from '@/lib/integrations/ghl';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -30,6 +32,15 @@ import { serviceClient } from '@/lib/supabase/service';
  * parked one. Both are now explicit, and both sit above the lead/new entries
  * because 'Closed' and 'Nurture' must be tested before anything looser matches.
  */
+/**
+ * Contact lookups per run, for the tags that identify a referral.
+ *
+ * One request each, so it is capped. Deals with no origin yet are done first, so
+ * a backlog drains instead of the same rows being re-read every run — the
+ * mistake that left the appointment enrichment spinning for weeks.
+ */
+const MAX_CONTACT_LOOKUPS = 150;
+
 const DEFAULT_STAGE_KEYWORDS: ReadonlyArray<[string, DealStage]> = [
   ['closed', 'won'],
   ['nurture', 'nurture'],
@@ -164,6 +175,27 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
   const unmappedStages = new Set<string>();
   const now = new Date().toISOString();
 
+  /*
+   * Which deals already know where they came from.
+   *
+   * Read up front so the lookup budget is spent on deals that have never been
+   * classified, rather than re-fetching contacts whose tags we already hold.
+   */
+  const known = await db
+    .from('deals')
+    .select('crm_opportunity_id, origin')
+    .neq('origin', 'unknown');
+  if (known.error) throw known.error;
+
+  const alreadyClassified = new Set(
+    (known.data ?? []).flatMap((row) =>
+      row.crm_opportunity_id ? [row.crm_opportunity_id] : [],
+    ),
+  );
+
+  let contactLookups = 0;
+  const originCounts = new Map<string, number>();
+
   for (const opportunity of opportunities) {
     const stage = mapStage(opportunity, overrides);
     if (
@@ -184,8 +216,64 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
       ? (userIdByCrm.get(opportunity.assignedUserId) ?? null)
       : null;
 
+    /*
+     * Where the lead came from.
+     *
+     * Referrals are the reason this is here: they carry no utm and no ad id, so
+     * the tag somebody put on the contact is the only evidence that exists. That
+     * costs a request per contact, so it is bounded and skipped for deals already
+     * classified.
+     */
+    let tags: string[] = [];
+    let origin = classifyOrigin({
+      tags: [],
+      source: opportunity.source,
+      utmSource: null,
+      utmMedium: null,
+      campaignId: null,
+      adId: null,
+    });
+
+    if (
+      opportunity.contactId &&
+      !alreadyClassified.has(opportunity.id) &&
+      contactLookups < MAX_CONTACT_LOOKUPS
+    ) {
+      contactLookups += 1;
+      try {
+        const contact = await getContact(
+          // The sub-account's own token when it is one of our clients rows, which
+          // it is: the sales account is registered. getContact needs a client id,
+          // and this is the same one the opportunity listing used.
+          owner.data?.id ?? locationId,
+          opportunity.contactId,
+        );
+        if (contact) {
+          tags = contact.tags;
+          origin = classifyOrigin({
+            tags: contact.tags,
+            source: contact.source ?? opportunity.source,
+            utmSource: contact.attribution.utmSource,
+            utmMedium: contact.attribution.utmMedium,
+            campaignId: contact.attribution.campaignId,
+            adId: contact.attribution.adId,
+          });
+        }
+      } catch (error) {
+        // One unreadable contact must not cost the other hundred their stage.
+        ctx.recordError('could not read contact tags', {
+          opportunityId: opportunity.id,
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    originCounts.set(origin, (originCounts.get(origin) ?? 0) + 1);
+
     const incoming: Partial<DealRow> = {
       crm_contact_id: opportunity.contactId,
+      tags,
+      origin,
       practice_name: opportunity.name,
       contact_name: opportunity.contactName,
       contact_email: opportunity.contactEmail,
@@ -272,6 +360,14 @@ export async function syncCrmDeals(ctx: SyncContext): Promise<void> {
 
     ctx.counts.updated += 1;
   }
+
+  if (originCounts.size > 0) {
+    ctx.note(
+      'leads_by_origin',
+      Object.fromEntries([...originCounts.entries()].sort((a, b) => b[1] - a[1])),
+    );
+  }
+  ctx.note('contact_lookups_used', contactLookups);
 
   if (unmappedStages.size > 0) {
     // Silently filing these as 'new' would quietly distort the pipeline board,

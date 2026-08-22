@@ -795,6 +795,14 @@ export interface GhlContact {
   email: string | null;
   phone: string | null;
   source: string | null;
+  /**
+   * Tags on the contact, lower-cased.
+   *
+   * Carried because a referral is not visible any other way: it has no utm and
+   * no ad id, and GoHighLevel's own source field says nothing useful about one.
+   * The tag a human put there is the only record that exists.
+   */
+  tags: string[];
   attribution: {
     utmSource: string | null;
     utmMedium: string | null;
@@ -861,6 +869,12 @@ export async function getContact(
     email: asString(record['email']),
     phone: asString(record['phone']),
     source: asString(record['source']),
+    tags: Array.isArray(record['tags'])
+      ? record['tags']
+          .filter((tag): tag is string => typeof tag === 'string')
+          .map((tag) => tag.trim().toLowerCase())
+          .filter((tag) => tag !== '')
+      : [],
     shape: {
       hasAttributions: attributions.length > 0,
       attributionKeys: Object.keys(first),

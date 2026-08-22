@@ -1881,3 +1881,30 @@ alter table provisioning_runs add column auth_kind text;
 -- is neither lost nor in progress. Without it the sync mapped Nurture to 'new'
 -- and reported held leads as fresh ones.
 alter type deal_stage add value if not exists 'nurture';
+
+-- ===========================================================================
+-- WHERE A B2B LEAD CAME FROM
+--
+-- About 10% of the client base refers somebody each month, known because two
+-- people were asked. Referrals and word-of-mouth searches are most of the new
+-- business while the ads are off, and none of it was measured.
+--
+-- A referral is invisible to every automatic signal: no utm, no ad id, and
+-- GoHighLevel's own source field says nothing useful about one. The tag a human
+-- put on the contact is the only record that exists, which is why tags are
+-- stored verbatim as well as classified — the classification is a guess over
+-- them, the tags are the fact.
+--
+-- 'origin' rather than reusing 'source': that column already holds GoHighLevel's
+-- free-text field, and the two disagree often enough that collapsing them would
+-- lose the disagreement.
+-- ===========================================================================
+
+create type lead_origin as enum ('referral', 'organic', 'paid', 'outbound', 'unknown');
+
+alter table deals
+  add column tags text[] not null default '{}',
+  add column origin lead_origin not null default 'unknown';
+
+create index deals_origin_idx on deals (origin);
+create index deals_tags_idx on deals using gin (tags);

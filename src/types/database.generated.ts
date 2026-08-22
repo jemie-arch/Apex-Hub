@@ -1176,11 +1176,13 @@ export type Database = {
           lost_at: string | null
           lost_reason: string | null
           next_follow_up_at: string | null
+          origin: Database["public"]["Enums"]["lead_origin"]
           owner_user_id: string | null
           practice_name: string
           source: string | null
           stage: Database["public"]["Enums"]["deal_stage"]
           synced_at: string | null
+          tags: string[]
           updated_at: string
           utm_campaign: string | null
           utm_content: string | null
@@ -1205,11 +1207,13 @@ export type Database = {
           lost_at?: string | null
           lost_reason?: string | null
           next_follow_up_at?: string | null
+          origin?: Database["public"]["Enums"]["lead_origin"]
           owner_user_id?: string | null
           practice_name: string
           source?: string | null
           stage?: Database["public"]["Enums"]["deal_stage"]
           synced_at?: string | null
+          tags?: string[]
           updated_at?: string
           utm_campaign?: string | null
           utm_content?: string | null
@@ -1234,11 +1238,13 @@ export type Database = {
           lost_at?: string | null
           lost_reason?: string | null
           next_follow_up_at?: string | null
+          origin?: Database["public"]["Enums"]["lead_origin"]
           owner_user_id?: string | null
           practice_name?: string
           source?: string | null
           stage?: Database["public"]["Enums"]["deal_stage"]
           synced_at?: string | null
+          tags?: string[]
           updated_at?: string
           utm_campaign?: string | null
           utm_content?: string | null
@@ -2347,6 +2353,7 @@ export type Database = {
         | "nurture"
         | "duplicate"
         | "spam"
+      lead_origin: "referral" | "organic" | "paid" | "outbound" | "unknown"
       lead_quality: "high" | "medium" | "low" | "unusable"
       notification_kind: "info" | "success" | "warning" | "error"
       onboarding_status:
@@ -2560,6 +2567,7 @@ export const Constants = {
         "duplicate",
         "spam",
       ],
+      lead_origin: ["referral", "organic", "paid", "outbound", "unknown"],
       lead_quality: ["high", "medium", "low", "unusable"],
       notification_kind: ["info", "success", "warning", "error"],
       onboarding_status: [
