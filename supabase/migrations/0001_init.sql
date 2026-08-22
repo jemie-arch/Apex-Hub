@@ -1596,3 +1596,41 @@ alter table form_submissions
 
 create index form_submissions_submitted_idx on form_submissions (submitted_at desc);
 create index form_submissions_clinic_idx on form_submissions (lower(clinic_name));
+
+
+-- ===========================================================================
+-- ROLES: PRIVILEGE VERSUS JOB
+--
+-- super_admin is a privilege level. ceo, tech, media_buyer, isa and csm are job
+-- titles and carry no reach of their own — what each person sees is their
+-- permission keys. Conflating the two would mean the only way to grant somebody
+-- the finance page is to make them chief executive.
+--
+-- READ THIS BEFORE ADDING A ROLE. The middleware ends with a blanket 404 for any
+-- staff role it has no rule for. Assigning 'super_admin' in the database before
+-- the code that recognised it was deployed returned Not found on every path for
+-- that account — the site was up, the owner's login was dead. A new role must be
+-- added to PRIVILEGED_ROLES in src/config/roles.ts, or handled explicitly in
+-- middleware, and DEPLOYED, before it is given to anybody.
+--
+-- isr and csr are the former names for isa and csm. Enum values cannot be
+-- dropped while rows reference them, so both remain and are labelled legacy.
+-- ===========================================================================
+
+alter type user_role add value if not exists 'super_admin';
+alter type user_role add value if not exists 'ceo';
+alter type user_role add value if not exists 'tech';
+alter type user_role add value if not exists 'media_buyer';
+alter type user_role add value if not exists 'isa';
+alter type user_role add value if not exists 'csm';
+
+-- One edit rather than forty: every policy already routes through this, so
+-- widening it grants the new privilege level across every table at once.
+create or replace function auth_is_admin()
+returns boolean
+language sql
+stable
+set search_path = public, pg_temp
+as $fn$
+  select auth_role() in ('admin', 'super_admin');
+$fn$;
