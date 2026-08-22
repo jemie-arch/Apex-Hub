@@ -24,17 +24,17 @@
   /* --- brand accent -------------------------------------------------------
      TODO(tenant): still a placeholder, now a periwinkle rather than a flat
      indigo. Replace these four and the whole app follows. */
-  --accent: #6d7cff;
-  --accent-hover: #8290ff;
-  --accent-subtle: #1e2140;
-  --accent-contrast: #0b0c10;
+  --accent: #2fe3ab;
+  --accent-hover: #4df0bd;
+  --accent-subtle: #0d2b23;
+  --accent-contrast: #04120d;
 
   /* --- surfaces ---------------------------------------------------------- */
-  --bg: #0d0e13;
-  --surface: #16181f;
-  --surface-raised: #1c1f28;
-  --surface-sunken: #101218;
-  --surface-hover: #212530;
+  --bg: #05070a;
+  --surface: #0c1014;
+  --surface-raised: #121820;
+  --surface-sunken: #080b0f;
+  --surface-hover: #161d25;
   --overlay: rgb(4 5 8 / 0.72);
 
   /* An inverted panel, for the one card that must outrank everything else. */
@@ -49,19 +49,19 @@
   --text-inverse: #14161d;
 
   /* --- lines ------------------------------------------------------------ */
-  --border: #242833;
-  --border-strong: #333947;
+  --border: #1a2129;
+  --border-strong: #27313c;
   --focus-ring: var(--accent);
 
   /* --- semantic --------------------------------------------------------- */
-  --positive: #43d6a0;
-  --positive-subtle: #102c24;
+  --positive: #35e0a1;
+  --positive-subtle: #0a2b21;
   --warning: #ffc061;
   --warning-subtle: #2f2413;
   --negative: #ff8072;
   --negative-subtle: #331714;
   --neutral: #9ba1b3;
-  --neutral-subtle: #1c1f28;
+  --neutral-subtle: #141b22;
 
   /* Darker semantic tones, for text sitting on the inverted light panel where
      the pastel versions above would wash out. */
@@ -70,13 +70,13 @@
   --negative-strong: #c03a2c;
 
   /* --- categorical series ----------------------------------------------- */
-  --chart-1: #7c8cff;
+  --chart-1: #2fe3ab;
   --chart-2: #ff8a7a;
-  --chart-3: #5ee0b0;
+  --chart-3: #7ef29d;
   --chart-4: #ffcc66;
   --chart-5: #b98cff;
-  --chart-6: #6fd3ff;
-  --chart-track: #1e222c;
+  --chart-6: #35c9e8;
+  --chart-track: #141b22;
 
   /* --- radii ------------------------------------------------------------
      Rounder than default: the reference leans on generous corners, and it is
@@ -102,9 +102,9 @@
 
 /* Light variant, for anyone who sets it explicitly or whose OS asks for it. */
 :root[data-theme='light'] {
-  --accent: #5766f5;
-  --accent-hover: #4453e0;
-  --accent-subtle: #eceefe;
+  --accent: #0f9c72;
+  --accent-hover: #0b8461;
+  --accent-subtle: #e2f7f0;
   --accent-contrast: #ffffff;
 
   --bg: #f6f7fa;
@@ -135,7 +135,7 @@
   --neutral: #565d70;
   --neutral-subtle: #eef0f5;
 
-  --chart-1: #5766f5;
+  --chart-1: #0f9c72;
   --chart-2: #f2634f;
   --chart-3: #10a675;
   --chart-4: #d99400;
@@ -173,4 +173,174 @@ body {
 * {
   scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;
+}
+
+/* ===========================================================================
+   Depth and motion.
+
+   The "3D" in a dashboard like this is not perspective — it is three cheap cues
+   applied consistently: a one-pixel light line along the top edge so a panel
+   reads as catching light from above, a shadow that grows on hover so it reads
+   as lifting toward you, and an accent glow that only appears on interaction so
+   the page is calm at rest.
+
+   Every one of them is defined once here and applied by class, so a card cannot
+   drift from the others and no component hand-rolls a shadow.
+
+   All of it sits behind prefers-reduced-motion. Movement is decoration; the
+   colour and shadow changes still convey the same state without it.
+   =========================================================================== */
+
+:root {
+  /* A rim of light along a panel's top edge. Inset, so it reads as the edge
+     itself catching light rather than as a border. */
+  --rim: inset 0 1px 0 0 rgb(255 255 255 / 0.045);
+  --rim-strong: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
+
+  --glow-accent: 0 0 0 1px rgb(47 227 171 / 0.35), 0 8px 30px -8px rgb(47 227 171 / 0.28);
+  --lift: 0 12px 28px -10px rgb(0 0 0 / 0.65);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 140ms;
+  --dur: 220ms;
+}
+
+:root[data-theme='light'] {
+  --rim: inset 0 1px 0 0 rgb(255 255 255 / 0.9);
+  --rim-strong: inset 0 1px 0 0 rgb(255 255 255 / 1);
+  --glow-accent: 0 0 0 1px rgb(15 156 114 / 0.3), 0 8px 26px -10px rgb(15 156 114 / 0.22);
+  --lift: 0 12px 26px -12px rgb(16 20 30 / 0.22);
+}
+
+/* An ambient wash behind the whole app, so the background is not a flat block.
+   Fixed rather than scrolled: it is lighting, and lighting does not move with
+   the page. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      60rem 34rem at 12% -8%,
+      color-mix(in srgb, var(--accent) 11%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44rem 28rem at 96% 4%,
+      color-mix(in srgb, var(--chart-6) 8%, transparent),
+      transparent 72%
+    );
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+@layer components {
+  /* A static container — a table, a panel of text. Takes the rim of light so
+     it sits on the page rather than being cut out of it, and nothing else: a
+     table that lifts when the pointer crosses it is noise, not affordance. */
+  .panel {
+    box-shadow: var(--rim), var(--shadow-sm);
+  }
+  /* The standard panel. Catches light on its top edge and lifts on hover. */
+  .surface-3d {
+    box-shadow: var(--rim), var(--shadow-sm);
+    transition:
+      box-shadow var(--dur) var(--ease-out),
+      transform var(--dur) var(--ease-out),
+      border-color var(--dur) var(--ease-out);
+  }
+
+  .surface-3d:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--rim-strong), var(--lift);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .surface-3d:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  /* For a panel that is itself a control — a card you click. Adds the accent
+     glow, which .surface-3d deliberately does not, so that a merely decorative
+     panel never looks interactive. */
+  .surface-interactive {
+    box-shadow: var(--rim), var(--shadow-sm);
+    transition:
+      box-shadow var(--dur) var(--ease-out),
+      transform var(--dur) var(--ease-out),
+      border-color var(--dur) var(--ease-out);
+  }
+
+  .surface-interactive:hover,
+  .surface-interactive:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: var(--rim-strong), var(--glow-accent), var(--lift);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .surface-interactive:hover {
+      transform: translateY(-3px);
+    }
+    .surface-interactive:active {
+      transform: translateY(-1px);
+    }
+  }
+
+  /* A sheen that sweeps once on hover. Used sparingly — the hero tile only. */
+  .sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      rgb(255 255 255 / 0.06) 50%,
+      transparent 65%
+    );
+    transform: translateX(-120%);
+    transition: transform 620ms var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .sheen:hover::after {
+      transform: translateX(120%);
+    }
+  }
+
+  /* Numbers that should feel engraved rather than printed. */
+  .metric-hero {
+    background: linear-gradient(
+      180deg,
+      var(--text) 0%,
+      color-mix(in srgb, var(--text) 72%, var(--bg)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* A table row that is a link. Slides a hair to hint the click without the
+     reflow a border would cause. */
+  .row-interactive {
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+    box-shadow: inset 0 0 0 0 var(--accent);
+  }
+
+  .row-interactive:hover {
+    box-shadow: inset 2px 0 0 0 var(--accent);
+  }
 }

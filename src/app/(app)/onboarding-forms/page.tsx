@@ -219,7 +219,7 @@ export default async function OnboardingFormsPage({ searchParams }: PageProps) {
             return (
               <details
                 key={row.id}
-                className="overflow-hidden rounded-lg border border-line bg-surface"
+                className="panel overflow-hidden rounded-lg border border-line bg-surface"
               >
                 <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-surface-hover">
                   <span className="font-medium text-fg">

@@ -243,7 +243,7 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-line bg-surface">
+      <section className="panel overflow-hidden rounded-lg border border-line bg-surface">
         <div className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-3">
           <h2 className="text-sm font-semibold text-fg">Recent syncs</h2>
           <span className="text-xs text-fg-subtle">

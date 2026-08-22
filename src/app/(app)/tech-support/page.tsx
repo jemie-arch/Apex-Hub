@@ -111,7 +111,7 @@ export default async function TechSupportPage() {
           icon={<LifeBuoy size={22} />}
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <table className="w-full text-sm">
             <tbody>
               {requested.map((row) => (
@@ -156,7 +156,7 @@ export default async function TechSupportPage() {
       {confirmed.length > 0 ? (
         <section className="mt-8">
           <h2 className="mb-3 text-sm font-semibold text-fg">Confirmed</h2>
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-sm">
               <tbody>
                 {confirmed.map((row) => (
@@ -188,7 +188,7 @@ export default async function TechSupportPage() {
       {closed.length > 0 ? (
         <section className="mt-8">
           <h2 className="mb-3 text-sm font-semibold text-fg">Closed</h2>
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-sm">
               <tbody>
                 {closed.map((row) => (

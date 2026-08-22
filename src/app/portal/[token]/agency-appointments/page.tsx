@@ -114,7 +114,7 @@ export default async function PortalAgencyAppointmentsPage({
           icon={<MessagesSquare size={22} />}
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <table className="w-full text-sm">
             <tbody>
               {rows.map((row) => (

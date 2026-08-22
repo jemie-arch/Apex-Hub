@@ -180,7 +180,7 @@ export default async function PipelinePage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+        <section className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <h2 className="flex items-center gap-1.5 border-b border-line px-4 py-3 text-sm font-semibold text-fg">
             <CalendarClock size={15} /> Sales calls, next 7 days
           </h2>
@@ -212,7 +212,7 @@ export default async function PipelinePage() {
           )}
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+        <section className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <h2 className="border-b border-line px-4 py-3 text-sm font-semibold text-fg">
             Follow-ups due
           </h2>

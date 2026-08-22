@@ -357,7 +357,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
       ) : null}
 
       {rollup.length > 0 ? (
-        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+        <section className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <div className="border-b border-line px-4 py-3">
             <h2 className="text-sm font-semibold text-fg">
               Every active {client.singular}

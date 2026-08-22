@@ -191,7 +191,7 @@ export default async function AdsPerformancePage({ searchParams }: PageProps) {
           icon={<BarChart3 size={22} />}
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

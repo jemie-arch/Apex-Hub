@@ -59,7 +59,7 @@ export function SkeletonCards({ count = 4 }: { count?: number }) {
 /** A table with a header strip and evenly spaced rows. */
 export function SkeletonTable({ rows = 8 }: { rows?: number }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-surface">
+    <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
         <Skeleton className="h-3 w-32" />
       </div>

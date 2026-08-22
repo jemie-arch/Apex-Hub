@@ -148,7 +148,7 @@ export default async function TeamPage() {
           icon={<UsersRound size={22} />}
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <table className="w-full text-sm">
             <tbody>
               {pending.map((row) => (
@@ -185,7 +185,7 @@ export default async function TeamPage() {
       {decided.length > 0 ? (
         <section className="mt-8">
           <h2 className="mb-3 text-sm font-semibold text-fg">Decided</h2>
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-sm">
               <tbody>
                 {decided.map((row) => (

@@ -62,7 +62,7 @@ export default async function PortalCreativesPage({ params }: PageProps) {
 
   function Card({ ad }: { ad: (typeof ads)[number] }) {
     return (
-      <article className="overflow-hidden rounded-lg border border-line bg-surface">
+      <article className="panel overflow-hidden rounded-lg border border-line bg-surface">
         {ad.creative_thumb_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- remote ad
           // thumbnails come from the ad platform's CDN on domains we do not

@@ -218,9 +218,10 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       href={item.href}
       className={cn(
         'mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
+        'transition-all duration-200',
         active
-          ? 'bg-accent-subtle font-medium text-accent'
-          : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+          ? 'bg-accent-subtle font-medium text-accent shadow-[inset_2px_0_0_0_var(--accent)]'
+          : 'text-fg-muted hover:translate-x-0.5 hover:bg-surface-hover hover:text-fg',
       )}
     >
       <Icon size={16} />

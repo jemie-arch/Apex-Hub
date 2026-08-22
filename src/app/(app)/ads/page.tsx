@@ -128,7 +128,7 @@ export default async function AdsPage({ searchParams }: PageProps) {
             return (
               <section
                 key={group.id}
-                className="overflow-hidden rounded-lg border border-line bg-surface"
+                className="panel overflow-hidden rounded-lg border border-line bg-surface"
               >
                 <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line px-4 py-3">
                   <Link

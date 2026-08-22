@@ -1,14 +1,17 @@
 'use client';
 
 /**
- * Six columns, and a panel behind each card.
+ * Every practice in onboarding, as one list grouped by status.
  *
- * The card shows six things and no more — company, client, CSM, the two calls
- * and when it arrived. Everything else is one click away rather than crammed
- * onto a tile, because a board is for seeing where forty practices are, and a
- * tile carrying twenty fields shows you nothing at a glance.
+ * A list rather than columns. Six columns of cards forces horizontal scrolling
+ * and lets each card show only what fits in 18rem — which meant the two call
+ * dates, the thing a CSM actually chases, were the first casualties. In rows the
+ * same six fields line up so forty practices can be compared down a column
+ * instead of hunted across tiles.
+ *
+ * Grouped rather than sorted, because the status is the question being asked.
  */
-import { CalendarClock, ExternalLink, Users } from 'lucide-react';
+import { CalendarClock, ChevronRight, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ClientOnboardingPanel } from '@/components/onboarding/ClientOnboardingPanel';
@@ -100,7 +103,6 @@ export interface BoardActivity {
   created_at: string;
 }
 
-/** A date the way somebody scanning a board wants it: short and unambiguous. */
 function shortDate(iso: string | null): string | null {
   if (!iso) return null;
   const at = new Date(iso);
@@ -125,13 +127,14 @@ function shortDateTime(iso: string | null): string | null {
   });
 }
 
-const COLUMN_TONE: Record<OnboardingStatus, string> = {
-  new_signup: 'border-t-accent',
-  onboarding_form: 'border-t-accent',
-  kickoff_form: 'border-t-accent',
-  waiting_on_team: 'border-t-warning',
-  waiting_on_client: 'border-t-warning',
-  launch_ready: 'border-t-positive',
+/** A stripe down the left of each group, so status reads without the label. */
+const STATUS_STRIPE: Record<OnboardingStatus, string> = {
+  new_signup: 'bg-chart-6',
+  onboarding_form: 'bg-accent',
+  kickoff_form: 'bg-chart-5',
+  waiting_on_team: 'bg-warning',
+  waiting_on_client: 'bg-warning',
+  launch_ready: 'bg-positive',
 };
 
 export function ClientOnboardingBoard({
@@ -152,6 +155,7 @@ export function ClientOnboardingBoard({
   activity: BoardActivity[];
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const staffById = useMemo(
     () => new Map(staff.map((person) => [person.id, person])),
@@ -171,13 +175,30 @@ export function ClientOnboardingBoard({
     const map = new Map<string, BoardGroup[]>();
     for (const status of ONBOARDING_STATUSES) map.set(status, []);
     for (const group of groups) {
-      const bucket = map.get(group.onboarding_status);
-      if (bucket) bucket.push(group);
+      map.get(group.onboarding_status)?.push(group);
+    }
+    // Oldest first inside a group: the practice waiting longest is the one to
+    // ring, and burying it at the bottom of a list is how it gets forgotten.
+    for (const list of map.values()) {
+      list.sort(
+        (a, b) =>
+          new Date(a.onboarding_added_at).getTime() -
+          new Date(b.onboarding_added_at).getTime(),
+      );
     }
     return map;
   }, [groups]);
 
   const open = openId ? groups.find((group) => group.id === openId) ?? null : null;
+
+  function toggle(status: string) {
+    setCollapsed((was) => {
+      const next = new Set(was);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }
 
   if (groups.length === 0) {
     return (
@@ -191,123 +212,154 @@ export function ClientOnboardingBoard({
 
   return (
     <>
-      <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
+      <div className="space-y-4">
         {ONBOARDING_STATUSES.map((status) => {
-          const column = byStatus.get(status) ?? [];
+          const rows = byStatus.get(status) ?? [];
+          const isCollapsed = collapsed.has(status);
 
           return (
             <section
               key={status}
-              className={cn(
-                'flex w-72 shrink-0 flex-col rounded-lg border border-line border-t-2 bg-surface',
-                COLUMN_TONE[status],
-              )}
+              className="surface-3d overflow-hidden rounded-lg border border-line bg-surface"
             >
-              <header className="border-b border-line px-3 py-2.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="text-xs font-semibold text-fg">
-                    {STATUS_LABELS[status]}
-                  </h2>
-                  <span className="numeric text-xs text-fg-subtle">
-                    {formatCount(column.length)}
+              <button
+                type="button"
+                onClick={() => toggle(status)}
+                aria-expanded={!isCollapsed}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-hover"
+              >
+                <span
+                  className={cn('h-8 w-1 shrink-0 rounded-full', STATUS_STRIPE[status])}
+                  aria-hidden
+                />
+                <span className="min-w-0">
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold text-fg">
+                      {STATUS_LABELS[status]}
+                    </span>
+                    <span className="numeric text-xs text-fg-subtle">
+                      {formatCount(rows.length)}
+                    </span>
                   </span>
-                </div>
-                <p className="mt-0.5 text-[11px] leading-snug text-fg-subtle">
-                  {STATUS_HINTS[status]}
-                </p>
-              </header>
+                  <span className="mt-0.5 block text-xs text-fg-subtle">
+                    {STATUS_HINTS[status]}
+                  </span>
+                </span>
+                <ChevronRight
+                  size={15}
+                  className={cn(
+                    'ml-auto shrink-0 text-fg-subtle transition-transform duration-200',
+                    isCollapsed ? '' : 'rotate-90',
+                  )}
+                />
+              </button>
 
-              <div className="flex-1 space-y-2 p-2">
-                {column.length === 0 ? (
-                  <p className="px-1 py-3 text-[11px] text-fg-subtle">Nobody here.</p>
-                ) : (
-                  column.map((group) => {
-                    const csm = group.csm_user_id
-                      ? staffById.get(group.csm_user_id)
-                      : null;
-                    const finished = doneCount.get(group.id) ?? 0;
+              {isCollapsed || rows.length === 0 ? (
+                rows.length === 0 && !isCollapsed ? (
+                  <p className="border-t border-line px-4 py-3 text-xs text-fg-subtle">
+                    Nobody at this status.
+                  </p>
+                ) : null
+              ) : (
+                <div className="overflow-x-auto border-t border-line">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-fg-subtle">
+                        <th className="px-4 py-2 font-medium">Company</th>
+                        <th className="px-4 py-2 font-medium">Client</th>
+                        <th className="px-4 py-2 font-medium">CSM</th>
+                        <th className="px-4 py-2 font-medium">Onboarding call</th>
+                        <th className="px-4 py-2 font-medium">Launch call</th>
+                        <th className="px-4 py-2 font-medium">Added</th>
+                        <th className="px-4 py-2 text-right font-medium">Steps</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((group) => {
+                        const csm = group.csm_user_id
+                          ? staffById.get(group.csm_user_id)
+                          : null;
+                        const finished = doneCount.get(group.id) ?? 0;
+                        const pct =
+                          steps.length === 0
+                            ? 0
+                            : Math.round((finished / steps.length) * 100);
 
-                    return (
-                      <button
-                        key={group.id}
-                        type="button"
-                        onClick={() => setOpenId(group.id)}
-                        className="w-full rounded-md border border-line bg-surface-sunken p-2.5 text-left transition-colors hover:border-accent hover:bg-surface-hover"
-                      >
-                        <p className="truncate text-sm font-medium text-fg">
-                          {group.name}
-                        </p>
-
-                        <p className="mt-0.5 truncate text-xs text-fg-muted">
-                          {group.contact_name ?? (
-                            <span className="text-fg-subtle">no client name</span>
-                          )}
-                        </p>
-
-                        <dl className="mt-2 space-y-1 text-[11px]">
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-fg-subtle">CSM</dt>
-                            <dd className="truncate text-fg-muted">
-                              {csm
-                                ? (csm.full_name ?? csm.email)
-                                : 'unassigned'}
-                            </dd>
-                          </div>
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-fg-subtle">Onboarding call</dt>
-                            <dd className="text-fg-muted">
-                              {shortDateTime(group.onboarding_call_at) ?? '—'}
-                            </dd>
-                          </div>
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-fg-subtle">Launch call</dt>
-                            <dd className="text-fg-muted">
-                              {shortDateTime(group.launch_call_at) ?? '—'}
-                            </dd>
-                          </div>
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-fg-subtle">Added</dt>
-                            <dd className="text-fg-muted">
+                        return (
+                          <tr
+                            key={group.id}
+                            onClick={() => setOpenId(group.id)}
+                            tabIndex={0}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setOpenId(group.id);
+                              }
+                            }}
+                            className="row-interactive cursor-pointer border-b border-line last:border-0 hover:bg-surface-hover focus:bg-surface-hover focus:outline-none"
+                          >
+                            <td className="px-4 py-2.5 font-medium text-fg">
+                              {group.name}
+                            </td>
+                            <td className="px-4 py-2.5 text-fg-muted">
+                              {group.contact_name ?? (
+                                <span className="text-fg-subtle">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-fg-muted">
+                              {csm ? (
+                                (csm.full_name ?? csm.email)
+                              ) : (
+                                <span className="text-fg-subtle">unassigned</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-fg-muted">
+                              {shortDateTime(group.onboarding_call_at) ?? (
+                                <span className="text-fg-subtle">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-fg-muted">
+                              {shortDateTime(group.launch_call_at) ?? (
+                                <span className="text-fg-subtle">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-fg-muted">
                               {shortDate(group.onboarding_added_at) ?? '—'}
-                            </dd>
-                          </div>
-                        </dl>
-
-                        {steps.length > 0 ? (
-                          <div className="mt-2 flex items-center gap-1.5">
-                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface">
-                              <div
-                                className={cn(
-                                  'h-full rounded-full',
-                                  finished >= steps.length
-                                    ? 'bg-positive'
-                                    : 'bg-accent',
-                                )}
-                                style={{
-                                  width: `${Math.round((finished / steps.length) * 100)}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="numeric text-[10px] text-fg-subtle">
-                              {finished}/{steps.length}
-                            </span>
-                          </div>
-                        ) : null}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="h-1 w-16 overflow-hidden rounded-full bg-chart-track">
+                                  <div
+                                    className={cn(
+                                      'h-full rounded-full transition-all duration-500',
+                                      finished >= steps.length && steps.length > 0
+                                        ? 'bg-positive'
+                                        : 'bg-accent',
+                                    )}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className="numeric text-xs text-fg-subtle">
+                                  {finished}/{steps.length}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           );
         })}
       </div>
 
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-fg-subtle">
+      <p className="mt-4 flex items-center gap-1.5 text-xs text-fg-subtle">
         <CalendarClock size={12} />
         Onboarding and launch calls come from the ADM Client Onboarding
         sub-account. A call booked there appears here once the calls sync has run.
-        <ExternalLink size={12} className="opacity-0" />
       </p>
 
       {open ? (

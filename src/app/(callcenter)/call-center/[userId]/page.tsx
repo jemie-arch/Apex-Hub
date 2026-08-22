@@ -134,7 +134,7 @@ export default async function RepPage({ params, searchParams }: PageProps) {
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+        <section className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <h2 className="border-b border-line px-4 py-3 text-sm font-semibold text-fg">
             Recent calls
           </h2>
@@ -176,7 +176,7 @@ export default async function RepPage({ params, searchParams }: PageProps) {
           )}
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+        <section className="panel overflow-hidden rounded-lg border border-line bg-surface">
           <h2 className="border-b border-line px-4 py-3 text-sm font-semibold text-fg">
             {titleCase(booking.plural)} booked
           </h2>

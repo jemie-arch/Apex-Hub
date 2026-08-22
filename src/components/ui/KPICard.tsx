@@ -44,9 +44,12 @@ export function KPICard({
   return (
     <div
       className={cn(
-        'rounded-lg border p-5 shadow-sm',
+        // surface-3d carries the top rim of light and the hover lift. The hero
+        // tile also gets the sheen, once, because it is the one thing on the
+        // page that is allowed to draw the eye.
+        'rounded-lg border p-5 surface-3d',
         hero
-          ? 'border-transparent bg-surface-invert sm:col-span-2 sm:row-span-2 sm:p-7'
+          ? 'sheen border-transparent bg-surface-invert sm:col-span-2 sm:row-span-2 sm:p-7'
           : 'border-line bg-surface',
       )}
     >
