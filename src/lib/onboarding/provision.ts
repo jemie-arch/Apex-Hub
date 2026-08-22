@@ -27,6 +27,8 @@ import {
 import { serviceClient } from '@/lib/supabase/service';
 
 export interface ProvisionOutcome {
+  /** The sub-account had no custom values yet — the snapshot is still landing. */
+  snapshotNotReady?: boolean;
   ok: boolean;
   status: 'created' | 'values_written' | 'partial' | 'failed';
   message: string;
@@ -275,11 +277,19 @@ export async function provisionFromSubmission(input: {
       locationId,
       written: outcome.written,
       missing: outcome.missing,
+      ...(outcome.snapshotNotReady ? { snapshotNotReady: true } : {}),
       message:
         `Sub-account ready with ${outcome.written.length} value(s) filled.` +
-        (outcome.missing.length > 0
-          ? ` ${outcome.missing.length} had no matching field in the snapshot: ${outcome.missing.join(', ')}.`
-          : '') +
+        // Two very different causes, one of which used to be reported as the
+        // other. Nothing at all means the snapshot is still being applied;
+        // some fields present but not these means the names are wrong.
+        (outcome.snapshotNotReady
+          ? ' It has no custom values yet, which means GoHighLevel is still ' +
+            'applying the snapshot rather than that anything is misconfigured. ' +
+            'The next provision-pending run fills them; no action needed.'
+          : outcome.missing.length > 0
+            ? ` ${outcome.missing.length} had no matching field in the snapshot: ${outcome.missing.join(', ')}.`
+            : '') +
         (outcome.failed.length > 0
           ? ` ${outcome.failed.length} were refused.`
           : ''),

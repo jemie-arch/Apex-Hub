@@ -198,6 +198,15 @@ export async function createSubAccount(
   return { locationId, raw: created, auth: kind };
 }
 
+/**
+ * How long to wait for a snapshot before re-reading the custom values.
+ *
+ * Long enough for the common case, short enough to stay inside the request. If
+ * it is still empty after this, provision-pending picks the submission up on its
+ * next run rather than anybody being asked to press anything.
+ */
+const SNAPSHOT_SETTLE_MS = 4000;
+
 export interface CustomValue {
   id: string;
   name: string;
@@ -291,6 +300,15 @@ export interface CustomValueResult {
    * location-scoped write is being attempted with the wrong kind of token.
    */
   authFellBackBecause?: string;
+  /**
+   * True when the sub-account has no custom values at all yet.
+   *
+   * A snapshot is applied asynchronously, so an account created seconds ago has
+   * none of its fields. Without this the run reports every value as "no matching
+   * field in the snapshot" -- the same sentence a genuine name mismatch produces,
+   * which sends somebody to check names that were never wrong.
+   */
+  snapshotNotReady?: boolean;
   written: string[];
   /** Asked for but no custom value of that name exists in the sub-account. */
   missing: string[];
@@ -338,12 +356,25 @@ export async function setCustomValues(
     );
   }
 
+  /*
+   * An empty list means the snapshot has not finished being applied, not that
+   * the sub-account is misconfigured. It is worth one short wait: the point of
+   * provisioning on submission is that the practice's answers are in place
+   * before anyone looks, and needing a retry for every new account defeats that
+   * even when the retry works.
+   */
+  if (existing.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, SNAPSHOT_SETTLE_MS));
+    existing = await listCustomValues(clientId, locationId);
+  }
+
   const key = (name: string) => name.toLowerCase().replace(/\s+/g, '');
   const byKey = new Map(existing.map((row) => [key(row.name), row]));
 
   const result: CustomValueResult = {
     auth: kind,
     ...(fellBackBecause === undefined ? {} : { authFellBackBecause: fellBackBecause }),
+    ...(existing.length === 0 ? { snapshotNotReady: true } : {}),
     written: [],
     missing: [],
     failed: [],
