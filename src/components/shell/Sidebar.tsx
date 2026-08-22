@@ -108,10 +108,21 @@ const ACCOUNT_ITEMS: NavItem[] = [
 /**
  * Whether this person may see the item. A route with no rule in the map is
  * admin-only, so an unmapped item stays hidden rather than showing for all.
+ *
+ * An admin sees everything that has a rule. Middleware already grants them the
+ * route, so the stored key list was only deciding whether they could find it —
+ * which meant every newly added page was invisible until somebody appended its
+ * key to each existing row. /billing shipped exactly that way: reachable by URL,
+ * absent from the menu.
  */
-function isAllowed(item: NavItem, allowed: Set<string>): boolean {
+function isAllowed(
+  item: NavItem,
+  allowed: Set<string>,
+  isAdmin: boolean,
+): boolean {
   const key = permissionForPath(item.href);
-  return key !== null && allowed.has(key);
+  if (key === null) return false;
+  return isAdmin || allowed.has(key);
 }
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -150,9 +161,12 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 export function Sidebar({
   permissions,
+  isAdmin = false,
   theme,
 }: {
   permissions: readonly string[];
+  /** Admins see every item — middleware already lets them reach every route. */
+  isAdmin?: boolean;
   theme: Theme;
 }) {
   const pathname = usePathname();
@@ -167,11 +181,11 @@ export function Sidebar({
 
   const visibleSections = SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => isAllowed(item, allowed)),
+    items: section.items.filter((item) => isAllowed(item, allowed, isAdmin)),
   })).filter((section) => section.items.length > 0);
 
   const visibleAccount = ACCOUNT_ITEMS.filter((item) =>
-    isAllowed(item, allowed),
+    isAllowed(item, allowed, isAdmin),
   );
 
   return (
