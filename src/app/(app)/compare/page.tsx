@@ -173,7 +173,12 @@ export default async function ComparePage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
+        eyebrow="Trend"
         title="Compare"
+        pill={{
+          label: `${formatCount(rows.length)} ${client.plural}`,
+          tone: 'neutral',
+        }}
         description={`${titleCase(client.singular)} performance, month over month`}
       />
 
@@ -226,7 +231,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
                   return (
                     <tr
                       key={group.id}
-                      className="border-b border-line last:border-0 hover:bg-surface-hover"
+                      className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
                     >
                       <td className="sticky left-0 bg-surface px-4 py-3">
                         <Link

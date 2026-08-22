@@ -48,6 +48,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
+        eyebrow="Book of business"
+        pill={{
+          label: `${formatCount(active)} trading`,
+          tone: 'positive',
+        }}
         title={titleCase(client.plural)}
         description={
           `${formatCount(active)} active · ${formatCount(onboarding)} onboarding · ` +
@@ -91,7 +96,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 {rollups.map((rollup) => (
                   <tr
                     key={rollup.group.id}
-                    className="border-b border-line last:border-0 hover:bg-surface-hover"
+                    className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
                   >
                     <td className="px-4 py-3">
                       <Link

@@ -226,7 +226,19 @@ export default async function BillingPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
+        eyebrow="Revenue"
         title="Billing"
+        pill={
+          uncollectedCents > 0
+            ? {
+                label: `${formatMoneyCompact(uncollectedCents)} uncollected`,
+                tone: 'warning',
+              }
+            : {
+                label: 'Everything collected',
+                tone: 'positive',
+              }
+        }
         description={`Charges to ${client.plural} · ${range.label}`}
         actions={<DateRangePicker />}
       />
@@ -328,7 +340,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
                 {failedRows.map((row) => (
                   <tr
                     key={row.stripe_payment_intent_id}
-                    className="border-b border-line last:border-0"
+                    className="row-interactive border-b border-line last:border-0"
                   >
                     <td className="numeric px-4 py-3 text-fg-muted">
                       {row.occurred_at.slice(0, 10)}
@@ -390,7 +402,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
                   return (
                     <tr
                       key={row.clientId ?? UNATTRIBUTED}
-                      className="border-b border-line last:border-0 hover:bg-surface-hover"
+                      className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
                     >
                       <td className="px-4 py-3">
                         {row.clientId ? (

@@ -101,7 +101,13 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
+        eyebrow="New business"
         title="Leads"
+        pill={
+          waiting > 0
+            ? { label: `${formatCount(waiting)} unclassified`, tone: 'warning' }
+            : { label: 'All classified', tone: 'positive' }
+        }
         description="Inbound B2B leads from the agency's own advertising"
         actions={<AddLead />}
       />
@@ -182,7 +188,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-line last:border-0 hover:bg-surface-hover"
+                    className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
                   >
                     <td className="numeric px-4 py-3 align-top text-fg-muted">
                       {formatDateTimeInZone(row.received_at, zone, 'd MMM, HH:mm')}
