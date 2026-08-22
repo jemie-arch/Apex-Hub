@@ -11,9 +11,21 @@ import {
   hasUnresolvedTenantPlaceholders,
   tenant,
 } from '@/config/tenant.config';
+import { cn } from '@/lib/cn';
 import { formatCount, humanise } from '@/lib/format';
 import { PLANNED_SYNCS, SYNCS } from '@/lib/sync/registry';
 import { serviceClient } from '@/lib/supabase/service';
+
+/** Coarse on purpose: "2 days" answers the question, "49 hours" does not. */
+function relative(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${Math.max(minutes, 1)} min`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} hr`;
+
+  return `${Math.round(hours / 24)} days`;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +87,40 @@ export default async function SettingsPage() {
   if (locations.error) throw locations.error;
   if (groups.error) throw groups.error;
   if (runs.error) throw runs.error;
+
+  /*
+   * When each sync last ran.
+   *
+   * Read across every sync rather than the recent history below, because the
+   * failure worth catching is a sync that produced no rows at all: it cannot
+   * appear in a list of runs, so the page looked healthy while three syncs had
+   * never executed once.
+   *
+   * 36 hours is the threshold — a daily cycle plus enough slack that a late run
+   * or a slow evening is not called a fault.
+   */
+  const STALE_AFTER_MS = 36 * 60 * 60 * 1000;
+
+  const lastRuns = await db
+    .from('sync_runs')
+    .select('name, started_at')
+    .order('started_at', { ascending: false })
+    .limit(400);
+  if (lastRuns.error) throw lastRuns.error;
+
+  const lastRunByName = new Map<
+    string,
+    { ago: string; stale: boolean }
+  >();
+
+  for (const run of lastRuns.data ?? []) {
+    if (lastRunByName.has(run.name)) continue;
+    const elapsed = Date.now() - new Date(run.started_at).getTime();
+    lastRunByName.set(run.name, {
+      ago: relative(elapsed),
+      stale: elapsed > STALE_AFTER_MS,
+    });
+  }
 
   const rows = tokens.data ?? [];
   const agency = rows.find(
@@ -228,18 +274,49 @@ export default async function SettingsPage() {
         </p>
 
         <div className="flex flex-col gap-4">
-          {Object.values(SYNCS).map((definition) => (
-            <div
-              key={definition.name}
-              className="flex flex-wrap items-center justify-between gap-3"
-            >
-              <div>
-                <p className="font-mono text-sm text-fg">{definition.name}</p>
-                <p className="text-xs text-fg-subtle">{definition.description}</p>
+          {Object.values(SYNCS).map((definition) => {
+            const last = lastRunByName.get(definition.name);
+
+            return (
+              <div
+                key={definition.name}
+                className="flex flex-wrap items-center justify-between gap-3"
+              >
+                <div>
+                  <p className="font-mono text-sm text-fg">{definition.name}</p>
+                  <p className="text-xs text-fg-subtle">
+                    {definition.description}
+                  </p>
+                  {/*
+                    When it last ran, which is the question somebody is actually
+                    asking when they look at this list.
+
+                    Worth the space because a sync that never runs writes no row
+                    anywhere, so it cannot appear in the history below and is
+                    invisible exactly when it matters. crm-deals, crm-calls and
+                    stripe-charges had never once run from cron — starved by a
+                    cycle that spent its budget on crm-appointments — and nothing
+                    on this page would have said so.
+                  */}
+                  <p
+                    className={cn(
+                      'mt-0.5 text-[11px]',
+                      last === undefined || last.stale
+                        ? 'text-negative'
+                        : 'text-fg-subtle',
+                    )}
+                  >
+                    {last === undefined
+                      ? 'never run'
+                      : last.stale
+                        ? `last ran ${last.ago} ago — expected daily`
+                        : `last ran ${last.ago} ago`}
+                  </p>
+                </div>
+                <RunSyncButton name={definition.name} label="Run now" />
               </div>
-              <RunSyncButton name={definition.name} label="Run now" />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

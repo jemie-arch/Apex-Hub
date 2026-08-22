@@ -25,15 +25,29 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * Order matters.
+ * Order matters, and so does what is missing from it.
  *
- * crm-clients first: it creates the client rows every other sync joins to. A
- * new sub-account added in GoHighLevel this morning has no appointments imported
- * until its client row exists, and doing it in the other order delays that by a
- * full day.
+ * crm-appointments is NOT here, and that is the point. It has its own cron entry
+ * in vercel.json at 18:00, and it takes 136 to 183 seconds — most of the 240s
+ * start budget below. Sitting fourth in this cycle it did exactly what this
+ * route was written to prevent: everything after it ran out of time and never
+ * started. The evidence was unambiguous once anyone looked at sync_runs —
+ * crm-deals, crm-calls and stripe-charges had never once run from cron, which is
+ * why the b2b pipeline was empty, and why the only ad spend in the database came
+ * from a spreadsheet import rather than from Windsor.
  *
- * stripe-charges last: it is the cheapest and the least urgent, so it is the
- * right thing to lose if the budget runs out.
+ * So the expensive sync keeps its own schedule and this cycle keeps the seven
+ * that fit. Duplicating it here bought nothing anyway: the same work, twice a
+ * day, at the cost of everything downstream.
+ *
+ * crm-clients first: it creates the client rows every other sync joins to. A new
+ * sub-account added in GoHighLevel this morning is invisible to the rest until
+ * its client row exists, and doing it in the other order delays that by a day.
+ *
+ * crm-calls last: it is the most expensive per record — two requests per
+ * conversation — and the call-centre leaderboard tolerates a day's lag better
+ * than money or attribution does. If the budget runs out, this is the right
+ * thing to lose.
  */
 const ORDER = [
   'crm-clients',
@@ -42,11 +56,10 @@ const ORDER = [
   // waiting on somebody noticing a button.
   'provision-pending',
   'onboarding-calls',
-  'crm-appointments',
   'crm-deals',
-  'crm-calls',
   'windsor-ads',
   'stripe-charges',
+  'crm-calls',
 ] as const;
 
 /**
