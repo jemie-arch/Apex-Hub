@@ -56,6 +56,10 @@ breaks.
 Rules that hold throughout:
 
 - Re-running never duplicates; syncs upsert on an external id.
+- `stripe-charges` reports `partial` whenever a charge was declined. That is not
+  a bug in the sync — a declined card is exactly what it exists to surface, and
+  `partial` is what makes the Slack alert fire. `error` still means the sync
+  itself broke.
 - A null from an API never overwrites a value a human typed. See
   `src/lib/sync/merge.ts`.
 - A reschedule updates the existing appointment rather than inserting a second.
@@ -76,6 +80,7 @@ deployment. On Pro, the schedule this app actually wants is:
 | `crm-deals` | hourly |
 | `crm-calls` | every 6 hours |
 | `windsor-ads` | daily, early morning |
+| `stripe-charges` | daily |
 
 Until then, the remaining syncs are run from the **Run now** buttons in
 `/settings`, which call the identical functions.
@@ -85,6 +90,32 @@ Until then, the remaining syncs are run from the **Run now** buttons in
 Set `SLACK_WEBHOOK_URL` and any sync ending `error` or `partial` posts to
 `#tech-team`. Successes stay silent on purpose: a channel that fires on every
 green run gets muted, and then the red ones are missed too.
+
+## Billing
+
+`/billing` answers one question: was this consult actually paid for?
+
+Nothing else in the stack can. GoHighLevel holds no record of Apex billing its
+clients — the sub-accounts and the Pay Per Show System location both return zero
+invoices and zero transactions. The tracker and the stat sheets only know what
+was *supposed* to be billed. Stripe is the only system that knows what was.
+
+Two failure modes, and keeping them apart is the point of the page:
+
+- **The card was declined.** Visible in Stripe as a payment intent sitting at
+  `requires_payment_method` with a `last_payment_error`. It is worth reading
+  payment intents rather than invoices or charges, because a declined autocharge
+  frequently never becomes either.
+- **No charge was ever attempted.** Invisible in Stripe by definition. It shows
+  up on the page as an active client with no rows against it, which is why the
+  table lists every active client rather than only the ones with charges.
+
+`billing_customers` maps a Stripe customer to a client. Most cannot be matched
+automatically — Stripe customers are named after the practice owner rather than
+the practice — so unmapped ones are listed on the page for a human to map, and
+`mapped_by_hand` stops the next sync from overwriting that decision. A practice
+with two Stripe customers is a real thing that happens, and it means the same
+consults get billed twice, so the duplicates are shown rather than merged.
 
 ## Roles
 

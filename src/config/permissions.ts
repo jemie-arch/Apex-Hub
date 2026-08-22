@@ -31,6 +31,7 @@ export const PERMISSION_KEYS = [
   'tech_support',
   'forms',
   'finance',
+  'billing',
   // Account menu
   'account',
   'access',
@@ -58,6 +59,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   tech_support: 'Tech Support',
   forms: 'Forms',
   finance: 'Finance',
+  billing: 'Billing',
   account: 'My Account',
   access: 'Access & Permissions',
   settings: 'Settings',
@@ -98,6 +100,7 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/tech-support', 'tech_support'],
     ['/forms', 'forms'],
     ['/finance', 'finance'],
+    ['/billing', 'billing'],
     ['/account', 'account'],
     ['/settings/access', 'access'],
     ['/settings', 'settings'],

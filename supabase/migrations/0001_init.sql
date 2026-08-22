@@ -879,6 +879,89 @@ create index sync_runs_name_started_idx on sync_runs (name, started_at desc);
 create index sync_runs_status_idx on sync_runs (status);
 
 -- ---------------------------------------------------------------------------
+-- Billing
+--
+-- What Apex actually charged its clients, mirrored from Stripe. Separate from
+-- finance_entries on purpose: that table is a hand-kept ledger of money that
+-- moved, this one is a faithful copy of an external system.
+--
+-- Keyed on the Stripe payment intent, so re-syncing cannot double-count and a
+-- retry of the same consult lands as its own row rather than overwriting the
+-- first attempt. That sequence is the evidence: it is how you see whether the
+-- retry logic carried an unpaid consult forward or quietly dropped it.
+-- ---------------------------------------------------------------------------
+
+create type billing_outcome as enum ('succeeded', 'failed', 'pending', 'canceled');
+
+-- One row per Stripe customer. A practice can have more than one, and when it
+-- does the same consults get billed twice — so duplicates stay visible rather
+-- than being merged away.
+create table billing_customers (
+  stripe_customer_id text primary key,
+  client_id          uuid references clients (id) on delete set null,
+  group_id           uuid references client_groups (id) on delete set null,
+
+  -- Stripe customers are named after the practice owner more often than the
+  -- practice, so most cannot be matched automatically.
+  name               text,
+  email              text,
+
+  -- Set when a human confirms the mapping, so a fuzzy guess and a known fact
+  -- are never mistaken for each other — and so the next sync leaves it alone.
+  mapped_by_hand     boolean not null default false,
+
+  first_seen_at      timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+create index billing_customers_client_idx on billing_customers (client_id);
+create index billing_customers_email_idx  on billing_customers (lower(email));
+
+create table billing_charges (
+  stripe_payment_intent_id text primary key,
+  stripe_customer_id       text references billing_customers (stripe_customer_id) on delete set null,
+
+  -- Denormalised from billing_customers so a charge stays attributable if the
+  -- mapping is later corrected, and so the page groups without a join.
+  client_id                uuid references clients (id) on delete set null,
+
+  amount_cents             bigint not null,
+  currency                 text   not null default 'usd',
+
+  -- Our answer to "was this charged?", alongside Stripe's own wording.
+  -- 'requires_payment_method' means the card was declined and nothing was
+  -- collected; that nuance is worth keeping rather than flattening.
+  outcome                  billing_outcome not null,
+  stripe_status            text not null,
+
+  error_code               text,
+  decline_code             text,
+  error_message            text,
+
+  description              text,
+
+  -- Parsed from the "[ADM] Consults charged:" description. This is what makes a
+  -- failed charge actionable: it names the patients that went unbilled.
+  consult_names            text[] not null default '{}',
+  consult_count            integer not null default 0,
+
+  stripe_invoice_id        text,
+  occurred_at              timestamptz not null,
+
+  created_at               timestamptz not null default now(),
+  updated_at               timestamptz not null default now(),
+  synced_at                timestamptz not null default now()
+);
+
+create index billing_charges_occurred_idx on billing_charges (occurred_at desc);
+create index billing_charges_client_idx   on billing_charges (client_id, occurred_at desc);
+create index billing_charges_customer_idx on billing_charges (stripe_customer_id);
+
+-- Partial: the failures are what anyone queries for, and they are the minority.
+create index billing_charges_outcome_idx on billing_charges (outcome)
+  where outcome <> 'succeeded';
+
+-- ---------------------------------------------------------------------------
 -- Row level security
 --
 -- The service-role key bypasses all of this, and API routes use it
@@ -911,6 +994,8 @@ alter table notifications     enable row level security;
 alter table finance_entries   enable row level security;
 alter table app_settings      enable row level security;
 alter table sync_runs         enable row level security;
+alter table billing_customers enable row level security;
+alter table billing_charges   enable row level security;
 
 create policy admin_all on client_groups     for all using (auth_is_admin()) with check (auth_is_admin());
 create policy admin_all on clients           for all using (auth_is_admin()) with check (auth_is_admin());
@@ -932,6 +1017,8 @@ create policy admin_all on notifications     for all using (auth_is_admin()) wit
 create policy admin_all on finance_entries   for all using (auth_is_admin()) with check (auth_is_admin());
 create policy admin_all on app_settings      for all using (auth_is_admin()) with check (auth_is_admin());
 create policy admin_all on sync_runs         for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on billing_customers for all using (auth_is_admin()) with check (auth_is_admin());
+create policy admin_all on billing_charges   for all using (auth_is_admin()) with check (auth_is_admin());
 
 -- Anyone signed in reads their own profile row, and only that row.
 create policy self_read on user_profiles

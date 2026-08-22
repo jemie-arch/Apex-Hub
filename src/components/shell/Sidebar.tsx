@@ -18,6 +18,7 @@ import {
   BarChart3,
   CalendarCheck,
   ClipboardList,
+  CreditCard,
   FileText,
   GitBranch,
   KeyRound,
@@ -92,6 +93,7 @@ const SECTIONS: NavSection[] = [
       { href: '/tech-support', label: 'Tech Support', icon: LifeBuoy },
       { href: '/forms', label: 'Forms', icon: FileText },
       { href: '/finance', label: 'Finance', icon: Wallet },
+      { href: '/billing', label: 'Billing', icon: CreditCard },
     ],
   },
 ];

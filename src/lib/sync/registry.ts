@@ -8,6 +8,7 @@ import { syncCrmCalls } from '@/lib/sync/crm-calls';
 import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
 import type { SyncFn } from '@/lib/sync/runner';
+import { syncStripeCharges } from '@/lib/sync/stripe-charges';
 import { syncWindsorAds } from '@/lib/sync/windsor-ads';
 
 export interface SyncDefinition {
@@ -44,6 +45,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
     description:
       'Windsor.ai daily ad spend — campaigns, ads, per-ad-day and the rollup',
     run: syncWindsorAds,
+  },
+  'stripe-charges': {
+    name: 'stripe-charges',
+    description:
+      'Stripe payment intents into billing — which client charges succeeded, ' +
+      'were attempted, and failed',
+    run: syncStripeCharges,
   },
 };
 
