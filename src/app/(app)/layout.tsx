@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { PortalSwitcher } from '@/components/shell/PortalSwitcher';
 import { Sidebar } from '@/components/shell/Sidebar';
 import type { Theme } from '@/components/shell/ThemeToggle';
 import { currentCaller } from '@/lib/supabase/server';
@@ -45,7 +46,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-bg">
       <Sidebar permissions={permissions} isAdmin={isAdmin} theme={theme} />
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1600px] px-8 py-8">{children}</div>
+        {/*
+          The switcher sits above the page rather than inside the sidebar: it
+          moves you between portals, which is a different kind of action from
+          moving between pages of one portal.
+        */}
+        <div className="mx-auto flex max-w-[1600px] justify-end px-8 pt-6">
+          <PortalSwitcher />
+        </div>
+        <div className="mx-auto max-w-[1600px] px-8 pb-8 pt-4">{children}</div>
       </main>
     </div>
   );

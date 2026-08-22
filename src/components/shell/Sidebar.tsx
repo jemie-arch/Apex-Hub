@@ -3,10 +3,13 @@
 /**
  * Navigation.
  *
- * The four sections follow how the business actually runs — you win a clinic,
- * you onboard and serve it, its patients book consultations, and separately
- * there is the business of running the agency. So the menu reads as a
- * lifecycle rather than an alphabetical list of features.
+ * Three sections, in the order the business actually runs: Company is Apex's own
+ * business — winning clients and billing them; Clients is the work done for them
+ * once won; Teams is running the agency itself.
+ *
+ * Call Center is deliberately absent. It is its own portal now, reached from the
+ * switcher, because the people who live in it all day should not have to scroll
+ * past the agency's finances to find it.
  *
  * Each item's permission key comes from its href, through the same map the
  * middleware guard uses — so a hidden item is also an unreachable URL rather
@@ -17,6 +20,8 @@ import {
   BadgeDollarSign,
   BarChart3,
   CalendarCheck,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   CreditCard,
   FileText,
@@ -26,7 +31,6 @@ import {
   LifeBuoy,
   Megaphone,
   MessagesSquare,
-  PhoneCall,
   Scale,
   Settings,
   Target,
@@ -38,6 +42,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 import { ThemeToggle, type Theme } from '@/components/shell/ThemeToggle';
 import { permissionForPath } from '@/config/permissions';
@@ -50,6 +55,15 @@ interface NavItem {
   icon: LucideIcon;
   /** Structure is shown before the page exists, so the shape is legible. */
   pending?: boolean;
+  /**
+   * Pages that belong under this one.
+   *
+   * A parent with children is still a real page in its own right — Client
+   * Management is a page that happens to contain the results tracker. A parent
+   * with no page of its own uses href '' and renders as a heading, which is how
+   * Tracker groups the two b2b trackers without inventing a route for itself.
+   */
+  children?: NavItem[];
 }
 
 interface NavSection {
@@ -59,41 +73,52 @@ interface NavSection {
 
 const SECTIONS: NavSection[] = [
   {
-    heading: 'B2B — winning clients',
-    items: [
-      { href: '/pipeline', label: 'B2B Overview', icon: GitBranch },
-      { href: '/leads', label: 'Leads', icon: Target },
-      { href: '/sales-tracker', label: 'Sales Tracker', icon: ClipboardList },
-      { href: '/b2b-ads', label: 'B2B Ads Tracker', icon: BarChart3 },
-    ],
-  },
-  {
-    heading: 'Clients — serving them',
-    items: [
-      { href: '/dashboard', label: 'Clients Overview', icon: LayoutDashboard },
-      { href: '/onboarding', label: 'Client Onboarding', icon: CalendarCheck },
-      { href: '/clients', label: 'Client Management', icon: Users },
-      { href: '/ads', label: 'Ads Management', icon: Megaphone },
-      { href: '/compare', label: 'Client Results Tracker', icon: Scale },
-    ],
-  },
-  {
-    heading: 'Patients',
-    items: [
-      { href: '/b2c', label: 'Consultations', icon: BadgeDollarSign },
-      { href: '/call-center', label: 'Call Center', icon: PhoneCall },
-    ],
-  },
-  {
+    // Apex's own business: winning and billing clients.
     heading: 'Company',
     items: [
+      { href: '/pipeline', label: 'Overview', icon: GitBranch },
+      { href: '/leads', label: 'Leads', icon: Target },
+      {
+        // No page of its own — purely a home for the two b2b trackers.
+        href: '',
+        label: 'Tracker',
+        icon: BarChart3,
+        children: [
+          { href: '/sales-tracker', label: 'Sales', icon: ClipboardList },
+          { href: '/b2b-ads', label: 'Ads', icon: BarChart3 },
+        ],
+      },
+      { href: '/billing', label: 'Billing', icon: CreditCard },
+    ],
+  },
+  {
+    // The work done for clients.
+    heading: 'Clients',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/onboarding', label: 'Onboarding', icon: CalendarCheck },
+      {
+        href: '/clients',
+        label: 'Client Management',
+        icon: Users,
+        children: [
+          { href: '/compare', label: 'Results Tracker', icon: Scale },
+        ],
+      },
+      { href: '/ads', label: 'Ads Management', icon: Megaphone },
+      { href: '/b2c', label: 'Consultations', icon: BadgeDollarSign },
+    ],
+  },
+  {
+    // Running the agency itself.
+    heading: 'Teams',
+    items: [
+      { href: '/hr', label: 'Team', icon: UsersRound },
       { href: '/meetings', label: 'Meetings', icon: MessagesSquare },
       { href: '/projects', label: 'Projects', icon: ClipboardList },
-      { href: '/hr', label: 'Team', icon: UsersRound },
       { href: '/tech-support', label: 'Tech Support', icon: LifeBuoy },
       { href: '/forms', label: 'Forms', icon: FileText },
       { href: '/finance', label: 'Finance', icon: Wallet },
-      { href: '/billing', label: 'Billing', icon: CreditCard },
     ],
   },
 ];
@@ -123,6 +148,40 @@ function isAllowed(
   const key = permissionForPath(item.href);
   if (key === null) return false;
   return isAdmin || allowed.has(key);
+}
+
+/**
+ * The item as this person should see it, or null if they should not.
+ *
+ * Children are filtered independently, so somebody with Client Management but
+ * not the results tracker sees the parent without the child. A pure grouping
+ * item — one with no page of its own — survives only while it still has a
+ * child worth showing, rather than lingering as a heading over nothing.
+ */
+function visible(
+  item: NavItem,
+  allowed: Set<string>,
+  isAdmin: boolean,
+): NavItem | null {
+  const children = item.children
+    ?.map((child) => visible(child, allowed, isAdmin))
+    .filter((child): child is NavItem => child !== null);
+
+  const isGroupOnly = item.href === '';
+
+  if (isGroupOnly) {
+    return children && children.length > 0 ? { ...item, children } : null;
+  }
+
+  if (!isAllowed(item, allowed, isAdmin)) {
+    // The parent is denied but a child may still be permitted. Promote the
+    // children rather than hiding a page somebody is entitled to.
+    return children && children.length > 0
+      ? { ...item, href: '', children }
+      : null;
+  }
+
+  return children && children.length > 0 ? { ...item, children } : { ...item };
 }
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -159,6 +218,91 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
+/**
+ * One nav item and whatever sits under it.
+ *
+ * Opens itself when the current page is inside it, so arriving at a nested page
+ * by URL does not leave its own menu entry hidden. Otherwise it stays closed and
+ * the section reads as a short list rather than a wall of links.
+ */
+function NavBranch({
+  item,
+  activeHref,
+}: {
+  item: NavItem;
+  activeHref: string | null;
+}) {
+  const children = item.children ?? [];
+  const holdsActive =
+    activeHref !== null &&
+    (activeHref === item.href ||
+      children.some((child) => child.href === activeHref));
+
+  const [open, setOpen] = useState(holdsActive);
+  const Icon = item.icon;
+
+  if (children.length === 0) {
+    return <NavLink item={item} active={activeHref === item.href} />;
+  }
+
+  // href '' means this is a grouping label with no page behind it, so it must
+  // not render as a link to nowhere.
+  const parentIsPage = item.href !== '';
+
+  return (
+    <div className="mb-0.5">
+      <div className="flex items-center">
+        {parentIsPage ? (
+          <Link
+            href={item.href}
+            className={cn(
+              'flex flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
+              activeHref === item.href
+                ? 'bg-accent-subtle font-medium text-accent'
+                : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+            )}
+          >
+            <Icon size={16} />
+            <span className="truncate">{item.label}</span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen((was) => !was)}
+            className="flex flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+            aria-expanded={open}
+          >
+            <Icon size={16} />
+            <span className="truncate">{item.label}</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setOpen((was) => !was)}
+          className="mr-1 rounded-md p-1 text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
+          aria-label={`${open ? 'Collapse' : 'Expand'} ${item.label}`}
+          aria-expanded={open}
+        >
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+      </div>
+
+      {open ? (
+        <div className="ml-4 border-l border-line pl-2">
+          {children.map((child) => (
+            <NavLink
+              key={child.href}
+              item={child}
+              active={activeHref === child.href}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Sidebar({
   permissions,
   isAdmin = false,
@@ -173,15 +317,24 @@ export function Sidebar({
   const allowed = new Set(permissions);
 
   // /settings/access must not also light up /settings, so the longest matching
-  // href wins rather than any prefix match.
-  const allHrefs = [...SECTIONS.flatMap((s) => s.items), ...ACCOUNT_ITEMS]
-    .map((item) => item.href)
+  // href wins rather than any prefix match. Children are included, or a nested
+  // page would leave its own entry unhighlighted.
+  const everyHref = [
+    ...SECTIONS.flatMap((section) =>
+      section.items.flatMap((item) => [item.href, ...(item.children ?? []).map((c) => c.href)]),
+    ),
+    ...ACCOUNT_ITEMS.map((item) => item.href),
+  ];
+  const allHrefs = everyHref
+    .filter((href) => href !== '')
     .filter((href) => pathname === href || pathname.startsWith(`${href}/`));
   const activeHref = allHrefs.sort((a, b) => b.length - a.length)[0] ?? null;
 
   const visibleSections = SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => isAllowed(item, allowed, isAdmin)),
+    items: section.items
+      .map((item) => visible(item, allowed, isAdmin))
+      .filter((item): item is NavItem => item !== null),
   })).filter((section) => section.items.length > 0);
 
   const visibleAccount = ACCOUNT_ITEMS.filter((item) =>
@@ -217,10 +370,10 @@ export function Sidebar({
               {section.heading}
             </p>
             {section.items.map((item) => (
-              <NavLink
-                key={item.href}
+              <NavBranch
+                key={`${section.heading}:${item.href}:${item.label}`}
                 item={item}
-                active={activeHref === item.href}
+                activeHref={activeHref}
               />
             ))}
           </div>
