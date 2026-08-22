@@ -1,16 +1,19 @@
 'use client';
 
 /**
- * Adds a teammate: a login, a job role, and the pages they start with.
+ * Adds a teammate: a login, a job role, the pages they start with, and a link
+ * for them to choose their own password.
  *
- * Sends no email. An invite would be a message going out under the company's
- * name, and this form is not the place to decide that — the confirmation says so
- * and tells you what to do instead.
+ * The link comes back here rather than going out by email. Two reasons: a
+ * message under the company's name is your decision and not this form's, and
+ * nobody ever has to invent a password on someone else's behalf or type one
+ * into a chat window.
  */
 import { UserPlus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 
 import { addTeammate, type AccessResult } from '@/app/(app)/settings/access/actions';
+import { SetPasswordLink } from '@/components/settings/SetPasswordLink';
 import { Button } from '@/components/ui/Button';
 import {
   ASSIGNABLE_ROLES,
@@ -172,6 +175,8 @@ export function AddTeammate({ callerRole }: { callerRole: string }) {
           {result.message}
         </p>
       ) : null}
+
+      {result?.link ? <SetPasswordLink url={result.link} /> : null}
 
       <div className="mt-4 flex items-center gap-2">
         <Button onClick={submit} disabled={pending}>

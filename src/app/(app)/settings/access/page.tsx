@@ -4,6 +4,7 @@ import { isPrivileged, roleLabel } from '@/config/roles';
 
 import { AccessEditor } from '@/components/settings/AccessEditor';
 import { AddTeammate } from '@/components/settings/AddTeammate';
+import { ReissueLinkButton } from '@/components/settings/ReissueLinkButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -52,8 +53,8 @@ export default async function AccessPage() {
         <EmptyState
           title="No staff accounts yet"
           description={
-            'Invite somebody from Supabase Auth and a profile row is created ' +
-            'for them automatically. Grant their pages here afterwards.'
+            'Use Add teammate above. It creates the login and hands you a ' +
+            'single-use link for them to choose their own password.'
           }
           icon={<ShieldCheck size={22} />}
         />
@@ -101,15 +102,21 @@ export default async function AccessPage() {
                               : '')}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <AccessEditor
-                        user={{
-                          id: row.id,
-                          name: row.full_name ?? row.email,
-                          email: row.email,
-                          role: row.role,
-                          permissions: row.permissions,
-                        }}
-                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <ReissueLinkButton
+                          userId={row.id}
+                          name={row.full_name ?? row.email}
+                        />
+                        <AccessEditor
+                          user={{
+                            id: row.id,
+                            name: row.full_name ?? row.email,
+                            email: row.email,
+                            role: row.role,
+                            permissions: row.permissions,
+                          }}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

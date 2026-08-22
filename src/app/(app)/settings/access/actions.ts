@@ -25,6 +25,94 @@ import { serviceClient } from '@/lib/supabase/service';
 export interface AccessResult {
   ok: boolean;
   message: string;
+  /**
+   * A single-use set-password link, when one was generated.
+   *
+   * Returned rather than emailed. Treat it as a credential: whoever holds it can
+   * set this person's password until it is used or expires.
+   */
+  link?: string;
+}
+
+/**
+ * This site's own address, for a link somebody will paste into a message.
+ *
+ * A relative path is useless once it leaves the app, and a guessed hostname
+ * would send a new teammate somewhere that does not exist, so this returns null
+ * rather than inventing one.
+ */
+function siteOrigin(): string | null {
+  const configured = process.env['NEXT_PUBLIC_APP_URL']?.trim();
+  if (configured) return configured.replace(/\/$/, '');
+
+  const vercel =
+    process.env['VERCEL_PROJECT_PRODUCTION_URL'] ?? process.env['VERCEL_URL'];
+  return vercel ? `https://${vercel}` : null;
+}
+
+/**
+ * A link that lets somebody choose their own password.
+ *
+ * generateLink returns the link instead of sending it, which is the point: the
+ * account gets created here and the message goes out however you choose, under
+ * your name rather than the software's.
+ */
+async function setPasswordLink(email: string): Promise<
+  { ok: true; link: string } | { ok: false; message: string }
+> {
+  const origin = siteOrigin();
+  if (origin === null) {
+    return {
+      ok: false,
+      message:
+        'Set NEXT_PUBLIC_APP_URL so the link points at this site rather than nowhere.',
+    };
+  }
+
+  const generated = await serviceClient().auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: { redirectTo: `${origin}/auth/set-password` },
+  });
+
+  if (generated.error || !generated.data.properties?.action_link) {
+    return {
+      ok: false,
+      message: generated.error?.message ?? 'Could not generate a link.',
+    };
+  }
+
+  return { ok: true, link: generated.data.properties.action_link };
+}
+
+/**
+ * Issues a fresh set-password link for somebody who already has an account.
+ *
+ * These links are single use and time limited, so the first one being expired is
+ * the normal case rather than a fault.
+ */
+export async function reissueSetPasswordLink(input: {
+  userId: string;
+}): Promise<AccessResult> {
+  await requireAdmin();
+
+  const person = await serviceClient()
+    .from('user_profiles')
+    .select('email, full_name')
+    .eq('id', input.userId)
+    .maybeSingle();
+
+  if (person.error) return { ok: false, message: person.error.message };
+  if (!person.data) return { ok: false, message: 'No such person.' };
+
+  const generated = await setPasswordLink(person.data.email);
+  if (!generated.ok) return { ok: false, message: generated.message };
+
+  return {
+    ok: true,
+    message: `New link for ${person.data.full_name ?? person.data.email}. Single use.`,
+    link: generated.link,
+  };
 }
 
 export async function setPermissions(input: {
@@ -138,12 +226,11 @@ export async function setRole(input: {
 }
 
 /**
- * Adds a teammate.
+ * Adds a teammate and returns a link for them to set their own password.
  *
- * Creates the login and the profile, and deliberately sends no email: an invite
- * would be a message going out under the company's name, which is not this
- * screen's decision to make. Hand them the address and let them use "Forgot
- * password" to set one, or send your own invite.
+ * No email is sent. The link comes back to you to pass on however you like,
+ * which also means no password is ever chosen for somebody else or typed into a
+ * chat window.
  */
 export async function addTeammate(input: {
   email: string;
@@ -231,10 +318,23 @@ export async function addTeammate(input: {
   revalidatePath('/settings/access');
   revalidatePath('/hr');
 
+  const generated = await setPasswordLink(email);
+
+  if (!generated.ok) {
+    return {
+      ok: true,
+      message:
+        `Added ${fullName} as ${ROLE_LABELS[input.role]} with ${keys.length} page(s), ` +
+        `but the set-password link failed: ${generated.message} ` +
+        'Use "New link" on their row once that is fixed.',
+    };
+  }
+
   return {
     ok: true,
     message:
       `Added ${fullName} as ${ROLE_LABELS[input.role]} with ${keys.length} page(s). ` +
-      'No email was sent — ask them to sign in with "Forgot password" to set one.',
+      'Send them the link below — it is single use and no email went out.',
+    link: generated.link,
   };
 }
