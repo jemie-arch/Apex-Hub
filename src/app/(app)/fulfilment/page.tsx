@@ -97,6 +97,15 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
         .select('id', { count: 'exact', head: true })
         .not('campaign_external_id', 'is', null),
       db.from('appointments').select('id', { count: 'exact', head: true }),
+      // The spreadsheet's own history, which does carry campaign ids.
+      db
+        .from('tracker_appointments')
+        .select('id', { count: 'exact', head: true })
+        .not('campaign_external_id', 'is', null),
+      db
+        .from('tracker_leads')
+        .select('id', { count: 'exact', head: true })
+        .not('campaign_external_id', 'is', null),
     ]),
   ]);
 
@@ -104,7 +113,8 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
   if (clientRows.error) throw clientRows.error;
   if (charges.error) throw charges.error;
 
-  const [adRows, callRows, attributed, allAppointments] = coverage;
+  const [adRows, callRows, attributed, allAppointments, trackerAttributed, trackerLeads] =
+    coverage;
 
   const rows = new Map<string, Row>();
   for (const client of clientRows.data ?? []) {
@@ -183,14 +193,19 @@ export default async function FulfilmentPage({ searchParams }: PageProps) {
 
   const gaps = [
     {
-      metric: 'Cost per lead · cost per booking · best performing ad',
-      cause: `No appointment carries a campaign or ad id — ${formatCount(attributed.count ?? 0)} of ${formatCount(allAppointments.count ?? 0)}. The UTM template from the SOP is not reaching GoHighLevel's attribution, so spend cannot be joined to a booking.`,
+      metric: 'Best performing ad, for bookings from today',
+      cause: `No live appointment carries a campaign or ad id — ${formatCount(attributed.count ?? 0)} of ${formatCount(allAppointments.count ?? 0)}. The UTM template from the SOP is not reaching GoHighLevel's attribution. The spreadsheet history imported alongside this does carry ids on ${formatCount(trackerAttributed.count ?? 0)} bookings and ${formatCount(trackerLeads.count ?? 0)} leads, so the question is answerable for the past and not for the present — the capture, not the reporting, is what is broken.`,
+    },
+    {
+      metric: 'Cost per lead · cost per booking',
+      cause:
+        'The spreadsheet has an Amount Spent column, but it is used two ways: on 43 practice-months one figure is repeated across every row, which is a monthly total, and on 36 it varies row to row. Summed it reads $1.34m, counted once per month $498k, and nothing in the sheet says which is meant. The column is imported verbatim and deliberately not divided by anything.',
     },
     {
       metric: 'Ad spend · impressions · clicks',
       cause:
         (adRows.count ?? 0) === 0
-          ? 'No ad data has been imported. 44 active locations have no ad account mapped, and the Windsor sync returned nothing for the 20 that do.'
+          ? 'No ad data has been imported from the ad platforms. 44 active locations have no ad account mapped, and the Windsor sync returned nothing for the 20 that do.'
           : `${formatCount(adRows.count ?? 0)} ad-day rows imported.`,
     },
     {
