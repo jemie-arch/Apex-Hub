@@ -13,13 +13,16 @@
  *   - attribution comes from a portal token when the link carried one, never
  *     from a client_group_id in the form body, which anyone could invent.
  *
- * The spec says these answers are also upserted into the CRM. That is not done
- * here: it would mean writing to a practice's CRM record on the word of an
- * unauthenticated form, and nothing yet decides which contact to write to. The
- * answers land on /forms for a person to act on, which is honest about where
- * the boundary currently is.
+ * The onboarding form is the one exception to "insert and stop": it also builds
+ * the practice's GoHighLevel sub-account. That is a write, on the word of an
+ * unauthenticated form, so it is worth being precise about why it is acceptable
+ * here. It creates a NEW sub-account from a snapshot and touches nothing
+ * existing — the worst a crafted POST achieves is an empty sub-account somebody
+ * deletes, not a change to a practice already trading. Every other form still
+ * only lands on /forms for a person to act on.
  */
 import { findPublicForm } from '@/config/public-forms';
+import { provisionFromSubmission } from '@/lib/onboarding/provision';
 import { resolvePortal } from '@/lib/portal';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -72,11 +75,18 @@ export async function submitPublicForm(
     groupId = portal?.group.id ?? null;
   }
 
-  const written = await serviceClient().from('form_submissions').insert({
-    form_key: definition.key,
-    client_group_id: groupId,
-    payload,
-  });
+  const written = await serviceClient()
+    .from('form_submissions')
+    .insert({
+      form_key: definition.key,
+      client_group_id: groupId,
+      payload,
+      clinic_name: payload['clinic_name'] ?? payload['practice_name'] ?? null,
+      person_name: payload['doctor_name'] ?? payload['contact_name'] ?? null,
+      contact_email: payload['doctor_email'] ?? payload['email'] ?? null,
+    })
+    .select('id')
+    .maybeSingle();
 
   if (written.error) {
     return { ok: false, message: 'Could not send that. Please try again.' };
@@ -84,7 +94,46 @@ export async function submitPublicForm(
 
   await notifyStaff(definition.title, payload, groupId);
 
+  /*
+   * Building the sub-account.
+   *
+   * Deliberately after the insert and deliberately unable to change the answer
+   * the sender sees. The submission is saved; if GoHighLevel refuses, that is
+   * ours to retry from the Onboarding page and not the practice's problem to
+   * hear about. Telling somebody their form failed when we have their answers
+   * would just get us the same answers twice.
+   */
+  if (definition.key === 'client_onboarding') {
+    void provisionInBackground({
+      submissionId: written.data?.id ?? null,
+      clientGroupId: groupId,
+      clinicName: payload['clinic_name'] ?? '',
+      answers: payload,
+    });
+  }
+
   return { ok: true, message: definition.thanks };
+}
+
+/**
+ * Kicks off provisioning without making the sender wait for GoHighLevel.
+ *
+ * Every outcome is written to provisioning_runs, so nothing depends on this
+ * promise being observed — which is the point, since the response has already
+ * gone back by the time it settles.
+ */
+async function provisionInBackground(input: {
+  submissionId: string | null;
+  clientGroupId: string | null;
+  clinicName: string;
+  answers: Record<string, string>;
+}): Promise<void> {
+  try {
+    await provisionFromSubmission(input);
+  } catch {
+    // provisionFromSubmission records its own failures. Anything escaping it is
+    // already on the row; swallowing here only stops an unhandled rejection.
+  }
 }
 
 /**
@@ -98,7 +147,10 @@ async function notifyStaff(
 ): Promise<void> {
   const db = serviceClient();
 
-  const admins = await db.from('user_profiles').select('id').eq('role', 'admin');
+  const admins = await db
+    .from('user_profiles')
+    .select('id')
+    .in('role', ['admin', 'super_admin']);
   if (admins.error || !admins.data || admins.data.length === 0) return;
 
   const who =

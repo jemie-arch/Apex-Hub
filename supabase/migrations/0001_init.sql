@@ -1825,3 +1825,49 @@ insert into onboarding_step_template
   ('ads_buildout', 'ads', 'Ads Set Up', 'Facebook ads buildout', false, 220),
   ('ads_pixel_code', 'ads', 'Ads Set Up', 'Add pixel code', false, 230),
   ('ads_copy', 'ads', 'Ads Set Up', 'Ads copy creation', false, 240);
+
+
+-- ===========================================================================
+-- PROVISIONING
+--
+-- Every attempt to build a sub-account from the onboarding form, successful or
+-- not, so provisioning can fail without losing anything. The submission is
+-- saved first and this records what happened next: a refused API call becomes a
+-- retry rather than a practice filling the form twice.
+--
+-- Append-only per attempt. The second try does not overwrite the first, because
+-- "it worked on the third go" and "it worked" are different facts and only one
+-- of them should send somebody to fix the cause.
+--
+-- crm_location_id is what makes a retry safe. With an id, the retry configures
+-- the account that already exists; without it, an agency ends up with two
+-- sub-accounts for one practice and nobody notices for a month.
+-- ===========================================================================
+
+create table provisioning_runs (
+  id                uuid primary key default gen_random_uuid(),
+  submission_id     uuid references form_submissions (id) on delete set null,
+  client_group_id   uuid references client_groups (id) on delete set null,
+  clinic_name       text not null,
+  snapshot_id       text not null,
+  -- 'created' | 'values_written' | 'partial' | 'failed'
+  status            text not null,
+  crm_location_id   text,
+  values_written    text[] not null default '{}',
+  values_missing    text[] not null default '{}',
+  values_failed     jsonb  not null default '[]'::jsonb,
+  error             text,
+  -- True when the refusal looked like authorisation rather than data, which is
+  -- the difference between "re-authorise the app" and "fix the form".
+  scope_problem     boolean not null default false,
+  started_by        uuid references user_profiles (id) on delete set null,
+  created_at        timestamptz not null default now()
+);
+
+create index provisioning_runs_submission_idx on provisioning_runs (submission_id);
+create index provisioning_runs_group_idx on provisioning_runs (client_group_id);
+create index provisioning_runs_created_idx on provisioning_runs (created_at desc);
+
+alter table provisioning_runs enable row level security;
+create policy admin_all on provisioning_runs
+  for all using (auth_is_admin()) with check (auth_is_admin());

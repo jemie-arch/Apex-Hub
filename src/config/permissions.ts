@@ -24,6 +24,7 @@ export const PERMISSION_KEYS = [
   'fulfilment',
   'onboarding_forms',
   'client_onboarding',
+  'provisioning',
   // Patients
   'consultations',
   'calls',
@@ -57,6 +58,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   fulfilment: 'Fulfilment',
   onboarding_forms: 'Onboarding Forms',
   client_onboarding: 'Client Onboarding',
+  provisioning: 'Provisioning',
   consultations: 'Consultations',
   calls: 'Call Center',
   meetings: 'Meetings',
@@ -105,6 +107,7 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/onboarding-forms', 'onboarding_forms'],
     // Longer prefix than '/onboarding', so it resolves to its own key.
     ['/onboarding/clients', 'client_onboarding'],
+    ['/onboarding/provisioning', 'provisioning'],
     ['/b2c', 'consultations'],
     ['/call-center', 'calls'],
     ['/meetings', 'meetings'],

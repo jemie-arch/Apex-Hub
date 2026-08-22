@@ -182,6 +182,102 @@ export const PUBLIC_FORMS: readonly PublicFormDefinition[] = [
       'Thank you — this is what we build the campaigns from. If anything ' +
       'changes, send the form again; the latest answers are the ones we use.',
   },
+  {
+    slug: 'onboarding',
+    key: 'client_onboarding',
+    title: 'Practice onboarding',
+    intro:
+      'This is what we need to build your account. Every answer here goes ' +
+      'straight into the system that books and confirms your consultations, so ' +
+      'it is worth being specific — the wording you give us is the wording your ' +
+      'patients will read.',
+    sections: [
+      {
+        heading: 'The practice',
+        fields: [
+          {
+            name: 'clinic_name',
+            label: 'Clinic name',
+            required: true,
+            hint: 'As you want it to appear to patients.',
+          },
+          {
+            name: 'timezone',
+            label: 'Timezone',
+            required: true,
+            hint: 'For example America/Los_Angeles. Every appointment time is set in this.',
+          },
+          { name: 'website', label: 'Website' },
+          { name: 'phone', label: 'Main phone', type: 'tel' },
+        ],
+      },
+      {
+        heading: 'The doctor',
+        fields: [
+          { name: 'doctor_name', label: 'Doctor name', required: true },
+          { name: 'doctor_email', label: 'Doctor email', type: 'email', required: true },
+          {
+            name: 'doctor_gender',
+            label: 'Doctor gender',
+            hint:
+              'Used so our messages refer to the doctor correctly. Say what you ' +
+              'would like us to use.',
+          },
+        ],
+      },
+      {
+        heading: 'Front desk',
+        fields: [
+          {
+            name: 'front_desk_name',
+            label: 'Front desk name',
+            hint: 'Who patients will be told to ask for.',
+          },
+          { name: 'front_desk_email', label: 'Front desk email', type: 'email' },
+        ],
+      },
+      {
+        heading: 'What patients need to know',
+        fields: [
+          {
+            name: 'landmark',
+            label: 'A landmark near the clinic',
+            type: 'long',
+            hint:
+              'Something we can point to when we direct people to their ' +
+              'appointment — "opposite the Safeway" beats an address.',
+          },
+          {
+            name: 'languages',
+            label: 'Consultations in other languages',
+            type: 'long',
+            hint:
+              'Any language other than English you can consult in. Patients who ' +
+              'ask for one of these go straight through to your office.',
+          },
+          {
+            name: 'minimum_ages',
+            label: 'Minimum ages for treatment',
+            type: 'long',
+            hint:
+              'Invisalign, clear aligners, braces, 6MS — only the treatments you ' +
+              'want us promoting.',
+          },
+          {
+            name: 'requirements',
+            label: 'What we should collect before the consultation',
+            type: 'long',
+            hint:
+              'Insurance details, date of birth, anything that saves your team ' +
+              'time on the day. We ask for these while booking.',
+          },
+        ],
+      },
+    ],
+    thanks:
+      'Thank you. Your account is being built from this now — we will be in ' +
+      'touch to book the onboarding call.',
+  },
 ];
 
 export function findPublicForm(slug: string): PublicFormDefinition | null {

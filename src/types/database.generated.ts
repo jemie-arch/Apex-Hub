@@ -1726,6 +1726,79 @@ export type Database = {
           },
         ]
       }
+      provisioning_runs: {
+        Row: {
+          client_group_id: string | null
+          clinic_name: string
+          created_at: string
+          crm_location_id: string | null
+          error: string | null
+          id: string
+          scope_problem: boolean
+          snapshot_id: string
+          started_by: string | null
+          status: string
+          submission_id: string | null
+          values_failed: Json
+          values_missing: string[]
+          values_written: string[]
+        }
+        Insert: {
+          client_group_id?: string | null
+          clinic_name: string
+          created_at?: string
+          crm_location_id?: string | null
+          error?: string | null
+          id?: string
+          scope_problem?: boolean
+          snapshot_id: string
+          started_by?: string | null
+          status: string
+          submission_id?: string | null
+          values_failed?: Json
+          values_missing?: string[]
+          values_written?: string[]
+        }
+        Update: {
+          client_group_id?: string | null
+          clinic_name?: string
+          created_at?: string
+          crm_location_id?: string | null
+          error?: string | null
+          id?: string
+          scope_problem?: boolean
+          snapshot_id?: string
+          started_by?: string | null
+          status?: string
+          submission_id?: string | null
+          values_failed?: Json
+          values_missing?: string[]
+          values_written?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provisioning_runs_client_group_id_fkey"
+            columns: ["client_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisioning_runs_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisioning_runs_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_calls: {
         Row: {
           closed_by_user_id: string | null

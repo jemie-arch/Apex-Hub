@@ -33,6 +33,7 @@ import {
   Megaphone,
   MessagesSquare,
   Scale,
+  Server,
   Settings,
   Target,
   UserCheck,
@@ -104,6 +105,7 @@ const SECTIONS: NavSection[] = [
         icon: CalendarCheck,
         children: [
           { href: '/onboarding/clients', label: 'Client Onboarding', icon: UserCheck },
+          { href: '/onboarding/provisioning', label: 'Provisioning', icon: Server },
           { href: '/onboarding-forms', label: 'Forms', icon: FileText },
         ],
       },
