@@ -2677,6 +2677,7 @@ export type Database = {
         Args: { p_group: string }
         Returns: Database["public"]["Enums"]["onboarding_status"]
       }
+      rebuild_appointment_ledger: { Args: never; Returns: Json }
       refresh_client_statuses: { Args: never; Returns: number }
       refresh_onboarding_status: {
         Args: { p_group: string }
