@@ -141,7 +141,17 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         client.crm_location_id,
         from,
         to,
-        isConsultationCalendar,
+        /*
+         * Excluded before the per-location calendar cap, not after.
+         *
+         * A practice with nine calendars ending "Booking Calendar" and a cap of
+         * eight could otherwise have its real one crowded out by mirrors, and
+         * would read as a practice with no bookings at all. Filtering here also
+         * saves a request per mirror.
+         */
+        (calendar) =>
+          isConsultationCalendar(calendar) &&
+          !excludedCalendars.has(calendar.id),
       );
     } catch (error) {
       // One client's dead token must not stop the other twenty.
@@ -152,6 +162,9 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       continue;
     }
 
+    // Belt and braces. The calendars were filtered before fetching, so this
+    // should never drop anything — it costs nothing and catches an event
+    // reporting a different calendar from the one it was fetched under.
     const admissible = events.filter(
       (event) =>
         event.calendarId === null || !excludedCalendars.has(event.calendarId),
