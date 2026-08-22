@@ -62,6 +62,9 @@ export async function saveConsultationOutcome(input: {
   appointmentId: string;
   outcome: string;
   showed: 'yes' | 'no' | 'unknown';
+  /** The second look some practices book before quoting. */
+  secondShowed: 'yes' | 'no' | 'unknown';
+  ccOnFile: 'yes' | 'no' | 'unknown';
   value: string;
   financing: 'yes' | 'no' | 'unknown';
   leadQuality: string;
@@ -105,10 +108,16 @@ export async function saveConsultationOutcome(input: {
     valueCents = Math.round(parsed * 100);
   }
 
-  const showed =
-    input.showed === 'yes' ? true : input.showed === 'no' ? false : null;
-  const financing =
-    input.financing === 'yes' ? true : input.financing === 'no' ? false : null;
+  // An unknown is a real answer and must stay distinct from a no: the
+  // practice has not looked yet, and a null is how the form knows to keep
+  // asking.
+  const tri = (v: string): boolean | null =>
+    v === 'yes' ? true : v === 'no' ? false : null;
+
+  const showed = tri(input.showed);
+  const secondShowed = tri(input.secondShowed);
+  const ccOnFile = tri(input.ccOnFile);
+  const financing = tri(input.financing);
 
   const written = await db
     .from('appointments')
@@ -120,6 +129,8 @@ export async function saveConsultationOutcome(input: {
       // Stamping the source is what stops the next CRM sync overwriting this:
       // the clinic was in the room, so their answer outranks the calendar's.
       ...(showed === null ? {} : { showed, showed_source: 'client' }),
+      ...(secondShowed === null ? {} : { second_consult_showed: secondShowed }),
+      ...(ccOnFile === null ? {} : { cc_on_file: ccOnFile }),
       ...(financing === null ? {} : { financing_approved: financing }),
       ...(valueCents === null ? {} : { value_cents: valueCents }),
       ...(input.leadQuality === ''

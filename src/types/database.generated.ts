@@ -246,6 +246,7 @@ export type Database = {
           booked_by_user_id: string | null
           campaign_external_id: string | null
           cancelled_at: string | null
+          cc_on_file: boolean | null
           client_id: string
           created_at: string
           crm_appointment_id: string | null
@@ -265,6 +266,7 @@ export type Database = {
           rescheduled_from: string | null
           scheduled_at: string
           scheduled_end_at: string | null
+          second_consult_showed: boolean | null
           showed: boolean | null
           showed_source: string | null
           source: string
@@ -287,6 +289,7 @@ export type Database = {
           booked_by_user_id?: string | null
           campaign_external_id?: string | null
           cancelled_at?: string | null
+          cc_on_file?: boolean | null
           client_id: string
           created_at?: string
           crm_appointment_id?: string | null
@@ -306,6 +309,7 @@ export type Database = {
           rescheduled_from?: string | null
           scheduled_at: string
           scheduled_end_at?: string | null
+          second_consult_showed?: boolean | null
           showed?: boolean | null
           showed_source?: string | null
           source?: string
@@ -328,6 +332,7 @@ export type Database = {
           booked_by_user_id?: string | null
           campaign_external_id?: string | null
           cancelled_at?: string | null
+          cc_on_file?: boolean | null
           client_id?: string
           created_at?: string
           crm_appointment_id?: string | null
@@ -347,6 +352,7 @@ export type Database = {
           rescheduled_from?: string | null
           scheduled_at?: string
           scheduled_end_at?: string | null
+          second_consult_showed?: boolean | null
           showed?: boolean | null
           showed_source?: string | null
           source?: string

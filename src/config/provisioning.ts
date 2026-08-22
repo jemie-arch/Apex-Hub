@@ -93,13 +93,7 @@ export const SETUP_ONLY_CUSTOM_VALUES: ReadonlyArray<{
       'Notification Webhook", also empty — so it is worth settling which of the ' +
       'two the automation actually reads before either is filled.',
   },
-  {
-    name: '*Client Stats Sheet URL',
-    key: 'medi_stats_sheet_url',
-    note:
-      'Per client. Apex creates the sheet, so it cannot be asked for on the ' +
-      'form — it has to be written back once the sheet exists.',
-  },
+
   {
     name: '*Appointment Status Form',
     key: 'appointment_status_form',
@@ -137,9 +131,23 @@ export const UNAVAILABLE_CUSTOM_VALUES: ReadonlyArray<{
  * Account Link is the agency URL for the new location, so it cannot be part of
  * the create call — it is written on a second pass once the id is known.
  */
-export function derivedCustomValues(locationId: string): Record<string, string> {
+export function derivedCustomValues(
+  locationId: string,
+  /**
+   * The practice's own portal URL, when the business has a token.
+   *
+   * This is what *Client Stats Sheet URL is for. The stat sheet and the portal
+   * are the same thing seen twice: the sheet's green columns -- did they attend,
+   * did they attend a second time, did they convert, were they approved for
+   * credit, what was it worth -- are exactly the post-appointment survey, and
+   * the portal is where a practice answers it. So the value points at the
+   * portal rather than at a spreadsheet somebody has to maintain by hand.
+   */
+  portalUrl?: string,
+): Record<string, string> {
   return {
     'Account Link': `https://app.gohighlevel.com/v2/location/${locationId}`,
+    ...(portalUrl === undefined ? {} : { '*Client Stats Sheet URL': portalUrl }),
   };
 }
 

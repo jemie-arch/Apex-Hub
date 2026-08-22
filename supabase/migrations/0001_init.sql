@@ -2100,3 +2100,27 @@ comment on column deals.stage_name is
   'The stage name GoHighLevel gave, kept beside the mapped deal_stage. /opportunities/search returns only a stage id, so this is resolved from the pipeline list -- without it a mapping failure is invisible and every deal reads "new".';
 comment on column deals.pipeline_name is
   'Which pipeline in the b2b sub-account the opportunity sits in. That sub-account has more than one, and they mean different things.';
+
+-- ---------------------------------------------------------------------------
+-- The two green columns the portal survey was missing
+--
+-- The Client Stat Sheet is the practice-facing dashboard, and its green columns
+-- are the post-appointment survey: did they attend, did they attend a second
+-- time, did they convert, were they approved for credit, what was it worth, and
+-- why not if not. Everything but two of those already had a home here --
+-- showed, outcome, value_cents, financing_approved, notes -- because the survey
+-- was built before the sheet was read.
+--
+-- These are the two that had nowhere to go. A practice that books a second look
+-- before quoting was being recorded as a first-consult no-show, which
+-- understated the show rate; and card-on-file is the practice's own leading
+-- indicator for whether somebody turns up.
+-- ---------------------------------------------------------------------------
+alter table appointments
+  add column if not exists second_consult_showed boolean,
+  add column if not exists cc_on_file boolean;
+
+comment on column appointments.second_consult_showed is
+  'Did they attend the second consultation. From the Client Stat Sheet, column K: a practice books a second look before quoting, and treating that absence as a first-consult no-show understated the show rate.';
+comment on column appointments.cc_on_file is
+  'Card on file at the time of booking. Column F of the Client Stat Sheet. Kept because it predicts attendance -- it is the practice''s own leading indicator, not a billing field.';

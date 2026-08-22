@@ -23,6 +23,8 @@ export interface ConsultationDetail {
   scheduledAt: string;
   status: string;
   showed: boolean | null;
+  secondConsultShowed: boolean | null;
+  ccOnFile: boolean | null;
   /** 'crm' when the calendar answered, 'client' when the practice did. */
   showedSource: string | null;
   outcome: string;
@@ -75,6 +77,10 @@ export function ConsultationForm({
 }) {
   const [outcome, setOutcome] = useState(appointment.outcome);
   const [showed, setShowed] = useState(triFrom(appointment.showed));
+  const [secondShowed, setSecondShowed] = useState(
+    triFrom(appointment.secondConsultShowed),
+  );
+  const [ccOnFile, setCcOnFile] = useState(triFrom(appointment.ccOnFile));
   const [financing, setFinancing] = useState(
     triFrom(appointment.financingApproved),
   );
@@ -133,6 +139,47 @@ export function ConsultationForm({
               Your answer. Nothing overwrites it.
             </span>
           ) : null}
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-fg-muted">
+            Did they attend a second consultation?
+          </span>
+          <select
+            value={secondShowed}
+            onChange={(event) =>
+              setSecondShowed(event.target.value as 'yes' | 'no' | 'unknown')
+            }
+            className={FIELD}
+          >
+            {TRI.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-fg-subtle">
+            Only if you booked one. Leaving this unanswered is not a no.
+          </span>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-fg-muted">
+            Card on file when they booked?
+          </span>
+          <select
+            value={ccOnFile}
+            onChange={(event) =>
+              setCcOnFile(event.target.value as 'yes' | 'no' | 'unknown')
+            }
+            className={FIELD}
+          >
+            {TRI.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -237,6 +284,8 @@ export function ConsultationForm({
                   appointmentId: appointment.id,
                   outcome,
                   showed,
+                  secondShowed,
+                  ccOnFile,
                   value,
                   financing,
                   leadQuality: quality,

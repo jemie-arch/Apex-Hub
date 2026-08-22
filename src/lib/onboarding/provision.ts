@@ -266,10 +266,45 @@ export async function provisionFromSubmission(input: {
     ctxNote = error instanceof Error ? error.message : String(error);
   }
 
-  // ---- 3. the custom values ----------------------------------------------
+  /*
+   * ---- 3. the portal link -------------------------------------------------
+   *
+   * The practice's dashboard, which is what *Client Stats Sheet URL means: the
+   * stat sheet and the portal are the same thing seen twice. Read from the group
+   * rather than built from the clinic name, because the token is the credential
+   * and guessing one would hand a practice somebody else's numbers.
+   *
+   * Absent when the group has no token or no base URL is configured. Then the
+   * value is simply not written, which leaves the snapshot default in place
+   * rather than writing a link that goes nowhere.
+   */
+  let portalUrl: string | undefined;
+
+  const base = process.env['NEXT_PUBLIC_APP_URL']?.trim().replace(new RegExp('/+$'), '');
+
+  if (base) {
+    const groupForPortal = clientId
+      ? await db
+          .from('clients')
+          .select('client_groups(portal_token, portal_enabled)')
+          .eq('id', clientId)
+          .maybeSingle()
+      : null;
+
+    const group = groupForPortal?.data?.client_groups as
+      | { portal_token: string | null; portal_enabled: boolean | null }
+      | null
+      | undefined;
+
+    if (group?.portal_token && group.portal_enabled) {
+      portalUrl = `${base}/portal/${group.portal_token}`;
+    }
+  }
+
+  // ---- 4. the custom values ----------------------------------------------
   const values = {
     ...valuesFor(clinicName, input.answers),
-    ...derivedCustomValues(locationId),
+    ...derivedCustomValues(locationId, portalUrl),
   };
 
   try {
