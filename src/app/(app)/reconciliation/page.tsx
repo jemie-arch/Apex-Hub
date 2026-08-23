@@ -59,7 +59,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
     to: single(searchParams['to']),
   });
 
-  const [ledger, exceptions, charges] = await Promise.all([
+  const [ledger, exceptions, charges, chargeExceptions] = await Promise.all([
     db
       .from('appointment_ledger')
       .select(
@@ -76,11 +76,30 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
       .from('billing_charges')
       .select('client_id, consult_names')
       .eq('outcome', 'succeeded'),
+    /*
+     * The other direction. The exception view above looks outward from the
+     * ledger, so a charge naming somebody who exists in neither feed has no row
+     * to hang off and cannot appear in it. That is the direction that costs
+     * money rather than delaying it.
+     */
+    db
+      .from('charge_exceptions')
+      .select('stripe_payment_intent_id, practice, patient_name, occurred_at, line_amount_cents, exception, severity')
+      .order('severity')
+      .limit(200),
   ]);
 
   if (ledger.error) throw ledger.error;
   if (exceptions.error) throw exceptions.error;
   if (charges.error) throw charges.error;
+  if (chargeExceptions.error) throw chargeExceptions.error;
+
+  const chargeRows = chargeExceptions.data ?? [];
+  const unevidenced = chargeRows.filter((row) => (row.severity ?? 9) <= 1);
+  const unevidencedCents = unevidenced.reduce(
+    (sum, row) => sum + (row.line_amount_cents ?? 0),
+    0,
+  );
 
   const rows = ledger.data ?? [];
 
@@ -227,6 +246,66 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
             </section>
           )}
         </>
+      )}
+
+      {unevidenced.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-lg border border-negative bg-surface">
+          <div className="border-b border-negative-subtle px-4 py-3">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-negative">
+              <AlertTriangle size={14} /> Charged with no appointment behind it
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              {formatCount(unevidenced.length)} charge line
+              {unevidenced.length === 1 ? '' : 's'} totalling{' '}
+              <b>{formatMoneyCompact(unevidencedCents)}</b> name a patient who
+              appears in neither the calendar nor the tracker, in a period both
+              were covering. Unbilled work is revenue not yet taken; this is
+              revenue taken with no record behind it, which is the kind a client
+              can dispute. Most likely the consultation happened and nobody wrote
+              it down — but that is a thing to establish, not assume.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">Practice</th>
+                  <th className="px-4 py-3 font-medium">Patient named</th>
+                  <th className="px-4 py-3 font-medium">Charged</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Problem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unevidenced.map((row) => (
+                  <tr
+                    key={`${row.stripe_payment_intent_id}-${row.patient_name}`}
+                    className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
+                  >
+                    <td className="px-4 py-3 text-fg">{row.practice}</td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {row.patient_name}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {row.occurred_at
+                        ? new Date(row.occurred_at).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            timeZone: 'UTC',
+                          })
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {formatMoneyCompact(row.line_amount_cents ?? 0)}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">{row.exception}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       <section className="panel overflow-hidden rounded-lg border border-line bg-surface">

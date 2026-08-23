@@ -98,4 +98,54 @@ export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
         'filled the survey and nobody ran the no-show check.',
     );
   }
+
+  /*
+   * The other direction: charges that cannot be tied to an appointment.
+   *
+   * appointment_exceptions looks outward from the ledger, so it can only see
+   * problems that have a row. A charge naming a patient who exists in neither
+   * feed has nothing to hang off and was invisible to it — which is how $9,808
+   * across 38 charge lines sat unnoticed while the same reconciliation reported
+   * unbilled work in the other direction.
+   *
+   * This is the direction that costs money rather than delays it. Unbilled work
+   * is revenue not yet taken; a charge with no appointment behind it is revenue
+   * taken with no evidence, and it is the one a client can dispute.
+   */
+  const chargeExceptions = await db
+    .from('charge_exceptions')
+    .select('exception, severity, line_amount_cents');
+  if (chargeExceptions.error) throw chargeExceptions.error;
+
+  const chargeRows = chargeExceptions.data ?? [];
+
+  if (chargeRows.length > 0) {
+    const byCharge = new Map<string, number>();
+    let unevidenced = 0;
+    let unevidencedCents = 0;
+
+    for (const row of chargeRows) {
+      const label = row.exception ?? 'unlabelled';
+      byCharge.set(label, (byCharge.get(label) ?? 0) + 1);
+      if ((row.severity ?? 9) <= 1) {
+        unevidenced += 1;
+        unevidencedCents += row.line_amount_cents ?? 0;
+      }
+    }
+
+    ctx.note(
+      'charge_exceptions',
+      Object.fromEntries([...byCharge.entries()].sort((a, b) => b[1] - a[1])),
+    );
+
+    if (unevidenced > 0) {
+      ctx.recordError(
+        `${unevidenced} charge line(s) totalling ` +
+          `$${(unevidencedCents / 100).toFixed(2)} cannot be tied to an ` +
+          'appointment in either feed. Money taken with no record behind it is ' +
+          'the disputable kind — see the charge_exceptions view.',
+        { lines: unevidenced, cents: unevidencedCents },
+      );
+    }
+  }
 }

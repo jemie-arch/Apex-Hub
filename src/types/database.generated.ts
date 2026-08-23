@@ -2663,9 +2663,31 @@ export type Database = {
           },
         ]
       }
+      charge_exceptions: {
+        Row: {
+          client_id: string | null
+          exception: string | null
+          line_amount_cents: number | null
+          occurred_at: string | null
+          patient_name: string | null
+          practice: string | null
+          severity: number | null
+          stripe_payment_intent_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       attribute_billing_charges: { Args: never; Returns: Json }
+      attribute_ledger_charges: { Args: never; Returns: number }
       auth_group_id: { Args: never; Returns: string }
       auth_is_admin: { Args: never; Returns: boolean }
       auth_role: {
