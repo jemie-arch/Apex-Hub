@@ -118,7 +118,14 @@ const SECTIONS: NavSection[] = [
         ],
       },
       { href: '/ads', label: 'Ads Management', icon: Megaphone },
-      { href: '/fulfilment', label: 'Fulfilment', icon: ClipboardCheck },
+      {
+        href: '/fulfilment',
+        label: 'Fulfilment',
+        icon: ClipboardCheck,
+        children: [
+          { href: '/reconciliation', label: 'Reconciliation', icon: Scale },
+        ],
+      },
       { href: '/b2c', label: 'Consultations', icon: BadgeDollarSign },
     ],
   },

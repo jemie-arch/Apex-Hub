@@ -104,6 +104,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/ads-performance', 'ads_management'],
     ['/compare', 'compare'],
     ['/fulfilment', 'fulfilment'],
+    // Same audience and the same question as fulfilment: what was delivered,
+    // and does the billing agree.
+    ['/reconciliation', 'fulfilment'],
     ['/onboarding-forms', 'onboarding_forms'],
     // Longer prefix than '/onboarding', so it resolves to its own key.
     ['/onboarding/clients', 'client_onboarding'],
