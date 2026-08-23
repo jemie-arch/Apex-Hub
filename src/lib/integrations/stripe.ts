@@ -120,22 +120,55 @@ function classify(status: string, hasError: boolean): BillingOutcome {
  *
  * The trailing hyphens, blank lines and stray whitespace are all present in
  * real data, and the number of names is what the amount is derived from — so
- * this is the only way to tell *which* consults a failed charge covered.
+ * this is the only way to tell *which* consults a charge covered.
  *
- * Returns an empty array for anything that is not an [ADM] consult charge
- * (subscription updates and manual invoices, which carry no patient names).
+ * ---------------------------------------------------------------------------
+ * There are three spellings of that heading in production, and the first
+ * version of this matched only one.
+ *
+ *   Consults charged:                  the documented form
+ *   Consults Charged                   capital C, no colon
+ *   Consults charged for Anaheim:      one heading per location, and a charge
+ *                                      can carry several of them
+ *
+ * Matching the literal string 'Consults charged:' left 29 charges worth $10,800
+ * with no names on them. Those then looked like subscription payments to
+ * everything downstream: they could not be reconciled against a consultation, so
+ * they showed up as delivered-but-unbilled on one side and unattributable money
+ * on the other. One missed capital letter, counted twice.
+ *
+ * The location clause is only consumed when a colon follows it. Without that
+ * guard a greedy match on "Consults charged for Anaheim Abraham Smith -" would
+ * swallow the patient, and losing a name silently is worse than leaving a stray
+ * heading to be filtered out below.
+ *
+ * Still returns an empty array for anything that is not a consult charge —
+ * subscription updates and manual invoices genuinely carry no patient names, and
+ * 39 of the 68 unnamed charges are exactly that.
+ * ---------------------------------------------------------------------------
  */
+const CONSULT_HEADING = /consults?\s+charged(?:\s+for\s+[^:\n]{1,60}(?=\s*:))?\s*:?/gi;
+
 export function parseConsultNames(description: string | null): string[] {
   if (!description) return [];
+  if (!/consults?\s+charged/i.test(description)) return [];
 
-  const marker = description.indexOf('Consults charged:');
-  if (marker === -1) return [];
-
-  return description
-    .slice(marker + 'Consults charged:'.length)
-    .split('\n')
-    .map((line) => line.replace(/[-–—\s]+$/, '').trim())
-    .filter((line) => line !== '' && line !== '[ADM]');
+  return (
+    description
+      // Every heading, not just the first: a multi-location charge carries one
+      // per clinic and the names sit under each.
+      .replace(CONSULT_HEADING, '\n')
+      .split('\n')
+      .map((line) => line.replace(/^[-–—\s]+|[-–—\s]+$/g, '').trim())
+      .filter(
+        (line) =>
+          line !== '' &&
+          line !== '[ADM]' &&
+          // A location label left behind by a heading with no colon. Dropping it
+          // is right; it is not a patient.
+          !/^for\s/i.test(line),
+      )
+  );
 }
 
 async function get<T>(path: string): Promise<T> {
