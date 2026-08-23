@@ -59,6 +59,9 @@ const ORDER = [
   'crm-deals',
   'windsor-ads',
   'stripe-charges',
+  // Reads what everything above writes, so it goes after them or it
+  // reconciles yesterday's picture and reports today's exceptions against it.
+  'appointment-ledger',
   'crm-calls',
 ] as const;
 

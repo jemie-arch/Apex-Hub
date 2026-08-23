@@ -3,6 +3,7 @@
  * resolve through here, so a sync can never exist in the cron schedule but not
  * on the command line — which is exactly when you need to run it by hand.
  */
+import { syncAppointmentLedger } from '@/lib/sync/appointment-ledger';
 import { syncCrmAppointments } from '@/lib/sync/crm-appointments';
 import { syncCrmCalls } from '@/lib/sync/crm-calls';
 import { syncCrmClients } from '@/lib/sync/crm-clients';
@@ -68,6 +69,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'Stripe payment intents into billing — which client charges succeeded, ' +
       'were attempted, and failed',
     run: syncStripeCharges,
+  },
+  'appointment-ledger': {
+    name: 'appointment-ledger',
+    description:
+      'One row per appointment, reconciled across both feeds — and the daily ' +
+      'exception list that comes out of it',
+    run: syncAppointmentLedger,
   },
 };
 
