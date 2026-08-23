@@ -79,16 +79,38 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
   );
 
   if (userIdByCrm.size === 0) {
-    // Without this link every call lands unattributed and the leaderboard
-    // stays empty, which looks like a broken sync rather than missing setup.
+    /*
+     * Without this link the leaderboard stays empty, which looks like a broken
+     * sync rather than missing setup.
+     *
+     * Deliberately does not promise that setting it fixes attribution. Only the
+     * calls GoHighLevel stamped a user on can ever be attributed by mapping,
+     * and that has been a small fraction of them — see the ownerless count
+     * below for the rest. Claiming otherwise sends somebody off to map users
+     * expecting thousands of calls to resolve.
+     */
     ctx.recordError(
-      'no user_profiles row has crm_user_id set, so calls cannot be ' +
-        'attributed to anyone. Set it for each ISR and CSR.',
+      'no user_profiles row has crm_user_id set, so no call can be attributed ' +
+        'to a person. Set it for each ISR and CSR — though that only reaches ' +
+        'the calls GoHighLevel recorded a user against.',
     );
   }
 
   let budget = CONVERSATION_BUDGET;
-  let unattributed = 0;
+  /*
+   * Two different failures, counted apart on purpose.
+   *
+   * 'unlinked' is ours to fix: GoHighLevel told us who made the call and no
+   * user_profiles row claims that id. 'ownerless' is not: the call record
+   * arrived with no user on it at all, which is what an inbound call to a
+   * shared number looks like, and no amount of mapping will attribute it.
+   *
+   * Reporting them as one number named the wrong cause for almost all of them.
+   * 4,734 of 4,753 calls carry no GoHighLevel user, so "link the ISRs" read as
+   * a fix for the whole backlog when its ceiling was 19 calls.
+   */
+  let unlinked = 0;
+  let ownerless = 0;
 
   for (const location of locations) {
     if (!location.crm_location_id) continue;
@@ -140,7 +162,10 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
 
     const rows = fresh.map((call) => {
       const userId = call.userId ? (userIdByCrm.get(call.userId) ?? null) : null;
-      if (!userId) unattributed += 1;
+      if (!userId) {
+        if (call.userId) unlinked += 1;
+        else ownerless += 1;
+      }
 
       return {
         user_id: userId,
@@ -177,10 +202,26 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
     ctx.counts.created += rows.length;
   }
 
-  if (unattributed > 0) {
+  if (unlinked > 0) {
     ctx.recordError(
-      `${unattributed} call(s) could not be attributed to a person — the ` +
-        'GoHighLevel user is not linked to any user_profiles.crm_user_id.',
+      `${unlinked} call(s) name a GoHighLevel user that no user_profiles row ` +
+        'claims. Set crm_user_id on the matching profile and these attribute ' +
+        'on the next run.',
+      { unlinked },
+    );
+  }
+
+  /*
+   * Logged, not recorded as an error. Nobody here can act on it: the call
+   * arrived from GoHighLevel with no user on it, so there is nothing to map.
+   * Firing an alert every night for something with no available fix is how an
+   * alert stops being read.
+   */
+  if (ownerless > 0) {
+    ctx.log(
+      `${ownerless} call(s) arrived with no GoHighLevel user on them, so no ` +
+        'mapping can attribute them. Attributing these needs a change in how ' +
+        'GoHighLevel assigns calls, not a change here.',
     );
   }
 
