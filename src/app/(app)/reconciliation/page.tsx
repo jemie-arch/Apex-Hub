@@ -59,7 +59,8 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
     to: single(searchParams['to']),
   });
 
-  const [ledger, exceptions, charges, chargeExceptions, backlog] = await Promise.all([
+  const [ledger, exceptions, allExceptions, charges, chargeExceptions, backlog] =
+    await Promise.all([
     db
       .from('appointment_ledger')
       .select(
@@ -67,11 +68,27 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
       )
       .gte('appointment_at', range.from.toISOString())
       .lte('appointment_at', range.to.toISOString()),
+    /*
+     * Only the rows somebody is expected to act on, in full.
+     *
+     * This used to fetch 400 and render all 400, which was most of a 649KB page
+     * and the single biggest thing on the wire. It was also not much use: 400 of
+     * 672 is neither the whole backlog nor a shortlist, and nobody scrolls a
+     * table that long. The actionable ones are severity 1 and 2 — money and
+     * evidence disagreeing — and there are 27 of those.
+     */
     db
       .from('appointment_exceptions')
       .select('id, practice, patient_name, appointment_at, outcome, billing_state, exception, severity')
+      .lte('severity', 2)
       .order('severity')
-      .limit(400),
+      .limit(100),
+    /*
+     * Two columns for everything else, so the summary underneath can count every
+     * category rather than only what fitted in the table above. 672 rows of two
+     * short fields costs a fraction of what 400 rendered rows did.
+     */
+    db.from('appointment_exceptions').select('exception, severity'),
     db
       .from('billing_charges')
       .select('client_id, consult_names')
@@ -93,13 +110,21 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
      * the finding, and a range filter would hide exactly the rows that matter
      * while showing the ones that are merely mid-billing.
      */
+    /*
+     * Grouped in the database, not here. This used to pull all 487 rows — each
+     * with a patient name on it — and aggregate them in the page to render
+     * twelve totals: forty times the data displayed, shipped across the
+     * Pacific, carrying names that appear in none of the output.
+     */
     db
-      .from('unbilled_backlog')
-      .select('practice, client_status, est_value_cents, days_old, age_band, rate_basis, is_aged'),
+      .from('unbilled_backlog_by_practice')
+      .select('practice, aged_shows, est_value_cents, oldest_days, partly_assumed')
+      .order('est_value_cents', { ascending: false }),
   ]);
 
   if (ledger.error) throw ledger.error;
   if (exceptions.error) throw exceptions.error;
+  if (allExceptions.error) throw allExceptions.error;
   if (charges.error) throw charges.error;
   if (chargeExceptions.error) throw chargeExceptions.error;
   if (backlog.error) throw backlog.error;
@@ -109,37 +134,26 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
    * derived from what each practice has actually been charged — so it is priced,
    * not guessed, but it is still exposure rather than confirmed receivable.
    */
-  const backlogRows = (backlog.data ?? []).filter((row) => row.is_aged);
-  const backlogCents = backlogRows.reduce(
+  /*
+   * Already one row per practice and already sorted, so the page adds up the
+   * groups rather than the appointments. Totals stay whole-fleet while the table
+   * shows the worst twelve — limiting the query would have silently made the
+   * headline figure describe only the twelve.
+   */
+  const backlogGroups = backlog.data ?? [];
+  const backlogShows = backlogGroups.reduce(
+    (sum, row) => sum + (row.aged_shows ?? 0),
+    0,
+  );
+  const backlogCents = backlogGroups.reduce(
     (sum, row) => sum + (row.est_value_cents ?? 0),
     0,
   );
-  const backlogAssumed = backlogRows.filter(
-    (row) => row.rate_basis === 'fleet assumption',
+  const backlogAssumedPractices = backlogGroups.filter(
+    (row) => row.partly_assumed,
   ).length;
 
-  const byPractice = new Map<
-    string,
-    { practice: string; shows: number; cents: number; oldest: number; assumed: boolean }
-  >();
-  for (const row of backlogRows) {
-    const key = row.practice ?? 'unknown';
-    const entry = byPractice.get(key) ?? {
-      practice: key,
-      shows: 0,
-      cents: 0,
-      oldest: 0,
-      assumed: false,
-    };
-    entry.shows += 1;
-    entry.cents += row.est_value_cents ?? 0;
-    entry.oldest = Math.max(entry.oldest, row.days_old ?? 0);
-    if (row.rate_basis === 'fleet assumption') entry.assumed = true;
-    byPractice.set(key, entry);
-  }
-  const backlogByPractice = [...byPractice.values()]
-    .sort((a, b) => b.cents - a.cents)
-    .slice(0, 12);
+  const backlogByPractice = backlogGroups.slice(0, 12);
 
   const chargeRows = chargeExceptions.data ?? [];
   const unevidenced = chargeRows.filter((row) => (row.severity ?? 9) <= 1);
@@ -205,15 +219,33 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
       ? null
       : delivered.length / (delivered.length + noShowed.length);
 
-  const exceptionRows = exceptions.data ?? [];
-  const urgent = exceptionRows.filter((row) => (row.severity ?? 9) <= 2);
+  /*
+   * Two different sets, and the distinction is the point.
+   *
+   * `urgent` is the worklist — severity 1 and 2, fetched with every column and
+   * rendered in full, because each one is a question somebody has to answer.
+   * `byException` counts the whole population from the two-column query, so the
+   * categories below are complete rather than describing only what fitted in a
+   * table.
+   */
+  const urgent = exceptions.data ?? [];
 
-  /** Grouped for the summary strip; the table below stays row-level. */
-  const byException = new Map<string, number>();
-  for (const row of exceptionRows) {
+  const byException = new Map<string, { count: number; severity: number }>();
+  for (const row of allExceptions.data ?? []) {
     const label = row.exception ?? 'unlabelled';
-    byException.set(label, (byException.get(label) ?? 0) + 1);
+    const existing = byException.get(label);
+    byException.set(label, {
+      count: (existing?.count ?? 0) + 1,
+      severity: Math.min(existing?.severity ?? 9, row.severity ?? 9),
+    });
   }
+
+  const exceptionTotal = (allExceptions.data ?? []).length;
+  /** Everything not shown row by row above. */
+  const summarised = [...byException.entries()]
+    .map(([exception, meta]) => ({ exception, ...meta }))
+    .filter((row) => row.severity > 2)
+    .sort((a, b) => b.count - a.count);
 
   return (
     <>
@@ -419,8 +451,8 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
               30 days ago, still no matching charge
             </h2>
             <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
-              {formatCount(backlogRows.length)} consultation
-              {backlogRows.length === 1 ? '' : 's'} worth an estimated{' '}
+              {formatCount(backlogShows)} consultation
+              {backlogShows === 1 ? '' : 's'} worth an estimated{' '}
               <b>{formatMoneyCompact(backlogCents)}</b>, priced from what each
               practice has actually been charged. Deliberately not filtered by the
               date range above — age is the finding, and a range filter would hide
@@ -431,11 +463,11 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
               row appears here because no successful Stripe charge could be matched
               to it, which does not prove it was never invoiced — it may have been
               billed outside Stripe, waived, or covered by a retainer.
-              {backlogAssumed > 0 && (
+              {backlogAssumedPractices > 0 && (
                 <>
                   {' '}
-                  {formatCount(backlogAssumed)} row
-                  {backlogAssumed === 1 ? ' is' : 's are'} priced from the fleet
+                  {formatCount(backlogAssumedPractices)} practice
+                  {backlogAssumedPractices === 1 ? ' has' : 's have'} rows priced from the fleet
                   rate because that practice has no charge history of its own.
                 </>
               )}
@@ -460,16 +492,16 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
                   >
                     <td className="px-4 py-3 text-fg">{row.practice}</td>
                     <td className="px-4 py-3 text-fg-muted">
-                      {formatCount(row.shows)}
+                      {formatCount(row.aged_shows ?? 0)}
                     </td>
                     <td className="px-4 py-3 text-fg-muted">
-                      {formatMoneyCompact(row.cents)}
+                      {formatMoneyCompact(row.est_value_cents ?? 0)}
                     </td>
                     <td className="px-4 py-3 text-fg-muted">
-                      {row.oldest} days
+                      {row.oldest_days} days
                     </td>
                     <td className="px-4 py-3 text-fg-subtle">
-                      {row.assumed ? 'partly assumed' : 'this practice'}
+                      {row.partly_assumed ? 'partly assumed' : 'this practice'}
                     </td>
                   </tr>
                 ))}
@@ -485,7 +517,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
             Needs somebody to act
           </h2>
           <span className="text-xs text-fg-subtle">
-            {formatCount(exceptionRows.length)} open ·{' '}
+            {formatCount(exceptionTotal)} open ·{' '}
             {urgent.length > 0 ? (
               <span className="text-negative">
                 {formatCount(urgent.length)} where money and evidence disagree
@@ -496,7 +528,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
           </span>
         </div>
 
-        {exceptionRows.length === 0 ? (
+        {exceptionTotal === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-fg-muted">
             Nothing outstanding. Every appointment has an outcome and every
             delivered one has a charge behind it.
@@ -515,7 +547,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {exceptionRows.map((row) => (
+                {urgent.map((row) => (
                   <tr
                     key={row.id}
                     className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
@@ -555,6 +587,42 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
             </table>
           </div>
         )}
+
+        {/*
+          The rest, by category rather than row by row.
+
+          These are a backlog, not a worklist: 487 delivered-not-yet-billed
+          appointments do not need naming individually on a page somebody opens
+          to see what needs doing. Listing them was most of the payload and
+          none of the value — and it also meant the counts described only the
+          400 that fitted, not the 672 that exist.
+        */}
+        {summarised.length > 0 ? (
+          <div className="border-t border-line px-4 py-3">
+            <p className="mb-2 text-xs text-fg-subtle">
+              The remaining{' '}
+              <b>{formatCount(exceptionTotal - urgent.length)}</b> are a backlog
+              rather than a worklist, so they are counted here instead of listed.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {summarised.map((row) => (
+                <span
+                  key={row.exception}
+                  className={cn(
+                    'rounded px-2 py-1 text-xs',
+                    SEVERITY_TONE[row.severity] ??
+                      'bg-surface-sunken text-fg-muted',
+                  )}
+                >
+                  {row.exception}
+                  <span className="numeric ml-1.5 font-medium">
+                    {formatCount(row.count)}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
     </>
   );

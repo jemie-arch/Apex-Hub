@@ -2765,6 +2765,26 @@ export type Database = {
           },
         ]
       }
+      unbilled_backlog_by_practice: {
+        Row: {
+          aged_shows: number | null
+          client_id: string | null
+          client_status: Database["public"]["Enums"]["client_status"] | null
+          est_value_cents: number | null
+          oldest_days: number | null
+          partly_assumed: boolean | null
+          practice: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       attribute_billing_charges: { Args: never; Returns: Json }
