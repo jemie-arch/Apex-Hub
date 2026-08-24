@@ -68,11 +68,19 @@ export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
 
   const byException = new Map<string, number>();
   let urgent = 0;
+  /*
+   * Counted apart because it is the only urgent category that can still be
+   * prevented. The other two describe something that has already gone wrong;
+   * this one is a booking whose appointment has not happened yet, so writing
+   * the tracker row today stops it becoming unbillable.
+   */
+  let preventable = 0;
 
   for (const row of exceptions.data ?? []) {
     const label = row.exception ?? 'unlabelled';
     byException.set(label, (byException.get(label) ?? 0) + 1);
     if ((row.severity ?? 9) <= 2) urgent += 1;
+    if (label.includes('still ahead')) preventable += 1;
   }
 
   if (byException.size > 0) {
@@ -82,12 +90,31 @@ export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
     );
   }
 
-  if (urgent > 0) {
+  /*
+   * The preventable count leads, because it is the only part of this anybody can
+   * act on today. Marlene Gonzalez at Ultra Smiles was booked on 20 August for
+   * the 25th with no tracker row, and this alert said nothing for four days
+   * because her appointment had not happened yet — she was found by hand, the
+   * day before, by reading Make execution logs. The view now flags that case at
+   * severity 2 and this is where it surfaces.
+   */
+  if (preventable > 0) {
     ctx.recordError(
-      `${urgent} appointment(s) are either billed without a recorded show or ` +
-        'vanished from the CRM while still open. Both mean money and evidence ' +
-        'disagree — see the appointment_exceptions view.',
-      { urgent },
+      `${preventable} appointment(s) are booked in the CRM with no tracker row ` +
+        'and have NOT happened yet. Writing the row before the patient arrives ' +
+        'is the only thing that keeps them billable — after the appointment ' +
+        'there is nothing to record an outcome against.',
+      { preventable },
+    );
+  }
+
+  const alreadyWrong = urgent - preventable;
+  if (alreadyWrong > 0) {
+    ctx.recordError(
+      `${alreadyWrong} appointment(s) are either billed without a recorded show ` +
+        'or vanished from the CRM while still open. Both mean money and ' +
+        'evidence disagree — see the appointment_exceptions view.',
+      { urgent: alreadyWrong },
     );
   }
 

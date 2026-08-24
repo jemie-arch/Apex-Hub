@@ -2016,6 +2016,87 @@ export type Database = {
         }
         Relationships: []
       }
+      payout_lines: {
+        Row: {
+          amount_cents: number | null
+          computed_at: string
+          hubstaff_user_id: string | null
+          id: string
+          leave_hours: number
+          period_id: string
+          rate_cents: number | null
+          tracked_hours: number
+          user_id: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          computed_at?: string
+          hubstaff_user_id?: string | null
+          id?: string
+          leave_hours?: number
+          period_id: string
+          rate_cents?: number | null
+          tracked_hours?: number
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number | null
+          computed_at?: string
+          hubstaff_user_id?: string | null
+          id?: string
+          leave_hours?: number
+          period_id?: string
+          rate_cents?: number | null
+          tracked_hours?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_lines_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "payout_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_lines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_periods: {
+        Row: {
+          created_at: string
+          ends_on: string
+          id: string
+          locked_at: string | null
+          pay_date: string
+          starts_on: string
+          state: Database["public"]["Enums"]["payout_state"]
+        }
+        Insert: {
+          created_at?: string
+          ends_on: string
+          id?: string
+          locked_at?: string | null
+          pay_date: string
+          starts_on: string
+          state?: Database["public"]["Enums"]["payout_state"]
+        }
+        Update: {
+          created_at?: string
+          ends_on?: string
+          id?: string
+          locked_at?: string | null
+          pay_date?: string
+          starts_on?: string
+          state?: Database["public"]["Enums"]["payout_state"]
+        }
+        Relationships: []
+      }
       project_notes: {
         Row: {
           author_user_id: string | null
@@ -2612,11 +2693,13 @@ export type Database = {
           crm_user_id: string | null
           email: string
           full_name: string | null
+          hourly_rate_cents: number | null
           id: string
           is_active: boolean
           job_title: string | null
           permissions: string[]
           role: Database["public"]["Enums"]["user_role"]
+          standard_daily_hours: number
           started_on: string | null
           theme: string
           timezone: string | null
@@ -2629,11 +2712,13 @@ export type Database = {
           crm_user_id?: string | null
           email: string
           full_name?: string | null
+          hourly_rate_cents?: number | null
           id: string
           is_active?: boolean
           job_title?: string | null
           permissions?: string[]
           role?: Database["public"]["Enums"]["user_role"]
+          standard_daily_hours?: number
           started_on?: string | null
           theme?: string
           timezone?: string | null
@@ -2646,11 +2731,13 @@ export type Database = {
           crm_user_id?: string | null
           email?: string
           full_name?: string | null
+          hourly_rate_cents?: number | null
           id?: string
           is_active?: boolean
           job_title?: string | null
           permissions?: string[]
           role?: Database["public"]["Enums"]["user_role"]
+          standard_daily_hours?: number
           started_on?: string | null
           theme?: string
           timezone?: string | null
@@ -2676,6 +2763,7 @@ export type Database = {
             | Database["public"]["Enums"]["ledger_billing_state"]
             | null
           client_id: string | null
+          days_away: number | null
           exception: string | null
           id: string | null
           outcome: Database["public"]["Enums"]["ledger_outcome"] | null
@@ -2795,10 +2883,15 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      ensure_payout_periods: { Args: { p_through?: string }; Returns: number }
       generate_portal_token: { Args: never; Returns: string }
       onboarding_status_for: {
         Args: { p_group: string }
         Returns: Database["public"]["Enums"]["onboarding_status"]
+      }
+      paid_leave_hours: {
+        Args: { p_from: string; p_to: string; p_user_id: string }
+        Returns: number
       }
       rebuild_appointment_ledger: { Args: never; Returns: Json }
       refresh_client_statuses: { Args: never; Returns: number }
@@ -2885,6 +2978,7 @@ export type Database = {
         | "waiting_on_team"
         | "waiting_on_client"
         | "launch_ready"
+      payout_state: "open" | "locked" | "paid"
       project_status:
         | "idea"
         | "planned"
@@ -3124,6 +3218,7 @@ export const Constants = {
         "waiting_on_client",
         "launch_ready",
       ],
+      payout_state: ["open", "locked", "paid"],
       project_status: [
         "idea",
         "planned",

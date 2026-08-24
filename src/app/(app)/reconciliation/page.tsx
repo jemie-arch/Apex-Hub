@@ -79,7 +79,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
      */
     db
       .from('appointment_exceptions')
-      .select('id, practice, patient_name, appointment_at, outcome, billing_state, exception, severity')
+      .select('id, practice, patient_name, appointment_at, outcome, billing_state, exception, severity, days_away')
       .lte('severity', 2)
       .order('severity')
       .limit(100),
@@ -230,6 +230,23 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
    */
   const urgent = exceptions.data ?? [];
 
+  /*
+   * Split out because it is the only category with a deadline.
+   *
+   * These appointments have not happened yet. Writing the tracker row today
+   * keeps them billable; after the appointment there is nothing to record an
+   * outcome against and the work is lost. Everything else on this page describes
+   * something that has already gone wrong, so this goes first — sorted by how
+   * soon, not by when the row appeared.
+   */
+  const preventable = urgent
+    .filter((row) => (row.exception ?? '').includes('still ahead'))
+    .sort((a, b) => (a.days_away ?? 0) - (b.days_away ?? 0));
+
+  const alreadyWrong = urgent.filter(
+    (row) => !(row.exception ?? '').includes('still ahead'),
+  );
+
   const byException = new Map<string, { count: number; severity: number }>();
   for (const row of allExceptions.data ?? []) {
     const label = row.exception ?? 'unlabelled';
@@ -332,6 +349,97 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
             </section>
           )}
         </>
+      )}
+
+      {/*
+        First on the page, because it is the only section with a deadline.
+
+        Everything below describes something that has already gone wrong.
+        These appointments have not happened yet: write the tracker row and they
+        stay billable, miss it and there is nothing to record an outcome against
+        once the patient has been and gone.
+      */}
+      {preventable.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-lg border border-negative bg-surface">
+          <div className="border-b border-negative-subtle px-4 py-3">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-negative">
+              <AlertTriangle size={14} /> Booked, missing from the tracker, still
+              time to fix
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              {formatCount(preventable.length)} appointment
+              {preventable.length === 1 ? ' is' : 's are'} confirmed in
+              GoHighLevel with no row in the tracker sheet, and{' '}
+              {preventable.length === 1 ? 'it has' : 'they have'} not happened
+              yet. The practice has nothing to mark an outcome against, so
+              without a row the work cannot become billable — and after the
+              appointment it is too late.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              A missing row does <b>not</b> prove the booking was dropped in
+              transit. The two feeds are paired on patient name and date, so a
+              spelling difference or a mismatched date lands here too. Either
+              way the row needs writing.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">When</th>
+                  <th className="px-4 py-3 font-medium">Practice</th>
+                  <th className="px-4 py-3 font-medium">Patient</th>
+                  <th className="px-4 py-3 font-medium">Appointment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preventable.map((row) => {
+                  const days = row.days_away ?? 0;
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b border-line last:border-0"
+                    >
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'inline-block rounded px-2 py-0.5 text-xs font-medium',
+                            days <= 1
+                              ? 'bg-negative-subtle text-negative'
+                              : days <= 3
+                                ? 'bg-warning-subtle text-warning'
+                                : 'bg-surface-sunken text-fg-muted',
+                          )}
+                        >
+                          {days === 0
+                            ? 'today'
+                            : days === 1
+                              ? 'tomorrow'
+                              : `${days} days`}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-fg">{row.practice}</td>
+                      <td className="px-4 py-3 text-fg-muted">
+                        {row.patient_name ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted">
+                        {row.appointment_at
+                          ? new Date(row.appointment_at).toLocaleString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: 'UTC',
+                            })
+                          : 'no date'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {unevidenced.length > 0 && (
@@ -520,7 +628,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
             {formatCount(exceptionTotal)} open ·{' '}
             {urgent.length > 0 ? (
               <span className="text-negative">
-                {formatCount(urgent.length)} where money and evidence disagree
+                {formatCount(alreadyWrong.length)} where money and evidence disagree
               </span>
             ) : (
               'none urgent'
@@ -547,7 +655,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {urgent.map((row) => (
+                {alreadyWrong.map((row) => (
                   <tr
                     key={row.id}
                     className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
