@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import {
-  PERMISSION_KEYS,
+  GRANTABLE_PERMISSION_KEYS,
   PERMISSION_LABELS,
   type PermissionKey,
 } from '@/config/permissions';
@@ -66,7 +66,8 @@ export function AccessEditor({ user }: { user: AccessUser }) {
   return (
     <>
       <Button size="sm" icon={<KeyRound size={13} />} onClick={() => setOpen(true)}>
-        {formatCount(user.permissions.length)} / {PERMISSION_KEYS.length}
+        {formatCount(user.permissions.length)} /{' '}
+        {GRANTABLE_PERMISSION_KEYS.length}
       </Button>
 
       <Modal
@@ -77,7 +78,14 @@ export function AccessEditor({ user }: { user: AccessUser }) {
         size="lg"
         footer={
           <>
-            <Button onClick={() => setKeys([...PERMISSION_KEYS])}>
+            {/*
+              Grantable keys only. This used PERMISSION_KEYS, which includes
+              the admin-only ones — so "Select all" would have handed somebody
+              provisioning, the one page that creates live GoHighLevel
+              sub-accounts, even though it is deliberately absent from the
+              checkboxes below.
+            */}
+            <Button onClick={() => setKeys([...GRANTABLE_PERMISSION_KEYS])}>
               Select all
             </Button>
             <Button onClick={() => setKeys([])}>Clear</Button>

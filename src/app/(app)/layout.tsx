@@ -43,9 +43,26 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
    */
   const isAdmin = isPrivileged(profile.data?.role);
 
+  /*
+   * A narrower gate than isAdmin, for the handful of pages that act on live
+   * systems rather than report on them.
+   *
+   * isPrivileged covers both 'admin' and 'super_admin', which is right for
+   * reading anything. Provisioning creates GoHighLevel sub-accounts and writes
+   * their custom values, and "only the owner sees this" was the requirement —
+   * so it is gated on super_admin specifically. Role rather than email: the
+   * same outcome today, without a person's address baked into navigation.
+   */
+  const isSuperAdmin = profile.data?.role === 'super_admin';
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
-      <Sidebar permissions={permissions} isAdmin={isAdmin} theme={theme} />
+      <Sidebar
+        permissions={permissions}
+        isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
+        theme={theme}
+      />
       <main className="flex-1 overflow-y-auto">
         {/*
           The switcher sits above the page rather than inside the sidebar: it

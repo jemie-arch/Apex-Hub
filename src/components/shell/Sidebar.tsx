@@ -49,7 +49,10 @@ import { useState } from 'react';
 
 import { Logo } from '@/components/shell/Logo';
 import { ThemeToggle, type Theme } from '@/components/shell/ThemeToggle';
-import { permissionForPath } from '@/config/permissions';
+import {
+  ADMIN_ONLY_PERMISSIONS,
+  permissionForPath,
+} from '@/config/permissions';
 import { cn } from '@/lib/cn';
 
 interface NavItem {
@@ -103,10 +106,18 @@ const SECTIONS: NavSection[] = [
         href: '/onboarding',
         label: 'Onboarding',
         icon: CalendarCheck,
+        /*
+         * Provisioning moved to the settings group and Forms dropped from the
+         * menu. Onboarding is now just the two pages the client-facing team
+         * uses; provisioning is an admin operation that happens to start here,
+         * and listing it beside them invited someone to press it.
+         *
+         * Both pages still exist and both are still permission-gated. Forms is
+         * reachable by URL at /onboarding-forms — the same arrangement /billing
+         * has always had — so nothing was deleted, only unlisted.
+         */
         children: [
           { href: '/onboarding/clients', label: 'Client Onboarding', icon: UserCheck },
-          { href: '/onboarding/provisioning', label: 'Provisioning', icon: Server },
-          { href: '/onboarding-forms', label: 'Forms', icon: FileText },
         ],
       },
       {
@@ -147,6 +158,13 @@ const SECTIONS: NavSection[] = [
 const ACCOUNT_ITEMS: NavItem[] = [
   { href: '/account', label: 'My Account', icon: UserCircle },
   { href: '/settings/access', label: 'Access & Permissions', icon: KeyRound },
+  /*
+   * Super-admin only, via ADMIN_ONLY_PERMISSIONS. It cannot be granted on the
+   * access screen at any role, and an 'admin' does not inherit it the way they
+   * inherit every other page — because this one creates live GoHighLevel
+   * sub-accounts rather than reporting on them.
+   */
+  { href: '/onboarding/provisioning', label: 'Provisioning', icon: Server },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -164,9 +182,13 @@ function isAllowed(
   item: NavItem,
   allowed: Set<string>,
   isAdmin: boolean,
+  isSuperAdmin: boolean,
 ): boolean {
   const key = permissionForPath(item.href);
   if (key === null) return false;
+  // Admin-only keys ignore the granted list entirely. Provisioning creates live
+  // GoHighLevel sub-accounts, so holding the string is not enough.
+  if (ADMIN_ONLY_PERMISSIONS.has(key)) return isSuperAdmin;
   return isAdmin || allowed.has(key);
 }
 
@@ -182,9 +204,10 @@ function visible(
   item: NavItem,
   allowed: Set<string>,
   isAdmin: boolean,
+  isSuperAdmin: boolean,
 ): NavItem | null {
   const children = item.children
-    ?.map((child) => visible(child, allowed, isAdmin))
+    ?.map((child) => visible(child, allowed, isAdmin, isSuperAdmin))
     .filter((child): child is NavItem => child !== null);
 
   const isGroupOnly = item.href === '';
@@ -193,7 +216,7 @@ function visible(
     return children && children.length > 0 ? { ...item, children } : null;
   }
 
-  if (!isAllowed(item, allowed, isAdmin)) {
+  if (!isAllowed(item, allowed, isAdmin, isSuperAdmin)) {
     // The parent is denied but a child may still be permitted. Promote the
     // children rather than hiding a page somebody is entitled to.
     return children && children.length > 0
@@ -327,11 +350,14 @@ function NavBranch({
 export function Sidebar({
   permissions,
   isAdmin = false,
+  isSuperAdmin = false,
   theme,
 }: {
   permissions: readonly string[];
   /** Admins see every item — middleware already lets them reach every route. */
   isAdmin?: boolean;
+  /** Narrower than isAdmin: gates pages that act on live systems. */
+  isSuperAdmin?: boolean;
   theme: Theme;
 }) {
   const pathname = usePathname();
@@ -354,12 +380,12 @@ export function Sidebar({
   const visibleSections = SECTIONS.map((section) => ({
     ...section,
     items: section.items
-      .map((item) => visible(item, allowed, isAdmin))
+      .map((item) => visible(item, allowed, isAdmin, isSuperAdmin))
       .filter((item): item is NavItem => item !== null),
   })).filter((section) => section.items.length > 0);
 
   const visibleAccount = ACCOUNT_ITEMS.filter((item) =>
-    isAllowed(item, allowed, isAdmin),
+    isAllowed(item, allowed, isAdmin, isSuperAdmin),
   );
 
   return (

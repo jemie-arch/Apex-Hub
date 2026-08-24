@@ -44,6 +44,26 @@ export const PERMISSION_KEYS = [
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
 
+/**
+ * Keys no ordinary teammate may hold, however the access screen is used.
+ *
+ * Provisioning creates live GoHighLevel sub-accounts and writes their custom
+ * values. That is not a reporting page somebody can be trusted with by
+ * accident, so it is gated on being an admin rather than on holding a key —
+ * meaning it cannot be granted, only inherited by an admin.
+ *
+ * Kept in PERMISSION_KEYS and in ROUTE_PERMISSIONS on purpose. Deleting the key
+ * would make permissionForPath return null for the route, and the menu treats a
+ * null as "hide from everyone" — including admins — so the page would vanish
+ * for the very people who need it. The gate belongs here, not in the map.
+ */
+export const ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>(['provisioning']);
+
+/** Keys that can actually be handed out on the access screen. */
+export const GRANTABLE_PERMISSION_KEYS = PERMISSION_KEYS.filter(
+  (key) => !ADMIN_ONLY_PERMISSIONS.has(key),
+);
+
 /** Human labels for the access screen. Safe to change; the keys are not. */
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   pipeline: 'B2B Overview',
