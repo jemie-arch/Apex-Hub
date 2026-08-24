@@ -133,9 +133,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
             key: option.key,
             label: option.label,
             count: countFor(option.key),
+            // Built here, on the server. The pills are a client component and a
+            // function prop cannot cross that boundary.
+            href: hrefFor(option.key),
           }))}
           value={tab}
-          hrefFor={hrefFor}
         />
       </div>
 

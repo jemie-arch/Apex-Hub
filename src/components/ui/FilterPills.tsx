@@ -31,23 +31,33 @@ function countClass(selected: boolean): string {
   return cn('numeric ml-1.5', selected ? 'text-accent' : 'text-fg-subtle');
 }
 
+/** A pill that navigates. `href` is precomputed — see the note below. */
+export interface FilterLinkOption<T extends string> extends FilterOption<T> {
+  href: string;
+}
+
 /**
  * The same control, but each pill is a link rather than a button.
  *
  * For tables that live in a server component, where the filter belongs in the
- * URL anyway: it survives a reload, it can be linked to somebody, and the page
+ * URL anyway: it survives a reload, it can be sent to somebody, and the page
  * keeps rendering on the server instead of shipping the whole table to the
  * client just to hide rows.
+ *
+ * Each option carries its own `href` string rather than the caller passing a
+ * `hrefFor(key)` builder. That is not a style preference — this is a client
+ * component, and a function cannot cross the server/client boundary. The first
+ * version took a builder, built cleanly, and then threw "An error occurred in
+ * the Server Components render" on every request, because the failure only
+ * happens at render time.
  */
 export function FilterPillLinks<T extends string>({
   options,
   value,
-  hrefFor,
   className,
 }: {
-  options: ReadonlyArray<FilterOption<T>>;
+  options: ReadonlyArray<FilterLinkOption<T>>;
   value: T;
-  hrefFor: (key: T) => string;
   className?: string;
 }) {
   return (
@@ -60,7 +70,7 @@ export function FilterPillLinks<T extends string>({
         return (
           <Link
             key={option.key}
-            href={hrefFor(option.key)}
+            href={option.href}
             aria-current={selected ? 'page' : undefined}
             className={pillClass(selected)}
           >
