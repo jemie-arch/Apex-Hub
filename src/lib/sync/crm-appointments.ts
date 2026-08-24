@@ -149,12 +149,29 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
    * the following evening and the consultation count went back to being seven
    * times too high.
    */
-  const excluded = await db.from('excluded_calendars').select('crm_calendar_id');
+  const excluded = await db
+    .from('excluded_calendars')
+    .select('crm_calendar_id, client_id, calendar_name');
   if (excluded.error) throw excluded.error;
 
   const excludedCalendars = new Set(
     (excluded.data ?? []).map((row) => row.crm_calendar_id),
   );
+
+  /*
+   * Also indexed by name, only so the conflict check below can find a
+   * contradiction that was recorded under one key in one table and another key
+   * in the other. Filtering still happens on id — that is the reliable key.
+   * Names in this table carry stray padding ("  {{location.name}} Virtual
+   * Calendar  "), hence the trim.
+   */
+  const excludedNamesByClient = new Map<string, Set<string>>();
+  for (const row of excluded.data ?? []) {
+    if (!row.client_id || !row.calendar_name) continue;
+    const names = excludedNamesByClient.get(row.client_id) ?? new Set<string>();
+    names.add(row.calendar_name.trim().toLowerCase());
+    excludedNamesByClient.set(row.client_id, names);
+  }
 
   /*
    * The other direction: consultation calendars the name rule wrongly removes.
@@ -172,7 +189,7 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
    */
   const included = await db
     .from('included_calendars')
-    .select('client_id, calendar_name, crm_calendar_id');
+    .select('client_id, calendar_name, crm_calendar_id, reason');
   if (included.error) throw included.error;
 
   const includedNamesByClient = new Map<string, Set<string>>();
@@ -202,13 +219,53 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
    * escalating retainer clients and dormant accounts at the same severity as a
    * practice whose consultations were genuinely vanishing.
    */
-  const billedPerConsult = await db
+  const consultCharges = await db
     .from('billing_charges')
-    .select('client_id')
+    .select('client_id, consult_names')
     .eq('outcome', 'succeeded')
-    .not('client_id', 'is', null)
-    .not('consult_names', 'is', null);
-  if (billedPerConsult.error) throw billedPerConsult.error;
+    .not('client_id', 'is', null);
+  if (consultCharges.error) throw consultCharges.error;
+
+  /*
+   * Length-checked in here rather than filtered in the query.
+   *
+   * "not consult_names is null" does NOT exclude an empty array: {} is not
+   * NULL, so it passes. The first version used that filter and promptly
+   * escalated Natalie Yang — a retainer client on $500/month whose charges
+   * carry no consult names at all — which is the exact client the split was
+   * written to stop escalating.
+   */
+  const perConsult = new Set(
+    (consultCharges.data ?? []).flatMap((row) =>
+      row.client_id && (row.consult_names?.length ?? 0) > 0
+        ? [row.client_id]
+        : [],
+    ),
+  );
+
+  /*
+   * A calendar named in both tables is a contradiction, and it must be said out
+   * loud rather than resolved quietly.
+   *
+   * Kind Dental's "Ortho & New Patient Exam | Dr. Vohra" was excluded by hand as
+   * "Not the practice booking calendar", and a GoHighLevel audit later found it
+   * Active, publicly bookable, on a real PatientSync chair, with confirmed
+   * new-patient appointments. Both entries are somebody's considered judgement
+   * and they disagree. Exclusion wins so the safe thing happens to the data, but
+   * letting it win silently leaves a practice reading zero appointments with
+   * nothing on screen explaining why.
+   */
+  const conflicting = (included.data ?? []).filter((row) => {
+    if (!row.client_id) return false;
+    if (row.crm_calendar_id && excludedCalendars.has(row.crm_calendar_id)) {
+      return true;
+    }
+    return (
+      excludedNamesByClient
+        .get(row.client_id)
+        ?.has(row.calendar_name.trim().toLowerCase()) === true
+    );
+  });
 
   let skippedByCalendar = 0;
   /** Calendars read only because they were named in included_calendars. */
@@ -285,13 +342,25 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         // forever, and the alert would contradict the table that fixed it.
         const overrideNames = includedNamesByClient.get(client.id);
         const overrideIds = includedIdsByClient.get(client.id);
-        const hasOne = calendars.some(
-          (calendar) =>
+        /*
+         * Must apply exclusion here too, and for a reason that cost Kind Dental
+         * a day: an earlier version checked the override but not the exclusion
+         * list, so a calendar that was BOTH excluded by hand and named as an
+         * override counted as "has one" here while the fetch above refused to
+         * read it. The practice vanished from the alert and stayed at zero
+         * appointments — strictly worse than before, because the warning went
+         * away and the problem did not. This check has to agree with the
+         * predicate or it is not a check, it is a cover-up.
+         */
+        const hasOne = calendars.some((calendar) => {
+          if (excludedCalendars.has(calendar.id)) return false;
+          return (
             isConsultationCalendar(calendar) ||
             overrideNames?.has((calendar.name ?? '').trim().toLowerCase()) ===
               true ||
-            overrideIds?.has(calendar.id) === true,
-        );
+            overrideIds?.has(calendar.id) === true
+          );
+        });
 
         if (!hasOne) {
           missingCalendar.push({
@@ -561,6 +630,21 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     ctx.note('calendars_admitted_by_override', admittedByOverride);
   }
 
+  if (conflicting.length > 0) {
+    ctx.recordError(
+      `${conflicting.length} calendar(s) are named in both excluded_calendars ` +
+        'and included_calendars. Exclusion wins, so they are NOT being read — ' +
+        'which means somebody added them as consultation calendars and is ' +
+        'still getting no appointments from them. One of the two entries is ' +
+        'wrong and a person has to decide which.',
+      {
+        calendars: conflicting.map(
+          (row) => `${row.calendar_name} (${row.reason})`,
+        ),
+      },
+    );
+  }
+
   if (skippedByCalendar > 0) {
     ctx.recordError(
       `${skippedByCalendar} event(s) came back from a calendar that was ` +
@@ -599,11 +683,6 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
      * does not mean anything. So the alert now escalates only practices that
      * actually bill per consultation, and logs the rest.
      */
-    const perConsult = new Set(
-      (billedPerConsult.data ?? []).flatMap((row) =>
-        row.client_id ? [row.client_id] : [],
-      ),
-    );
     const costly = missingCalendar.filter((row) => perConsult.has(row.clientId));
     const harmless = missingCalendar.filter(
       (row) => !perConsult.has(row.clientId),
