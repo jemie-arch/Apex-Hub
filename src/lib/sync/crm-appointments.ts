@@ -270,6 +270,8 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   let skippedByCalendar = 0;
   /** Calendars read only because they were named in included_calendars. */
   let admittedByOverride = 0;
+  /** Clients whose GoHighLevel location has been deleted underneath us. */
+  const goneFromCrm: { practice: string; locationId: string | null }[] = [];
 
   for (const client of clients.data ?? []) {
     if (!client.crm_location_id) continue;
@@ -307,10 +309,31 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       );
     } catch (error) {
       // One client's dead token must not stop the other twenty.
-      ctx.recordError(`could not list appointments for ${client.name}`, {
-        clientId: client.id,
-        detail: error instanceof Error ? error.message : String(error),
-      });
+      const detail = error instanceof Error ? error.message : String(error);
+
+      /*
+       * A location that no longer exists in GoHighLevel is a different thing
+       * from a location that failed to answer, and reporting them the same way
+       * meant one of them was never actioned.
+       *
+       * The two deleted `jemie test` sub-accounts errored on every single run,
+       * indefinitely, under the message "could not list appointments" — which
+       * reads like a transient fault worth retrying. It is not: the location is
+       * gone and no number of retries will bring it back. It needs a row
+       * removing from this database, which nobody was ever told.
+       *
+       * Not auto-deactivated. This is one API response, and deactivating a real
+       * client because GoHighLevel had a bad minute would be a far worse failure
+       * than a noisy alert. Named and counted instead, so a person can act.
+       */
+      if (/location not found/i.test(detail)) {
+        goneFromCrm.push({ practice: client.name, locationId: client.crm_location_id });
+      } else {
+        ctx.recordError(`could not list appointments for ${client.name}`, {
+          clientId: client.id,
+          detail,
+        });
+      }
       continue;
     }
 
@@ -628,6 +651,21 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
 
   if (admittedByOverride > 0) {
     ctx.note('calendars_admitted_by_override', admittedByOverride);
+  }
+
+  if (goneFromCrm.length > 0) {
+    ctx.recordError(
+      `${goneFromCrm.length} client(s) point at a GoHighLevel location that no ` +
+        'longer exists, so they will fail on every run until the row is dealt ' +
+        'with. Retrying cannot fix this: either the sub-account was deleted and ' +
+        'the client should be removed or marked inactive here, or the location ' +
+        'id is wrong and needs correcting.',
+      {
+        clients: goneFromCrm.map(
+          (row) => `${row.practice} (${row.locationId ?? 'no location id'})`,
+        ),
+      },
+    );
   }
 
   if (conflicting.length > 0) {
