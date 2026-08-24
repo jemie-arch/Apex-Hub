@@ -118,8 +118,18 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   let contactLookups = 0;
   /** One shape note per run is enough; see ctx.note beside the lookup. */
   let shapeNoted = false;
-  /** Practices with no calendar matching the booking-calendar name. */
-  const missingCalendar: string[] = [];
+  /**
+   * Practices with no calendar matching the booking-calendar name, and what they
+   * have instead.
+   *
+   * The names matter as much as the count. "10 practices have no booking
+   * calendar" sends somebody into ten sub-accounts to work out what is wrong;
+   * the list of what each one actually holds usually answers it on sight — a
+   * calendar renamed, an unrendered `{{location.name}}` merge field, or nothing
+   * bookable at all. Since the listing is already fetched here to tell a quiet
+   * fortnight from a missing calendar, keeping the names costs nothing.
+   */
+  const missingCalendar: { practice: string; has: string[] }[] = [];
 
   /*
    * Calendars that pass the name test and still are not consultations.
@@ -199,7 +209,12 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
       try {
         const calendars = await listCalendars(client.id, client.crm_location_id);
         if (!calendars.some(isConsultationCalendar)) {
-          missingCalendar.push(client.name);
+          missingCalendar.push({
+            practice: client.name,
+            has: calendars
+              .map((calendar) => (calendar.name ?? '').trim())
+              .filter((name) => name !== ''),
+          });
         }
       } catch {
         // The listing already failed above if the token is dead; a failure here
@@ -468,11 +483,29 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
 
   if (missingCalendar.length > 0) {
     ctx.note('no_booking_calendar', missingCalendar);
+
+    /*
+     * Split by whether there is anything to rename. A practice holding calendars
+     * under other names is a five-minute fix by whoever owns GoHighLevel; a
+     * practice holding none at all never had one provisioned, which is a
+     * different job for a different person. Reported as one number they were
+     * indistinguishable.
+     */
+    const renameable = missingCalendar.filter((row) => row.has.length > 0);
+    const empty = missingCalendar.filter((row) => row.has.length === 0);
+
     ctx.recordError(
       `${missingCalendar.length} practice(s) have no calendar whose name ends ` +
-        '"Booking Calendar", so no consultations were read for them. Either the ' +
-        'calendar was renamed or the snapshot never created it.',
-      { practices: missingCalendar },
+        '"Booking Calendar", so no consultations were read for them. ' +
+        `${renameable.length} hold calendars under other names and can be fixed ` +
+        `by renaming; ${empty.length} hold no calendars at all and need one ` +
+        'created.',
+      {
+        renameable: renameable.map(
+          (row) => `${row.practice}: ${row.has.join(' | ')}`,
+        ),
+        no_calendars_at_all: empty.map((row) => row.practice),
+      },
     );
   }
 }
