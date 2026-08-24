@@ -1,9 +1,25 @@
 # PPS template — the corrected `01 - New Appointment Booked`
 
-**Status: not applied.** Nothing in Make has been created, edited, activated or
-deleted. This directory holds a reviewed replacement for the template and the
-original it was derived from, so the change can be checked before it touches
-anything live.
+**Status: created in Make, inactive, nothing live touched.**
+
+The corrected template now exists as scenario **`6033666`**, in the same folder
+as the original (`186831`), named
+`01 - PPS - New Appointment Booked -> Update sheet - [CORRECTED TEMPLATE - inactive, for review]`.
+
+- `isActive: false` — it is not running and has no schedule that will start it.
+- `hookId: null` — it holds **no webhook**, so nothing can reach it until
+  somebody deliberately attaches one. It cannot take traffic from hook
+  `1657778`, which the live template still owns.
+- Every sheet module targets `1 - COPY THIS - Stat Sheet Template`, so even a
+  manual test run cannot touch a client sheet.
+- The original `5947250` was **not modified** — it is untouched and still live.
+
+Verified after creation by reading the scenario back and checking the corrected
+fields, the deliberately-unchanged fields, all 13 module ids, and the column
+inventory of every `addRow` against the original. All matched.
+
+This directory holds the same blueprint as files, so the change is reviewable
+without opening Make.
 
 - `01-new-appointment-booked.original.json` — scenario `5947250` exactly as it
   runs today, pulled 2026-08-24.
@@ -126,19 +142,25 @@ sheets and needs sign-off, not a quiet correction.
 
 ---
 
-## Applying it
+## Testing it
 
-Import creates a new scenario and leaves `5947250` untouched, which is why it
-is the route recommended here rather than editing in place.
+Scenario `6033666` already exists and is ready to test. It carries no webhook,
+so give it one first — that is the only setup step.
 
-1. Make → the folder holding `5947250` → **Create a new scenario → Import Blueprint**
-2. Upload `01-new-appointment-booked.corrected.json`
-3. It lands **inactive** and named `[CORRECTED TEMPLATE - inactive, for review]`
-4. Re-point the Google Sheets connection if it does not carry over — the
-   blueprint references connection `6237841` (Josh@apex)
-5. Every sheet module targets `1 - COPY THIS - Stat Sheet Template`, not a
-   client sheet, so a test run cannot touch client data
-6. Test with two payloads before activating anything:
+1. Open `6033666` in Make
+2. Click the webhook module and create a **new** webhook. Do not select the
+   existing one; hook `1657778` belongs to the live template and sharing it
+   would put this scenario on production traffic.
+3. Confirm the Google Sheets connection resolved to `6237841` (Josh@apex).
+   It should have carried over, since connections are team-scoped.
+4. Send the two payloads below and check the template sheet.
+
+If you would rather rebuild it from the file than use `6033666`:
+**Create a new scenario → Import Blueprint** →
+`01-new-appointment-booked.corrected.json`. Either route leaves `5947250`
+untouched.
+
+The two payloads that matter:
    - one with `attributionSource.url` present and **no** `utm_id` — this is the
      case that currently writes nothing, and it must now write a row with
      column 23 empty
