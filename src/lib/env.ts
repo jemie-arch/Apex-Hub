@@ -55,6 +55,17 @@ const serverSchema = z.object({
   // Windsor.ai — the ad data source. One key covers every connected ad
   // account, so there is no per-account token to expire.
   WINDSOR_API_KEY: z.string().min(1).optional(),
+
+  /*
+   * Hubstaff, for payout hours. A Personal Access Token from Settings ->
+   * Personal Access Tokens, held only here — never in the database, never in a
+   * log, never in the browser. Optional so its absence stops the payout sync
+   * rather than the whole app.
+   */
+  HUBSTAFF_TOKEN: z.string().min(1).optional(),
+  HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),
+  /** The organisation whose members and time are read. */
+  HUBSTAFF_ORGANIZATION_ID: z.string().min(1).optional(),
   WINDSOR_API_BASE: z.string().url().default('https://connectors.windsor.ai'),
 
   /**
@@ -225,6 +236,39 @@ export function windsorCredentials(): WindsorCredentials {
   }
 
   return { apiKey: env.WINDSOR_API_KEY, apiBase: env.WINDSOR_API_BASE };
+}
+
+export interface HubstaffCredentials {
+  token: string;
+  apiBase: string;
+  organizationId: string | null;
+}
+
+/**
+ * The Hubstaff token, or a loud error. Same contract as the others: missing
+ * configuration stops the payout sync, never a boot.
+ *
+ * The organisation id is returned rather than demanded, because the API can
+ * list organisations for a token — so the sync can discover it and say which
+ * one it picked instead of failing on a value nobody knew to set.
+ */
+export function hubstaffCredentials(): HubstaffCredentials {
+  const env = serverEnv();
+
+  if (!env.HUBSTAFF_TOKEN) {
+    throw new Error(
+      'Hubstaff is not configured: HUBSTAFF_TOKEN is not set, so payout hours ' +
+        'cannot be read. Create a Personal Access Token in Hubstaff under ' +
+        'Settings then Personal Access Tokens, add it to the environment, and ' +
+        'retry. Nothing else in the app needs it.',
+    );
+  }
+
+  return {
+    token: env.HUBSTAFF_TOKEN,
+    apiBase: env.HUBSTAFF_API_BASE,
+    organizationId: env.HUBSTAFF_ORGANIZATION_ID ?? null,
+  };
 }
 
 export interface StripeCredentials {

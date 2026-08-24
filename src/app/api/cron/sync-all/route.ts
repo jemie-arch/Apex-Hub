@@ -63,6 +63,20 @@ const ORDER = [
   // reconciles yesterday's picture and reports today's exceptions against it.
   'appointment-ledger',
   'crm-calls',
+  /*
+   * 'payout-hours' is deliberately NOT here yet.
+   *
+   * HUBSTAFF_TOKEN is not set, so adding it would guarantee a failed sync every
+   * night — and a cycle that always reports a failure is how a real failure
+   * stops being noticed. It is registered, so it runs from settings and the CLI
+   * the moment the token exists; add it here at that point, not before.
+   *
+   * When it does go in, it belongs at the end. It reads paid_leave_hours() and
+   * nothing else in this list writes time-off requests, so it has no dependency
+   * on the syncs above — but it does call an external API, and the cycle has a
+   * 240-second start budget against a 300-second limit. The tail is where a slow
+   * sync costs least.
+   */
 ] as const;
 
 /**

@@ -9,6 +9,7 @@ import { syncCrmCalls } from '@/lib/sync/crm-calls';
 import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
+import { syncPayoutHours } from '@/lib/sync/payout-hours';
 import { syncProvisionPending } from '@/lib/sync/provision-pending';
 import type { SyncFn } from '@/lib/sync/runner';
 import { syncStripeCharges } from '@/lib/sync/stripe-charges';
@@ -56,6 +57,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'Builds the GoHighLevel sub-account for any onboarding submission that ' +
       'does not have a configured one yet',
     run: syncProvisionPending,
+  },
+  'payout-hours': {
+    name: 'payout-hours',
+    description:
+      'Hubstaff tracked time plus approved paid leave into fortnightly payout ' +
+      'lines — needs HUBSTAFF_TOKEN',
+    run: syncPayoutHours,
   },
   'windsor-ads': {
     name: 'windsor-ads',
