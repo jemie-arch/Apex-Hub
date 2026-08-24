@@ -179,15 +179,15 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     {titleCase(client.singular)}
                   </th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Health</th>
-                  <th className="px-4 py-3 text-right font-medium">Retainer</th>
+                  <th className="hidden px-4 py-3 font-medium md:table-cell">Health</th>
+                  <th className="hidden px-4 py-3 text-right font-medium xl:table-cell">Retainer</th>
                   <th className="px-4 py-3 text-right font-medium">
                     {titleCase(booking.plural)}
                   </th>
-                  <th className="px-4 py-3 text-right font-medium">Showed</th>
-                  <th className="px-4 py-3 text-right font-medium">Won</th>
-                  <th className="px-4 py-3 text-right font-medium">Spend</th>
-                  <th className="px-4 py-3 text-right font-medium">ROAS</th>
+                  <th className="hidden px-4 py-3 text-right font-medium lg:table-cell">Showed</th>
+                  <th className="hidden px-4 py-3 text-right font-medium xl:table-cell">Won</th>
+                  <th className="hidden px-4 py-3 text-right font-medium lg:table-cell">Spend</th>
+                  <th className="hidden px-4 py-3 text-right font-medium md:table-cell">ROAS</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,7 +217,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                         tone={clientStatusTone(rollup.group.status)}
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="hidden px-4 py-3 md:table-cell">
                       <span title={rollup.health.reason}>
                         <StatusPill
                           value={rollup.health.level.replace('_', ' ')}
@@ -225,7 +225,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                         />
                       </span>
                     </td>
-                    <td className="numeric px-4 py-3 text-right text-fg-muted">
+                    <td className="numeric hidden px-4 py-3 text-right text-fg-muted xl:table-cell">
                       {formatMoney(
                         rollup.group.retainer_cents,
                         rollup.group.currency,
@@ -234,19 +234,19 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     <td className="numeric px-4 py-3 text-right font-medium text-fg">
                       {formatCount(rollup.booked)}
                     </td>
-                    <td className="numeric px-4 py-3 text-right text-fg-muted">
+                    <td className="numeric hidden px-4 py-3 text-right text-fg-muted lg:table-cell">
                       {formatPercent(rollup.showRate, 0)}
                     </td>
-                    <td className="numeric px-4 py-3 text-right text-fg-muted">
+                    <td className="numeric hidden px-4 py-3 text-right text-fg-muted xl:table-cell">
                       {formatCount(rollup.converted)}
                     </td>
-                    <td className="numeric px-4 py-3 text-right text-fg-muted">
+                    <td className="numeric hidden px-4 py-3 text-right text-fg-muted lg:table-cell">
                       {formatMoneyCompact(
                         rollup.spendCents,
                         rollup.group.currency,
                       )}
                     </td>
-                    <td className="numeric px-4 py-3 text-right text-fg-muted">
+                    <td className="numeric hidden px-4 py-3 text-right text-fg-muted md:table-cell">
                       {formatMultiple(rollup.roas)}
                     </td>
                   </tr>

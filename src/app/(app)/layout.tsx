@@ -69,10 +69,22 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           moves you between portals, which is a different kind of action from
           moving between pages of one portal.
         */}
-        <div className="mx-auto flex max-w-[1600px] justify-end px-8 pt-6">
+        {/*
+          Fluid rather than capped at 1600px.
+
+          The cap left dead space either side on a wide monitor while the tables
+          it was protecting — Clients has nine columns, the ledger more — were
+          the very things that needed the room. A max-width earns its place on a
+          page of prose, where a long measure hurts reading; it costs on a page
+          of data, where the alternative to width is a horizontal scrollbar.
+
+          Padding steps up with the viewport instead of sitting at a fixed 2rem,
+          which on a phone spent an eighth of the screen on margins.
+        */}
+        <div className="flex justify-end px-4 pt-4 sm:px-6 lg:px-8 lg:pt-6">
           <PortalSwitcher />
         </div>
-        <div className="mx-auto max-w-[1600px] px-8 pb-8 pt-4">{children}</div>
+        <div className="px-4 pb-8 pt-4 sm:px-6 lg:px-8">{children}</div>
       </main>
     </div>
   );

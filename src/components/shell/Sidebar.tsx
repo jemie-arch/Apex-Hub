@@ -31,6 +31,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   Megaphone,
+  Menu,
   MessagesSquare,
   Scale,
   Server,
@@ -363,6 +364,18 @@ export function Sidebar({
   const pathname = usePathname();
   const allowed = new Set(permissions);
 
+  /*
+   * Drawer state, small screens only. Closes itself whenever the path changes,
+   * because on a phone the menu covers the page — leaving it open after a tap
+   * would hide the thing that was just navigated to.
+   */
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [lastPath, setLastPath] = useState(pathname);
+  if (pathname !== lastPath) {
+    setLastPath(pathname);
+    if (mobileOpen) setMobileOpen(false);
+  }
+
   // /settings/access must not also light up /settings, so the longest matching
   // href wins rather than any prefix match. Children are included, or a nested
   // page would leave its own entry unhighlighted.
@@ -389,7 +402,41 @@ export function Sidebar({
   );
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-line bg-surface">
+    <>
+      {/*
+        Off-canvas below lg, static from lg up.
+
+        It was w-64 shrink-0 with no breakpoint, so on a phone the navigation
+        took two thirds of the screen and the page it navigated to got the
+        rest. Now it slides over the content on small screens and behaves
+        exactly as before on a desktop, so nothing changes for the way it is
+        mostly used.
+      */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
+        className="fixed left-3 top-3 z-40 rounded-md border border-line bg-surface p-2 text-fg-muted shadow-sm lg:hidden"
+      >
+        <Menu size={18} />
+      </button>
+
+      {/* Tapping the page dismisses the menu, which is what a phone expects. */}
+      {mobileOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      ) : null}
+
+    <aside
+      className={cn(
+        "z-50 flex h-full w-64 shrink-0 flex-col border-r border-line bg-surface",
+        "fixed inset-y-0 left-0 transition-transform lg:static lg:translate-x-0",
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+      )}
+    >
       {/*
         The wordmark carries the company name itself, so repeating it as text
         beside the logo would say the same thing twice. The tagline stays,
@@ -429,5 +476,6 @@ export function Sidebar({
         </div>
       </div>
     </aside>
+    </>
   );
 }
