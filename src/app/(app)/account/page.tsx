@@ -6,8 +6,9 @@ import { ThemeToggle, type Theme } from '@/components/shell/ThemeToggle';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { TimeOff } from '@/components/account/TimeOff';
 import { tenant } from '@/config/tenant.config';
-import { formatDateInZone } from '@/lib/format';
+import { formatDateInZone, formatMoney } from '@/lib/format';
 import { currentCaller } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -23,7 +24,7 @@ export default async function AccountPage() {
   const profile = await serviceClient()
     .from('user_profiles')
     .select(
-      'email, full_name, role, permissions, theme, client_group_id, created_at',
+      'email, full_name, role, permissions, theme, client_group_id, created_at, standard_daily_hours, hourly_rate_cents',
     )
     .eq('id', caller.id)
     .maybeSingle();
@@ -32,6 +33,34 @@ export default async function AccountPage() {
 
   const me = profile.data;
   const theme: Theme = me?.theme === 'light' ? 'light' : 'dark';
+
+  /*
+   * Your own leave and your own payouts. RLS restricts both tables to the caller
+   * unless they are an admin, and these queries are scoped to caller.id anyway —
+   * belt and braces, because a pay figure shown to the wrong person is not a bug
+   * you get to explain away.
+   */
+  const [timeOff, payouts] = await Promise.all([
+    serviceClient()
+      .from('time_off_requests')
+      .select('id, starts_on, ends_on, kind, status, note, decision_note')
+      .eq('user_id', caller.id)
+      .order('starts_on', { ascending: false })
+      .limit(12),
+    serviceClient()
+      .from('payout_lines')
+      .select(
+        'id, tracked_hours, leave_hours, rate_cents, amount_cents, computed_at, payout_periods(starts_on, ends_on, pay_date, state)',
+      )
+      .eq('user_id', caller.id)
+      .order('computed_at', { ascending: false })
+      .limit(8),
+  ]);
+
+  if (timeOff.error) throw timeOff.error;
+  if (payouts.error) throw payouts.error;
+
+  const dailyHours = Number(me?.standard_daily_hours ?? 8);
 
   return (
     <>
@@ -130,6 +159,97 @@ export default async function AccountPage() {
         pages a person holds, which is the same answer arrived at by walking the
         menu instead of reading a denial.
       */}
+
+      <section className="mt-5 rounded-lg border border-line bg-surface p-6">
+        <TimeOff requests={timeOff.data ?? []} dailyHours={dailyHours} />
+      </section>
+
+      <section className="mt-5 rounded-lg border border-line bg-surface p-6">
+        <h2 className="text-sm font-semibold text-fg">Payouts</h2>
+        <p className="mt-1 text-xs text-fg-subtle">
+          Fortnightly, paid on the closing Friday. Hours come from Hubstaff;
+          approved paid leave is added on top.
+        </p>
+
+        {(payouts.data ?? []).length === 0 ? (
+          /*
+           * Two different nothings, and saying which one matters. No lines at all
+           * means the Hubstaff sync has not run for you yet — not that you worked
+           * no hours.
+           */
+          <p className="mt-4 text-xs text-fg-subtle">
+            No payout has been calculated for you yet. Periods exist, but hours
+            are only filled in once the Hubstaff sync has run.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="py-2 pr-3 font-medium">Period</th>
+                  <th className="py-2 pr-3 font-medium">Pays</th>
+                  <th className="py-2 pr-3 text-right font-medium">Tracked</th>
+                  <th className="py-2 pr-3 text-right font-medium">Leave</th>
+                  <th className="py-2 pr-3 text-right font-medium">Total</th>
+                  <th className="py-2 text-right font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(payouts.data ?? []).map((line) => {
+                  const period = line.payout_periods;
+                  const tracked = Number(line.tracked_hours ?? 0);
+                  const leave = Number(line.leave_hours ?? 0);
+                  return (
+                    <tr
+                      key={line.id}
+                      className="border-b border-line last:border-0"
+                    >
+                      <td className="py-2.5 pr-3 text-fg">
+                        {period ? `${period.starts_on} → ${period.ends_on}` : '—'}
+                        {period ? (
+                          <span className="block text-xs text-fg-subtle">
+                            {period.state}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="numeric py-2.5 pr-3 text-fg-muted">
+                        {period?.pay_date ?? '—'}
+                      </td>
+                      <td className="numeric py-2.5 pr-3 text-right text-fg-muted">
+                        {tracked.toFixed(2)}
+                      </td>
+                      <td className="numeric py-2.5 pr-3 text-right text-fg-muted">
+                        {leave.toFixed(2)}
+                      </td>
+                      <td className="numeric py-2.5 pr-3 text-right font-medium text-fg">
+                        {(tracked + leave).toFixed(2)}
+                      </td>
+                      <td className="numeric py-2.5 text-right text-fg">
+                        {line.amount_cents === null ? (
+                          /*
+                           * Hours with no money against them. A null rate is
+                           * deliberate — it means nobody has recorded what this
+                           * person is paid, and showing zero would state
+                           * something false about their work.
+                           */
+                          <span
+                            className="text-fg-subtle"
+                            title="No hourly rate on record, so no amount can be calculated"
+                          >
+                            no rate set
+                          </span>
+                        ) : (
+                          formatMoney(line.amount_cents, 'usd')
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </>
   );
 }
