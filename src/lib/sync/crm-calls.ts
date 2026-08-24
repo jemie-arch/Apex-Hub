@@ -68,9 +68,56 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
   if (profiles.error) throw profiles.error;
 
   const churned = new Set((churnedGroups.data ?? []).map((row) => row.id));
-  const locations = (clientRows.data ?? []).filter(
+  const eligible = (clientRows.data ?? []).filter(
     (row) => !churned.has(row.group_id),
   );
+
+  /*
+   * Stalest first, and this is a data-loss fix rather than a tidy-up.
+   *
+   * The budget allows 400 conversations at 40 per sub-account, so exactly ten
+   * get read per run. With no ordering, Postgres returned the same ten every
+   * night — meaning 63 of 73 practices' calls were NEVER read, and the run
+   * reported "budget exhausted, later locations were not read" as though that
+   * were a capacity note rather than 86% of the fleet going unsampled
+   * indefinitely.
+   *
+   * Ordering by when each sub-account's calls were last written fixes it
+   * without new state: a location nobody has ever read sorts first, then the
+   * one read longest ago. Coverage rotates on its own and stays fair, and the
+   * queue self-corrects if the budget or the client count changes.
+   *
+   * Raising the budget instead would not work: 73 x 40 is nearly 3,000 requests
+   * against a sync that has to finish inside the cycle's time slice.
+   */
+  const lastSeen = await db
+    .from('calls')
+    .select('client_id, synced_at')
+    .not('client_id', 'is', null)
+    .order('synced_at', { ascending: false });
+  if (lastSeen.error) throw lastSeen.error;
+
+  const freshestByClient = new Map<string, string>();
+  for (const row of lastSeen.data ?? []) {
+    // Descending, so the first sighting of a client is its most recent call.
+    if (row.client_id && !freshestByClient.has(row.client_id)) {
+      freshestByClient.set(row.client_id, row.synced_at ?? '');
+    }
+  }
+
+  const locations = [...eligible].sort((a, b) => {
+    const left = freshestByClient.get(a.id);
+    const right = freshestByClient.get(b.id);
+    if (left === undefined && right === undefined) {
+      return a.name.localeCompare(b.name);
+    }
+    if (left === undefined) return -1;
+    if (right === undefined) return 1;
+    return left.localeCompare(right);
+  });
+
+  ctx.note('locations_eligible', locations.length);
+  ctx.note('locations_never_read', locations.filter((l) => !freshestByClient.has(l.id)).length);
 
   const userIdByCrm = new Map(
     (profiles.data ?? []).flatMap((row) =>
@@ -225,10 +272,24 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
     );
   }
 
+  /*
+   * Logged, not an error, now that coverage rotates.
+   *
+   * Exhausting the budget is the expected steady state: 73 sub-accounts cannot
+   * fit in 400 conversations, and they are not meant to. What made it worth an
+   * alert before was that the same ten were read every night while the rest
+   * were never touched — and that is fixed by the ordering above, not by a
+   * bigger number. Reported with the coverage figure so the rotation can be
+   * seen working rather than assumed.
+   */
   if (budget <= 0) {
-    ctx.recordError(
-      `conversation budget of ${CONVERSATION_BUDGET} was exhausted, so later ` +
-        'locations were not read at all. Raise the cap or run this more often.',
+    const covered = locations.filter((l) => freshestByClient.has(l.id)).length;
+    ctx.log(
+      `budget of ${CONVERSATION_BUDGET} conversations spent across ` +
+        `${Math.ceil(CONVERSATION_BUDGET / CONVERSATIONS_PER_LOCATION)} of ` +
+        `${locations.length} sub-accounts, stalest first. ` +
+        `${locations.length - covered} have never been read; they sort to the ` +
+        'front of the next run.',
     );
   }
 }

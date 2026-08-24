@@ -104,10 +104,28 @@ export async function syncOnboardingCalls(ctx: SyncContext): Promise<void> {
   }
 
   if (kindOf.size === 0) {
+    /*
+     * Rewritten to be actionable by whoever can actually fix it.
+     *
+     * The old wording — "check the names against classifyCalendar()" — names an
+     * internal function, so the only person who could act on it was a developer
+     * reading this file. Meanwhile it fired every night, because the onboarding
+     * sub-account holds one personal calendar and nothing else. An alert that
+     * recurs forever and tells its reader to inspect source code is one nobody
+     * will action, and this one has not been actioned.
+     *
+     * Both real outcomes are stated, because "no calendar matches" has two very
+     * different causes and the fix differs completely.
+     */
     ctx.recordError(
-      'No calendar in the onboarding sub-account looks like an onboarding or ' +
-        'launch call. Check the names against classifyCalendar().',
-      { seen: calendars.map((calendar) => calendar.name) },
+      'The onboarding sub-account has no calendar that looks like an ' +
+        'onboarding or launch call, so this sync can never find anything. ' +
+        'Either onboarding and launch calls are booked somewhere this cannot ' +
+        'see — in which case point it at the right sub-account — or they are ' +
+        'not booked in GoHighLevel at all, in which case retire this sync ' +
+        'rather than leave it alerting. Calendars actually present are listed ' +
+        'below.',
+      { calendars_present: calendars.map((calendar) => calendar.name) },
     );
     return;
   }
