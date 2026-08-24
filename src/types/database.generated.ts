@@ -1,10 +1,3 @@
-/*
- * Generated from the live database. Do not edit by hand.
- *
- * Regenerate after any migration; the app's Supabase clients are typed from
- * this file, so a column added in SQL and not regenerated here is invisible to
- * the compiler and fails at runtime instead.
- */
 export type Json =
   | string
   | number
@@ -390,6 +383,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "appointment_ledger"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_reschedule_of_fkey"
+            columns: ["reschedule_of"]
+            isOneToOne: false
+            referencedRelation: "unbilled_backlog"
+            referencedColumns: ["ledger_id"]
           },
         ]
       }
@@ -2677,6 +2677,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      practice_rate_card: {
+        Row: {
+          client_id: string | null
+          confidence: string | null
+          implied_base_cents: number | null
+          lines_at_this_rate: number | null
+          lines_total: number | null
+          practice: string | null
+          unit_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unbilled_backlog: {
+        Row: {
+          age_band: string | null
+          appointment_at: string | null
+          client_id: string | null
+          client_status: Database["public"]["Enums"]["client_status"] | null
+          days_old: number | null
+          est_value_cents: number | null
+          is_aged: boolean | null
+          ledger_id: string | null
+          patient_name: string | null
+          practice: string | null
+          rate_basis: string | null
+          rate_confidence: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"

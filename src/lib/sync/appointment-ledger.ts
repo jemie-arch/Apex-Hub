@@ -148,4 +148,76 @@ export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
       );
     }
   }
+
+  await reportUnbilledBacklog(ctx, db);
+}
+
+/**
+ * What the delivered-but-uninvoiced work is worth, and how old it is.
+ *
+ * The count alone was already on screen. The value was not, because until Stripe
+ * was in the database there was no way to price an appointment — the PPS audit
+ * concluded the rate was unrecoverable, and from Make and GoHighLevel alone it
+ * was. It is recoverable from what was actually charged.
+ *
+ * Age is the part that makes this a finding rather than a number. A show from
+ * last week sitting unbilled is billing in progress. A show from December is
+ * not, and one total covering both hides it: when this was written 28 of 489
+ * unbilled shows were inside two weeks and 116 were over six months old.
+ *
+ * Only the aged portion is recorded as an error. Alerting on the whole backlog
+ * would fire every night forever, because there is always work mid-billing.
+ */
+async function reportUnbilledBacklog(
+  ctx: SyncContext,
+  db: ReturnType<typeof serviceClient>,
+): Promise<void> {
+  const backlog = await db
+    .from('unbilled_backlog')
+    .select('est_value_cents, is_aged, age_band, rate_basis');
+  if (backlog.error) throw backlog.error;
+
+  const rows = backlog.data ?? [];
+  if (rows.length === 0) return;
+
+  const byBand = new Map<string, number>();
+  let agedRows = 0;
+  let agedCents = 0;
+  let totalCents = 0;
+  let assumedRows = 0;
+
+  for (const row of rows) {
+    const band = row.age_band ?? 'unbanded';
+    byBand.set(band, (byBand.get(band) ?? 0) + 1);
+    totalCents += row.est_value_cents ?? 0;
+    if (row.rate_basis === 'fleet assumption') assumedRows += 1;
+    if (row.is_aged) {
+      agedRows += 1;
+      agedCents += row.est_value_cents ?? 0;
+    }
+  }
+
+  ctx.note('unbilled_backlog', {
+    rows: rows.length,
+    estimated_cents: totalCents,
+    aged_rows: agedRows,
+    aged_cents: agedCents,
+    /*
+     * Surfaced because it bounds how much the figure can be trusted. A practice
+     * with no charge history has no rate of its own, so its rows are priced from
+     * the fleet mode — a real estimate, but not a measured one.
+     */
+    priced_by_assumption: assumedRows,
+    by_age: Object.fromEntries([...byBand.entries()]),
+  });
+
+  if (agedRows > 0) {
+    ctx.recordError(
+      `${agedRows} delivered consultation(s) worth an estimated ` +
+        `$${(agedCents / 100).toFixed(2)} are over 30 days old with no ` +
+        'matching charge. This is an estimate of exposure, not confirmed ' +
+        'receivable — see the unbilled_backlog view for the per-practice split.',
+      { rows: agedRows, cents: agedCents },
+    );
+  }
 }

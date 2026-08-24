@@ -59,7 +59,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
     to: single(searchParams['to']),
   });
 
-  const [ledger, exceptions, charges, chargeExceptions] = await Promise.all([
+  const [ledger, exceptions, charges, chargeExceptions, backlog] = await Promise.all([
     db
       .from('appointment_ledger')
       .select(
@@ -87,12 +87,59 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
       .select('stripe_payment_intent_id, practice, patient_name, occurred_at, line_amount_cents, exception, severity')
       .order('severity')
       .limit(200),
+    /*
+     * The backlog with a price on it, and deliberately NOT restricted to the
+     * selected date range. Ageing is the whole point: a show from December is
+     * the finding, and a range filter would hide exactly the rows that matter
+     * while showing the ones that are merely mid-billing.
+     */
+    db
+      .from('unbilled_backlog')
+      .select('practice, client_status, est_value_cents, days_old, age_band, rate_basis, is_aged'),
   ]);
 
   if (ledger.error) throw ledger.error;
   if (exceptions.error) throw exceptions.error;
   if (charges.error) throw charges.error;
   if (chargeExceptions.error) throw chargeExceptions.error;
+  if (backlog.error) throw backlog.error;
+
+  /*
+   * Grouped by practice, aged rows only, biggest first. The value is an estimate
+   * derived from what each practice has actually been charged — so it is priced,
+   * not guessed, but it is still exposure rather than confirmed receivable.
+   */
+  const backlogRows = (backlog.data ?? []).filter((row) => row.is_aged);
+  const backlogCents = backlogRows.reduce(
+    (sum, row) => sum + (row.est_value_cents ?? 0),
+    0,
+  );
+  const backlogAssumed = backlogRows.filter(
+    (row) => row.rate_basis === 'fleet assumption',
+  ).length;
+
+  const byPractice = new Map<
+    string,
+    { practice: string; shows: number; cents: number; oldest: number; assumed: boolean }
+  >();
+  for (const row of backlogRows) {
+    const key = row.practice ?? 'unknown';
+    const entry = byPractice.get(key) ?? {
+      practice: key,
+      shows: 0,
+      cents: 0,
+      oldest: 0,
+      assumed: false,
+    };
+    entry.shows += 1;
+    entry.cents += row.est_value_cents ?? 0;
+    entry.oldest = Math.max(entry.oldest, row.days_old ?? 0);
+    if (row.rate_basis === 'fleet assumption') entry.assumed = true;
+    byPractice.set(key, entry);
+  }
+  const backlogByPractice = [...byPractice.values()]
+    .sort((a, b) => b.cents - a.cents)
+    .slice(0, 12);
 
   const chargeRows = chargeExceptions.data ?? [];
   const unevidenced = chargeRows.filter((row) => (row.severity ?? 9) <= 1);
@@ -300,6 +347,74 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
                       {formatMoneyCompact(row.line_amount_cents ?? 0)}
                     </td>
                     <td className="px-4 py-3 text-fg-muted">{row.exception}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {backlogByPractice.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+              <AlertTriangle size={14} className="text-warning" /> Delivered over
+              30 days ago, still no matching charge
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              {formatCount(backlogRows.length)} consultation
+              {backlogRows.length === 1 ? '' : 's'} worth an estimated{' '}
+              <b>{formatMoneyCompact(backlogCents)}</b>, priced from what each
+              practice has actually been charged. Deliberately not filtered by the
+              date range above — age is the finding, and a range filter would hide
+              the oldest rows.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              This is an estimate of <b>exposure, not confirmed receivable</b>. A
+              row appears here because no successful Stripe charge could be matched
+              to it, which does not prove it was never invoiced — it may have been
+              billed outside Stripe, waived, or covered by a retainer.
+              {backlogAssumed > 0 && (
+                <>
+                  {' '}
+                  {formatCount(backlogAssumed)} row
+                  {backlogAssumed === 1 ? ' is' : 's are'} priced from the fleet
+                  rate because that practice has no charge history of its own.
+                </>
+              )}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">Practice</th>
+                  <th className="px-4 py-3 font-medium">Shows</th>
+                  <th className="px-4 py-3 font-medium">Estimated value</th>
+                  <th className="px-4 py-3 font-medium">Oldest</th>
+                  <th className="px-4 py-3 font-medium">Rate basis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {backlogByPractice.map((row) => (
+                  <tr
+                    key={row.practice}
+                    className="row-interactive border-b border-line last:border-0 hover:bg-surface-hover"
+                  >
+                    <td className="px-4 py-3 text-fg">{row.practice}</td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {formatCount(row.shows)}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {formatMoneyCompact(row.cents)}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {row.oldest} days
+                    </td>
+                    <td className="px-4 py-3 text-fg-subtle">
+                      {row.assumed ? 'partly assumed' : 'this practice'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
