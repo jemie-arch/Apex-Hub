@@ -84,7 +84,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
      */
     db
       .from('charge_exceptions')
-      .select('stripe_payment_intent_id, practice, patient_name, occurred_at, line_amount_cents, exception, severity')
+      .select('stripe_payment_intent_id, practice, patient_name, candidate_name, occurred_at, line_amount_cents, exception, severity')
       .order('severity')
       .limit(200),
     /*
@@ -143,6 +143,13 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
 
   const chargeRows = chargeExceptions.data ?? [];
   const unevidenced = chargeRows.filter((row) => (row.severity ?? 9) <= 1);
+  /*
+   * Held separately because the fix is different and cheap: correct the spelling
+   * in the tracker and the charge reconciles itself. These are not disputes.
+   */
+  const misspelled = chargeRows.filter(
+    (row) => row.exception === 'name may be spelled differently in the tracker',
+  );
   const unevidencedCents = unevidenced.reduce(
     (sum, row) => sum + (row.line_amount_cents ?? 0),
     0,
@@ -347,6 +354,55 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
                       {formatMoneyCompact(row.line_amount_cents ?? 0)}
                     </td>
                     <td className="px-4 py-3 text-fg-muted">{row.exception}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {misspelled.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-sm font-semibold text-fg">
+              Same patient, spelled two ways
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              The charge and the tracker disagree on the spelling, so nothing
+              could pair them. Correcting the tracker reconciles these without
+              any billing change — they are not disputes. Only names sharing a
+              first initial or first-name spelling appear here; a shared surname
+              alone is treated as a different person, because at a practice it
+              usually is one.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">Practice</th>
+                  <th className="px-4 py-3 font-medium">Charged as</th>
+                  <th className="px-4 py-3 font-medium">Tracker has</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {misspelled.map((row) => (
+                  <tr
+                    key={`${row.stripe_payment_intent_id}-${row.patient_name}`}
+                    className="border-b border-line last:border-0"
+                  >
+                    <td className="px-4 py-3 text-fg">{row.practice}</td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {row.patient_name}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {row.candidate_name ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {formatMoneyCompact(row.line_amount_cents ?? 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

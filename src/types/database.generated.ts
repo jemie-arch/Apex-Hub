@@ -2665,6 +2665,7 @@ export type Database = {
       }
       charge_exceptions: {
         Row: {
+          candidate_name: string | null
           client_id: string | null
           exception: string | null
           line_amount_cents: number | null
