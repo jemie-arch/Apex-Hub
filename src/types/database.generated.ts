@@ -1764,6 +1764,41 @@ export type Database = {
           },
         ]
       }
+      included_calendars: {
+        Row: {
+          calendar_name: string
+          client_id: string
+          confirmed_by: string
+          crm_calendar_id: string | null
+          included_at: string
+          reason: string
+        }
+        Insert: {
+          calendar_name: string
+          client_id: string
+          confirmed_by: string
+          crm_calendar_id?: string | null
+          included_at?: string
+          reason: string
+        }
+        Update: {
+          calendar_name?: string
+          client_id?: string
+          confirmed_by?: string
+          crm_calendar_id?: string | null
+          included_at?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null

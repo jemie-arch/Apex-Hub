@@ -129,7 +129,11 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
    * bookable at all. Since the listing is already fetched here to tell a quiet
    * fortnight from a missing calendar, keeping the names costs nothing.
    */
-  const missingCalendar: { practice: string; has: string[] }[] = [];
+  const missingCalendar: {
+    clientId: string;
+    practice: string;
+    has: string[];
+  }[] = [];
 
   /*
    * Calendars that pass the name test and still are not consultations.
@@ -152,7 +156,63 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     (excluded.data ?? []).map((row) => row.crm_calendar_id),
   );
 
+  /*
+   * The other direction: consultation calendars the name rule wrongly removes.
+   *
+   * The name rule has to stay strict — loosening it is what let 1,026 of 2,411
+   * appointments in from mirrors and personal calendars. But a calendar can be a
+   * genuine new-patient consultation and simply be named something else. Kind
+   * Dental's is called "Ortho & New Patient Exam | Dr. Vohra": Active, publicly
+   * bookable, on a real PatientSync chair, and invisible here for months while
+   * the practice accrued 32 tracker rows and 10 charges.
+   *
+   * Keyed per client, because a name that means "consultation" at one practice
+   * means nothing at another. Matched on name, with id as an alternative when
+   * one has been recorded — see the table comment for why name comes first.
+   */
+  const included = await db
+    .from('included_calendars')
+    .select('client_id, calendar_name, crm_calendar_id');
+  if (included.error) throw included.error;
+
+  const includedNamesByClient = new Map<string, Set<string>>();
+  const includedIdsByClient = new Map<string, Set<string>>();
+
+  for (const row of included.data ?? []) {
+    if (!row.client_id) continue;
+    const names =
+      includedNamesByClient.get(row.client_id) ??
+      new Set<string>();
+    names.add(row.calendar_name.trim().toLowerCase());
+    includedNamesByClient.set(row.client_id, names);
+
+    if (row.crm_calendar_id) {
+      const ids = includedIdsByClient.get(row.client_id) ?? new Set<string>();
+      ids.add(row.crm_calendar_id);
+      includedIdsByClient.set(row.client_id, ids);
+    }
+  }
+
+  /*
+   * Which practices actually bill per consultation.
+   *
+   * A charge carrying consultation names is a pay-per-show charge; a
+   * "Subscription" charge is a retainer. The distinction decides whether a
+   * missing calendar costs anybody money, and without it this sync was
+   * escalating retainer clients and dormant accounts at the same severity as a
+   * practice whose consultations were genuinely vanishing.
+   */
+  const billedPerConsult = await db
+    .from('billing_charges')
+    .select('client_id')
+    .eq('outcome', 'succeeded')
+    .not('client_id', 'is', null)
+    .not('consult_names', 'is', null);
+  if (billedPerConsult.error) throw billedPerConsult.error;
+
   let skippedByCalendar = 0;
+  /** Calendars read only because they were named in included_calendars. */
+  let admittedByOverride = 0;
 
   for (const client of clients.data ?? []) {
     if (!client.crm_location_id) continue;
@@ -172,9 +232,21 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
          * would read as a practice with no bookings at all. Filtering here also
          * saves a request per mirror.
          */
-        (calendar) =>
-          isConsultationCalendar(calendar) &&
-          !excludedCalendars.has(calendar.id),
+        (calendar) => {
+          // Exclusion wins over everything. A calendar somebody deliberately
+          // removed stays removed even if it is also named as an override.
+          if (excludedCalendars.has(calendar.id)) return false;
+
+          if (isConsultationCalendar(calendar)) return true;
+
+          const name = (calendar.name ?? '').trim().toLowerCase();
+          const admitted =
+            includedNamesByClient.get(client.id)?.has(name) === true ||
+            includedIdsByClient.get(client.id)?.has(calendar.id) === true;
+
+          if (admitted) admittedByOverride += 1;
+          return admitted;
+        },
       );
     } catch (error) {
       // One client's dead token must not stop the other twenty.
@@ -208,8 +280,22 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
        */
       try {
         const calendars = await listCalendars(client.id, client.crm_location_id);
-        if (!calendars.some(isConsultationCalendar)) {
+        // An override counts as having one. Otherwise a practice whose only
+        // consultation calendar is admitted by name would be reported missing
+        // forever, and the alert would contradict the table that fixed it.
+        const overrideNames = includedNamesByClient.get(client.id);
+        const overrideIds = includedIdsByClient.get(client.id);
+        const hasOne = calendars.some(
+          (calendar) =>
+            isConsultationCalendar(calendar) ||
+            overrideNames?.has((calendar.name ?? '').trim().toLowerCase()) ===
+              true ||
+            overrideIds?.has(calendar.id) === true,
+        );
+
+        if (!hasOne) {
           missingCalendar.push({
+            clientId: client.id,
             practice: client.name,
             has: calendars
               .map((calendar) => (calendar.name ?? '').trim())
@@ -471,6 +557,10 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
    */
   ctx.note('mirror_calendars_skipped', excludedCalendars.size);
 
+  if (admittedByOverride > 0) {
+    ctx.note('calendars_admitted_by_override', admittedByOverride);
+  }
+
   if (skippedByCalendar > 0) {
     ctx.recordError(
       `${skippedByCalendar} event(s) came back from a calendar that was ` +
@@ -494,18 +584,60 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     const renameable = missingCalendar.filter((row) => row.has.length > 0);
     const empty = missingCalendar.filter((row) => row.has.length === 0);
 
-    ctx.recordError(
-      `${missingCalendar.length} practice(s) have no calendar whose name ends ` +
-        '"Booking Calendar", so no consultations were read for them. ' +
-        `${renameable.length} hold calendars under other names and can be fixed ` +
-        `by renaming; ${empty.length} hold no calendars at all and need one ` +
-        'created.',
-      {
-        renameable: renameable.map(
-          (row) => `${row.practice}: ${row.has.join(' | ')}`,
-        ),
-        no_calendars_at_all: empty.map((row) => row.practice),
-      },
+    /*
+     * Only a practice billed per consultation loses money by having no readable
+     * calendar. A GoHighLevel audit on 2026-08-24 walked all five this alert was
+     * naming and only one was a real fault:
+     *
+     *   Kind Dental          real consultation calendar, wrongly named  -> fixed
+     *   Skyline Implants     plausible calendar, no appointment since 2024
+     *   Habib Dental         dormant, bookings went to a personal calendar
+     *   Natalie Yang Ortho   retainer client, $500/month subscription
+     *   HIP Creative, Inc.   a marketing agency, not a dental practice
+     *
+     * Firing at severity for all five taught whoever read it that this alert
+     * does not mean anything. So the alert now escalates only practices that
+     * actually bill per consultation, and logs the rest.
+     */
+    const perConsult = new Set(
+      (billedPerConsult.data ?? []).flatMap((row) =>
+        row.client_id ? [row.client_id] : [],
+      ),
     );
+    const costly = missingCalendar.filter((row) => perConsult.has(row.clientId));
+    const harmless = missingCalendar.filter(
+      (row) => !perConsult.has(row.clientId),
+    );
+
+    if (costly.length > 0) {
+      ctx.recordError(
+        `${costly.length} practice(s) billed per consultation have no readable ` +
+          'calendar, so their consultations are not being captured at all. ' +
+          `${costly.filter((r) => r.has.length > 0).length} hold calendars ` +
+          'under other names — confirm one is a new-patient consultation and ' +
+          'add it to included_calendars; the rest need a calendar created.',
+        {
+          practices: costly.map(
+            (row) =>
+              `${row.practice}: ${row.has.length > 0 ? row.has.join(' | ') : 'no calendars at all'}`,
+          ),
+        },
+      );
+    }
+
+    if (harmless.length > 0) {
+      ctx.log(
+        `${harmless.length} practice(s) have no readable calendar but are not ` +
+          'billed per consultation — retainer clients, dormant accounts and ' +
+          'non-practices. Nothing is being lost: ' +
+          harmless.map((row) => row.practice).join(', ') +
+          '.',
+      );
+    }
+
+    ctx.note('no_calendar_costly', costly.length);
+    ctx.note('no_calendar_harmless', harmless.length);
+    ctx.note('no_calendar_renameable', renameable.length);
+    ctx.note('no_calendar_empty', empty.length);
   }
 }

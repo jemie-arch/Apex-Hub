@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterPillLinks } from '@/components/ui/FilterPills';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill, clientStatusTone } from '@/components/ui/StatusPill';
 import { tenant, titleCase } from '@/config/tenant.config';
@@ -28,6 +29,39 @@ function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/**
+ * The tabs, and why they are these five.
+ *
+ * client_status has exactly four values, and 'all' is the unfiltered view. The
+ * tab that is easy to leave out is Onboarding: 19 businesses sit there, and
+ * without a tab of their own they would only ever be visible under All while
+ * every other status got a filter. A tab set that hides its largest minority is
+ * worse than no tabs.
+ *
+ * Two of these will read nought today, and that is the honest state rather than
+ * a bug to hide. refresh_client_statuses() only ever moves a group between
+ * 'active' and 'onboarding' — nothing derives 'paused' or 'churned', so they are
+ * only ever set by hand. Every group currently marked paused is one of Apex's
+ * own internal sub-accounts, and those are already excluded from this page. The
+ * tabs are still right to have: they are where a paused or churned client shows
+ * up the moment somebody marks one, instead of vanishing into All.
+ */
+const STATUS_TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'onboarding', label: 'Onboarding' },
+  { key: 'paused', label: 'Paused' },
+  { key: 'churned', label: 'Churned' },
+] as const;
+
+type StatusTab = (typeof STATUS_TABS)[number]['key'];
+
+function resolveTab(value: string | undefined): StatusTab {
+  return STATUS_TABS.some((tab) => tab.key === value)
+    ? (value as StatusTab)
+    : 'all';
+}
+
 export default async function ClientsPage({ searchParams }: PageProps) {
   const range = resolveRange({
     preset: single(searchParams['preset']),
@@ -35,15 +69,47 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     to: single(searchParams['to']),
   });
 
-  const rollups = await getGroupRollups(range);
+  const allRollups = await getGroupRollups(range);
   const client = tenant.vocabulary.client;
   const location = tenant.vocabulary.location;
   const booking = tenant.vocabulary.booking;
 
-  const active = rollups.filter((r) => r.group.status === 'active').length;
-  const onboarding = rollups.filter(
-    (r) => r.group.status === 'onboarding',
-  ).length;
+  const tab = resolveTab(single(searchParams['status']));
+
+  /*
+   * Counted off the unfiltered set, so every tab shows its own size whichever
+   * one is open. A count that only appears once you are already looking at the
+   * tab is not much of a filter.
+   */
+  const countFor = (key: StatusTab): number =>
+    key === 'all'
+      ? allRollups.length
+      : allRollups.filter((r) => r.group.status === key).length;
+
+  const rollups =
+    tab === 'all'
+      ? allRollups
+      : allRollups.filter((r) => r.group.status === tab);
+
+  /*
+   * The date range is carried through, because the two controls answer different
+   * questions and dropping one when you press the other is how a filter becomes
+   * annoying. Status stays out of the URL on 'all' so the default has a clean
+   * link.
+   */
+  const hrefFor = (key: StatusTab): string => {
+    const params = new URLSearchParams();
+    for (const field of ['preset', 'from', 'to'] as const) {
+      const value = single(searchParams[field]);
+      if (value) params.set(field, value);
+    }
+    if (key !== 'all') params.set('status', key);
+    const query = params.toString();
+    return query ? `/clients?${query}` : '/clients';
+  };
+
+  const active = countFor('active');
+  const onboarding = countFor('onboarding');
 
   return (
     <>
@@ -61,7 +127,37 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         actions={<DateRangePicker />}
       />
 
-      {rollups.length === 0 ? (
+      <div className="mb-4">
+        <FilterPillLinks
+          options={STATUS_TABS.map((option) => ({
+            key: option.key,
+            label: option.label,
+            count: countFor(option.key),
+          }))}
+          value={tab}
+          hrefFor={hrefFor}
+        />
+      </div>
+
+      {/*
+        Two different empty states. "No clients yet" means the sync has never
+        run and is a setup problem; an empty tab means this status simply has
+        nobody in it, which for paused and churned is the normal case. Showing
+        the setup message on an empty tab would send somebody to re-run a sync
+        that is working fine.
+      */}
+      {allRollups.length > 0 && rollups.length === 0 ? (
+        <EmptyState
+          title={`No ${client.plural} are ${tab}`}
+          description={
+            tab === 'paused' || tab === 'churned'
+              ? `Nothing derives "${tab}" — it is only ever set by hand, so this ` +
+                'stays empty until somebody marks a business that way.'
+              : `No ${client.plural} currently hold this status.`
+          }
+          icon={<Users size={22} />}
+        />
+      ) : rollups.length === 0 ? (
         <EmptyState
           title={`No ${client.plural} yet`}
           description={
