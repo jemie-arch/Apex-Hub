@@ -494,3 +494,51 @@ Three Stripe invoice generators (four Stripe calls each plus a HighLevel contact
 search), one direct-booking sheet writer for Best Care Dental, and a two-call Stripe
 fragment for Village Dental. None active. Recorded so nobody counts them as live
 automation, and so that whoever eventually wires up invoicing knows these exist.
+
+---
+
+# The detector hole is closed
+
+Finding Art of Smile by hand was luck — a shape audit noticed thirteen sheet
+operations where the standard is eight. The findings view itself could never have
+found it, and the reason is a single word in the SQL:
+
+```
+join owners o on o.sheet_id = t.spreadsheet_id
+```
+
+`owners` is the set of files that are some scenario's primary target. An inner join
+means a module writing into a file **nobody owns** produces no row at all. The
+detector could only ever see a write that landed in another practice's sheet.
+
+That is backwards. A write into a known practice's file at least lands where somebody
+is looking. A write into an unowned file lands where nobody is.
+
+`writes_to_unowned_sheet` now covers it, severity 1. It fires exactly once across all
+56 scenarios — Art of Smile — so it closes the hole without adding noise.
+
+Findings: **10 → 11**.
+
+| Finding | Count | Practices |
+|---|---|---|
+| misdirected_write | 6 | Kind Dental · SMYLE East Meadows · Team Dental Swedesboro |
+| padded_id | 2 | Dental Solutions |
+| read_write_split | 1 | Z. Eagle Creek Dentistry |
+| shared_sheet | 1 | OC Healthy Smiles & Z. Stanton Dental Care |
+| **writes_to_unowned_sheet** | **1** | **Art of Smile** |
+
+## Correcting the older-generation count
+
+I wrote "eleven" above. It is **twelve** active scenarios on the older three-operation
+shape — the shape table listed Z. Snyder separately and I read past it.
+
+Of the twelve: Test Clinic is not a practice, and three are `Z.`-marked as finished
+(Eagle Creek, Snyder, Stanton). That leaves **eight** practices whose bookings never
+captured campaign, ad set, ad id or offer name:
+
+Best Care Dental · DNA Dental Studio · Dental Design Studios · Glamorous Smile Dental
+Spa · OC Healthy Smiles · Ofir Orthodontics · Royal Dentistry Studio · Smile Now Align
+
+Attribution reporting across those eight is reading blanks as absences. Two of them —
+Best Care and Ofir — are also the pair `0001_init.sql` records as having no client in
+the CRM at all.
