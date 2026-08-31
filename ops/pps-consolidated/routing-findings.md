@@ -244,57 +244,53 @@ authoritative while being wrong — worse than having none.
 
 ---
 
-# Has any of it actually executed?
+# Did the misdirected writes ever run? Still unanswered
 
-The reconciliation page says plainly that a wrong-target finding proves the
-configuration is wrong and not that rows have moved, and that Make's execution
-list cannot settle it. That is correct. But there is a second place to look.
+I thought I had a way to check this and I was wrong. Recording the attempt because
+the reasoning error is worth not repeating.
 
-Every booking row carries the GoHighLevel **location name** into column R. So a
-row sitting in one practice's tracker while naming a different practice is a write
-that happened. `tracker_foreign_rows` is that check, over all 1,281 tracker rows —
-every one of which has the field populated, so a clean result means something.
+**The idea.** `scenario_sheet_findings` reads Make's configuration and can only say
+a scenario *points* at the wrong sheet. Every booking row carries its GoHighLevel
+location name, so — I reasoned — a row sitting in one practice's sheet while naming
+a different practice would be a write that had actually landed in the wrong file.
 
-## What it found
+**Why it does not work.** `tracker_appointments` is not per-practice stat sheets.
+It is a single Client Fulfilment Tracker. `source_row integer not null unique` says
+so plainly, and I read past it. `location_name` is the practice as that one
+spreadsheet spells it, and `client_id` is a name match the Hub makes on import.
 
-| Sheet | Row says it came from | Rows | Period |
-|---|---|---|---|
-| TMJ Sleep Airway Orthodontics - Williston | Airway Orthodontics - VT | 15 | Apr–Jun |
-| TMJ Sleep Airway Orthodontics - Gainesville | Airway Orthodontics - GNV | 10 | Jun–Jul |
-| TMJ Sleep Airway Orthodontics - New York | Airway Orthodontics - NY | 1 | Apr |
-| Art Of Smile: Center for Cosmetic Orthodontics | Art of Smile | 22 | May–Aug |
-| Team Dental N. Liberties | Team Dental N. Liberties Apex | 5 | May–Jul |
-| Team Dental Swedesboro | Team Dental Swedesboro Apex | 3 | Jun–Jul |
-| **Kind Dental** | **Kind Dental (General Dentistry)** | **1** | **20 Aug** |
+So the mismatches I found were the Hub's name matching, not misdirected writes. Six
+of the seven are the alias list **already written into `0001_init.sql`** — mapping
+"Airway Orthodontics - GNV" to Gainesville, "Art of Smile" to the full trading name,
+the "... Apex" suffixes home. I rediscovered an existing table and reported it as
+new evidence.
 
-Six of the seven are **one clinic under two naming conventions** — the Hub and
-GoHighLevel simply disagree on what to call it. Nothing is misrouted.
+The seventh, a "Kind Dental (General Dentistry)" row attributed to Kind Dental, is
+the same class — most likely left over from the earlier matching rule that dropped
+everything after the first bracket, which is the rule `0001` replaced *because* it
+merged distinct practices. There is no unaudited misdirect behind it: scenario
+`5972241`, Kind Dental (GD), points every module at its own sheet. I checked.
 
-Those six are also **independent corroboration of the six inferred routing rows**
-filed earlier. I matched "Airway Orthodontics - GNV" to Gainesville by reading an
-abbreviation; the tracker shows GNV-labelled bookings physically landing in the
-Gainesville client's sheet, from a source that had nothing to do with how I
-matched them. Those proposals are now considerably better than a good guess —
-though somebody should still open the sheets before ticking them off.
+The view has been dropped. Nothing replaces it, because this table cannot answer
+the question.
 
-**One entry is a real cross-account write:** a booking from Kind Dental (General
-Dentistry) sitting in Kind Dental's tracker, 20 Aug. One row. The direction is the
-*reverse* of the configured fault the audit found — the audit shows Kind Dental's
-module 15 writing into the GD sheet, and this row went the other way. So either the
-GD scenario has its own misdirect that has not been audited, or the two accounts
-share something upstream. One row, but worth ten minutes.
+## What survives
 
-## What this does not prove, and I want to be exact
+**The inferred routing matches are corroborated, but not by me.** `0001_init.sql`
+already contains the same conclusions, reached by whoever wrote it, with the same
+reasoning — including that Williston is the only real Vermont town among the Airway
+locations, and that Ponte Vedra has no tracker rows at all. Five of my six
+`inferred` rows were already established there. That is genuine support for them; it
+is just older than my work, not independent of it.
 
-**City Dental Centers has 170 tracker rows, all carrying a location name, and zero
-foreign.** So no Kind Dental booking has been *appended* to City Dental's sheet.
+That same comment records "Best Care Dental" and "Ofir Orthodontics" as names with
+no candidate anywhere in the CRM — which matches what I found separately about Best
+Care Dental having a live scenario and no client record.
 
-That is not the same as City Dental's sheet being uncorrupted, and the difference
-matters. Kind Dental's two misdirected modules are `updateRow`, not `addRow`. An
-updateRow writes one cell into an existing row, addressed by a row number worked
-out against a *different* spreadsheet — so it overwrites whichever City Dental
-patient happens to occupy that row number, and changes no name. This method is
-blind to that by construction.
+## What is still open
 
-Answering it needs the spreadsheet's own revision history, which is outside
-anything I can reach. Flagging it rather than reporting City Dental clean.
+Whether the misdirected `updateRow` modules on Kind Dental and Team Dental
+Swedesboro have ever fired. They overwrite one cell in an existing row of another
+practice's sheet, addressed by a row number computed against a different file, and
+they change no name — so nothing in the Hub can see them. It needs the receiving
+spreadsheet's own revision history, in Google Sheets.

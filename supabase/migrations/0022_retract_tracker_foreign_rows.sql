@@ -1,0 +1,31 @@
+-- Withdraw tracker_foreign_rows. Its premise was wrong.
+--
+-- It was built to answer "did the misdirected Make writes actually run", on the
+-- belief that tracker_appointments held per-practice stat sheets and that a row
+-- naming a different practice than the sheet it sat in was a write that had
+-- landed in the wrong file.
+--
+-- tracker_appointments is not per-practice sheets. It is one Client Fulfilment
+-- Tracker — source_row is globally unique, which should have been the tell —
+-- where location_name is the practice as that spreadsheet spells it and
+-- client_id is a name match the Hub makes on import.
+--
+-- So every row the view returned was the name matching working, not a
+-- misdirected write. Worse, the six "findings" are the alias list already
+-- written into 0001_init.sql, which maps "Airway Orthodontics - GNV" to
+-- Gainesville, "Art of Smile" to the full trading name, and the "... Apex"
+-- suffixes home. The view rediscovered an existing table and reported it as
+-- evidence.
+--
+-- The seventh, "Kind Dental (General Dentistry)" attributed to Kind Dental, is
+-- the same class: an artefact of practice-name matching, most likely left from
+-- the earlier squash rule that dropped everything after the first bracket —
+-- the rule 0001 replaced precisely because it merged distinct practices. It is
+-- not a cross-account write, and there is no unaudited misdirect behind it. The
+-- Kind Dental (GD) scenario 5972241 points every one of its modules at its own
+-- sheet.
+--
+-- Dropped rather than corrected because there is nothing to correct: this table
+-- cannot answer the question. Whether the misdirected updateRow modules have
+-- fired remains open, and needs the receiving spreadsheet's revision history.
+drop view if exists tracker_foreign_rows;
