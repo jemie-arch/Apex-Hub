@@ -71,34 +71,55 @@ piece of work exists to stop.
 The distinction is the point: a deliberate switch-off is quiet, an unconfigured
 clinic is loud.
 
-## BLOCKER — the stat sheets do not share a column layout
+## The column-layout problem, and how it was solved
 
-The consolidated scenario maps values by column **index**, which requires every
-target sheet to have identical columns. They do not. Measured across 118 fetched
-blueprints:
+Index-based mapping requires every target sheet to have identical columns. They
+do not. Extracting the header lists straight out of the blueprints — Make stores
+them verbatim in each `addRow` module's `metadata` — gives **three** layouts:
 
-| Column carrying "Offer Name" | Blueprints |
-|---|---|
-| `AD` | 832 |
-| `AA` | 114 |
+| | Layout 1 | Layout 2 | Layout 3 |
+|---|---|---|---|
+| Columns | 30 | 28 | 33 |
+| Scenarios | 41 | 8 | 2 |
+| index 22 | Date Booked | **Make Remarks** | Date Booked |
+| index 24 | Campaign Name | **Ad Set ID** | Campaign Name |
+| index 26 | Ad Set Name | **Offer Name** | Ad Set Name |
+| index 28–29 | Ad Name, Offer Name | *past end of sheet* | Ad Name, Offer Name |
 
-and 22 blueprints carry a `First Called` column that the others lack.
+Columns A–V (indices 0–21) are **identical in all three**. They diverge only
+from index 22.
 
-Index 29 is column AD. So the current mapping is right for the newer layout and
-writes past the end of the older one. **Do not activate against the whole estate
-until this is resolved.** Two ways:
+So the original index mapping would have written `utmMedium` into layout 2's
+**Offer Name** column, and indices 28–29 past the end of the sheet entirely. For
+eight practices.
 
-1. **Map by header name** — set `useColumnHeaders: true` and key the `values`
-   collection on header strings rather than indices. Robust to layout drift,
-   which is the durable answer. It needs the exact header text, and some headers
-   contain awkward whitespace (`"CC On File\n (Y/N)"`), so it has to be taken
-   from a real sheet rather than typed from memory.
-2. **Standardise the sheets** to one layout first. More work, and it touches
-   live client sheets.
+**Resolved by mapping on header names** — `useColumnHeaders: true`, with the
+`values` collection keyed on the exact header strings taken from the blueprints
+rather than typed from memory. Position no longer matters, so all three layouts
+are written correctly by the same scenario.
 
-Option 1 is preferred. Until either is done, the consolidated scenario is safe
-only for clinics on the AD layout, and which clinic is on which is not yet
-recorded anywhere.
+The fourteen headers it writes exist in **all three** layouts: Name, Email,
+Phone, Date Added, App Date, Source, Appointment ID, Location Name, Location ID,
+Phone (+), Campaign ID, Ad Set ID, Ad ID, Offer Name.
+
+### What that costs, stated plainly
+
+Layout 1 and 3 have richer attribution columns — `Campaign Name`, `Ad Set Name`,
+`Ad Name`, `Date Booked` — that layout 2 lacks. Writing only the intersection
+means those four stop being filled for the 43 practices that have them.
+
+It also means the consolidated scenario inherits the **mislabelling** the audit
+found: `Ad Set ID` receives `utmMedium` and `Ad ID` receives `utmContent`, which
+are not ad-set or ad identifiers. Those are the columns that exist everywhere, so
+they are what the safe mapping can use. Propagating a known-wrong label was the
+lesser evil against writing into the wrong column for eight practices — but it
+is a compromise, not a fix.
+
+The clean end state is to standardise the eight layout-2 sheets onto layout 1,
+then restore the richer mapping (`utm_id` → Campaign ID, `campaign` → Campaign
+Name, `utmMedium` → Ad Set Name, `utmContent` → Ad Name). Module 3, the regex
+that extracts `utm_id`, is still in the scenario and currently unused — left in
+place deliberately, because that restoration is what it is for.
 
 ## The GoHighLevel side
 
@@ -119,6 +140,19 @@ until the cutover is proven.
 still has its own workflow pointing at its own webhook, so each needs its URL
 repointed once. That is one change per clinic — against maintaining five
 scenarios per clinic indefinitely.
+
+## Built so far
+
+| | |
+|---|---|
+| Scenario | **6046761** — `01 - PPS - New Appointment Booked [CONSOLIDATED]` |
+| State | inactive, `isinvalid: false` |
+| Webhook | id `2755826` — `https://hook.us2.make.com/wihxahuu2g8en7tcdslrvdg25i1v83ec` |
+| Routing store | `137975` (structure `472153`), 2 rows seeded of 56 needed |
+| Mapping | by header name, safe across all three sheet layouts |
+
+Event types 02, 03, 04 and 06 are not built. They follow the identical pattern:
+same webhook-per-type, same data-store lookup, same header-name mapping.
 
 ## Rollout order
 
