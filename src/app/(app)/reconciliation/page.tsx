@@ -67,6 +67,7 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
     chargeExceptions,
     backlog,
     scenarioFindings,
+    scenarioCoverage,
   ] =
     await Promise.all([
     db
@@ -147,6 +148,16 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
       )
       .eq('severity', 1)
       .order('practice'),
+    /*
+     * How much of the estate the panel below actually speaks for.
+     *
+     * Without this the panel reads as a complete verdict on the automations,
+     * when it only covers the scenarios that have been audited — and a clean
+     * row for a scenario nobody has read is the same mistake as treating an
+     * empty execution log as proof nothing ran. Cheap to state, expensive to
+     * leave implied.
+     */
+    db.from('scenario_sheet_targets').select('scenario_id, observed_at'),
   ]);
 
   if (ledger.error) throw ledger.error;
@@ -162,6 +173,15 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
    * reconcile a month's billing.
    */
   const misdirected = scenarioFindings.error ? [] : (scenarioFindings.data ?? []);
+
+  const coverageRows = scenarioCoverage.error ? [] : (scenarioCoverage.data ?? []);
+  const auditedScenarios = new Set(
+    coverageRows.map((row) => row.scenario_id),
+  ).size;
+  const lastAudited = coverageRows.reduce<string | null>((latest, row) => {
+    if (!row.observed_at) return latest;
+    return latest === null || row.observed_at > latest ? row.observed_at : latest;
+  }, null);
 
   /*
    * Grouped by practice, aged rows only, biggest first. The value is an estimate
@@ -501,6 +521,19 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
               have moved — whether a fault has executed has to be checked in the
               receiving sheet, because Make&rsquo;s execution list cannot answer
               it.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              Covers the <b>{formatCount(auditedScenarios)}</b> scenario
+              {auditedScenarios === 1 ? '' : 's'} read so far
+              {lastAudited
+                ? `, last on ${new Date(lastAudited).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}`
+                : ''}
+              . A scenario that has not been read does not appear here and is
+              not evidence of a clean one — run the scenario audit to widen it.
             </p>
           </div>
           <div className="overflow-x-auto">
