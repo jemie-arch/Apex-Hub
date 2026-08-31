@@ -294,3 +294,54 @@ Swedesboro have ever fired. They overwrite one cell in an existing row of anothe
 practice's sheet, addressed by a row number computed against a different file, and
 they change no name — so nothing in the Hub can see them. It needs the receiving
 spreadsheet's own revision history, in Google Sheets.
+
+---
+
+# Do the other event types misdirect too? A targeted sample says probably not
+
+Only type 01 has ever been audited for wrong-sheet writes. Types 02, 03, 04 and 06
+are ~226 more live scenarios nobody has checked. Reading all of them is a large
+spend, so rather than sample at random I went at the practices that **already have
+a type-01 fault** — faults cluster, and these clones were edited by the same hands.
+
+That gives 32 candidate scenarios across eight practices. I read the two with the
+strongest prior: Kind Dental's type 04 and type 06. Kind Dental's type-01 carries
+three misdirected modules, more than any other practice.
+
+**Both are clean.** Every sheet module in `4627528` (type 04) and `4627545`
+(type 06) points at `1AyUqTch…`, Kind Dental's own stat sheet.
+
+That is worth something. It suggests the misdirection is a property of **type 01**
+rather than of the practice — which is plausible on inspection: type 01 is the
+biggest scenario, eight sheet modules deep, and the one that has been revised
+repeatedly. Types 04 and 06 have two or three modules and far less edit history.
+
+**I stopped there rather than reading the remaining 30.** Two clean results against
+the strongest prior in the set moves the expected yield low enough that the reading
+cost is hard to justify without somebody deciding it is worth it. The list of 32 is
+above if that decision goes the other way.
+
+## Two real faults found on the way
+
+**The dead second route in type 04 is in the template, not a one-off.** Abraham
+Orthodontics and Kind Dental both have it: a router whose second branch filters on
+`contact_source` containing `Second_consultation` and then writes the *same three
+columns* to the *same row* as the unfiltered first branch. When the filter matches,
+both fire and write identically. Two for two suggests all 57 carry it. It does no
+damage — it just does nothing, while looking like it handles second consultations.
+
+**Type 06 has at least two variants, and one of them mis-files second-consult
+cancellations.** Abraham's (`3803591`) has a router: calendar name containing
+"Booking Calendar" writes `C` into column J, "Second_consultation" writes `C` into
+column K. Kind Dental's (`4627545`) has **no router at all** — one path, always
+writing `C` into column J.
+
+So at Kind Dental, cancelling a *second* consultation writes the cancellation into
+the *first* consultation's show column, overwriting whatever was there. A second
+consult that was attended and then had a follow-up cancelled would have its first
+consult marked cancelled.
+
+Which variant a practice has is not something you can see without opening it. Worth
+knowing: the consolidated type-06 scenario has no such branch to get wrong, because
+the Hub holds one row per appointment and the appointment id already says which
+consultation was cancelled.
