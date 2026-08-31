@@ -238,6 +238,24 @@ export function windsorCredentials(): WindsorCredentials {
   return { apiKey: env.WINDSOR_API_KEY, apiBase: env.WINDSOR_API_BASE };
 }
 
+/**
+ * An integration has no credentials, as opposed to broken ones.
+ *
+ * Exists so the nightly cycle can tell "nobody has set this up yet" apart from
+ * "this is failing". The difference matters more than it looks. Leaving an
+ * unconfigured sync out of the cycle means a manual step somebody has to
+ * remember months later; leaving it in means the cycle reports a failure every
+ * night, which is how a real failure stops being noticed. Neither is
+ * acceptable, so the runner treats this as a skip and the sync joins the cycle
+ * the moment its credentials exist, with no code change.
+ */
+export class NotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotConfiguredError';
+  }
+}
+
 export interface HubstaffCredentials {
   /**
    * Null once the seed has been removed from the environment, which is the

@@ -29,7 +29,7 @@
  * means to a person being paid; asking for a UTC instant would split somebody's
  * Friday evening across two periods depending on where they live.
  */
-import { hubstaffCredentials } from '@/lib/env';
+import { hubstaffCredentials, NotConfiguredError } from '@/lib/env';
 import { serviceClient } from '@/lib/supabase/service';
 
 /** Matches the agency-level row shape: no client, no location. */
@@ -245,7 +245,7 @@ async function accessToken(force = false): Promise<string> {
   const refresh = stored?.refreshToken ?? hubstaffCredentials().token;
 
   if (!refresh) {
-    throw new Error(
+    throw new NotConfiguredError(
       'Hubstaff has no refresh token: the database holds none and ' +
         'HUBSTAFF_TOKEN is not set. Create a personal access token in Hubstaff ' +
         'under Account then Personal access tokens and set HUBSTAFF_TOKEN to ' +
