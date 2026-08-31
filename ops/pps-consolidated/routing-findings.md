@@ -362,3 +362,69 @@ across every module, no padding, no read/write split.
 whole fleet of booking scenarios, misdirection is confined to Kind Dental, SMYLE
 Dental Centers East Meadows, Team Dental Swedesboro, Dental Solutions and Eagle
 Creek. That is now a complete statement about type 01 rather than a partial one.
+
+---
+
+# All 223 active scenarios, audited structurally, for no fetches at all
+
+I had been about to read 226 blueprints to check types 02, 03, 04 and 06. That was
+unnecessary. Make's **scenario list** already carries `usedModules` — the ordered
+list of every module in a scenario with its package. It does not carry spreadsheet
+ids, so it cannot find misdirection, but it finds something else: scenarios that are
+**shaped differently from their siblings**, which is where behaviour diverges.
+
+Grouping every active scenario by its module signature:
+
+| Type | Active | Distinct shapes |
+|---|---|---|
+| 02 CCM Show Tracker | 55 | **1** — completely uniform |
+| 03 CCM No Show Tracker | 55 | 2 |
+| 04 Appointment Update Form | 57 | 2 |
+| 06 Appointment Cancelled | 56 | **2, split almost evenly** |
+
+## The one that matters: half the fleet mis-files cancelled second consultations
+
+Type 06 exists in two shapes. Twenty-seven have a router that sends a cancelled
+*first* consultation to column J and a cancelled *second* consultation to column K.
+**Twenty-nine have no router at all** and write column J unconditionally.
+
+Verified by reading two of them in full — Kind Dental (`4627545`) and Dental
+Solutions (`4511141`). Both write `{"9": "C"}`, which is column J, First
+Consultation Show. Two of two, and all 29 share an identical module signature.
+
+So at these practices, cancelling a second consultation writes `C` over the **first**
+consultation's show status. A patient who attended their first consult and later
+cancelled a follow-up has their attended consult recorded as cancelled — which feeds
+the show rate, and a show is the billable event.
+
+Twenty-eight real practices (the twenty-ninth is Test Clinic):
+
+Airway Orthodontics FL · GNV · NY · VT · All Dental of Menifee · Andros Orthodontics ·
+Art of Smile · Best Care Dental · Cruz Orthodontics · Dental Illusions ·
+Dental Solutions · Diamond Dental · Fiesta Orthodontics · Genuine Family Dentistry ·
+Hancock and Johnston · Integrity Dental · Kind Dental · Kind Dental (GD) ·
+Lompoc Family Dental · Magic Dental · Plano Top Dental · SMYLE Dental Centers ·
+SMYLE East Meadows · Team Dental N. Liberties · Team Dental Swedesboro ·
+The Smile Patio · Village Dental of New England (GD) · Z. Stanton Dental Care
+
+The consolidated type-06 scenario cannot have this fault. A stat sheet holds one row
+per patient, so the two consultations share a row and must be told apart by calendar
+name; the Hub holds one row per appointment, so the appointment id already answers it.
+
+## Two smaller outliers
+
+**Type 04 — four practices have no router**: Anaheim Smile Center, Bling Dental, DNA
+Dental Studio, The Dental Collective. Here the missing router is *harmless*, and
+arguably better: the second branch in the other 53 writes the same three columns to
+the same row as the first, so it does nothing. These four are the version without the
+dead code.
+
+**Type 03 — Anaheim Smile Center** is missing a `util:SetVariable2` the other 54 have.
+Worth a glance; not obviously harmful.
+
+## The method is worth keeping
+
+`usedModules` from the scenario list gives a fleet-wide structural audit at no cost.
+It cannot see spreadsheet ids, so it complements `scenario_sheet_targets` rather than
+replacing it — one finds wrong destinations, the other finds wrong shapes. Between
+them they cover the fleet without reading 226 blueprints.
