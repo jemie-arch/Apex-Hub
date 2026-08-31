@@ -255,3 +255,45 @@ Types 03 (CCM No Show), 04 (Update Appointment Info) and 06 (Appointment
 Cancelled) are unchanged across all clinics. 03 is the same shape as 02 with the
 value inverted, so it is the obvious next one; 04 and 06 carry more fields and
 want reading properly first.
+
+## Type 03 — CCM No Show, also built
+
+Read before building rather than assumed, and it is the exact inverse of 02:
+same Call Center Mastery trigger, same split on `calendar.calendarName`, and it
+writes `N` where 02 writes `Y` — index 9 for a first consult, index 10 plus the
+App Date for a second.
+
+**Make scenario 6108222** — `03 - PPS - CCM No Show Tracker -> HUB
+[CONSOLIDATED]`, inactive, on its own new hook `2755973`. Posts
+`{"showed": "no"}` or `{"second_consult_showed": "no"}` to the same endpoint. No
+Sheets module. The 57 live type-03 scenarios are untouched.
+
+One oddity noticed while reading 3744117, harmless but worth knowing: its two
+routes carry *different* column specs in their `expect` metadata — the first
+route describes a 26-column sheet where index 9 is "Show (Y/N)", the second a
+27-column sheet where index 9 is "First Consultation Show". Only the stale UI
+cache disagrees; both mappers write numeric indices, so behaviour is consistent.
+It is the same stale-metadata phenomenon as the misdirected spreadsheet labels,
+in a place where it happens not to matter.
+
+### Why "no" is the more dangerous value
+
+A wrongly recorded show is a billing error somebody notices, because the
+practice is charged for an appointment. A wrongly recorded **no-show** is a
+billing error nobody notices, because it removes a charge — the practice is
+happy, the revenue is simply absent, and it shows up only in the unbilled
+backlog months later.
+
+That is why the endpoint refuses to infer. `showed: "no"` has to be sent
+explicitly by this scenario; an absent or unrecognised value leaves the column
+untouched rather than defaulting to a no-show. The `readTri` mapping accepts
+`no`, `no show`, `no-show`, `noshow`, `missed` and `dna` because CCM and the
+forms spell it differently, and returns undefined for anything else — so an
+unmapped spelling is a 422 rather than a silent lost charge.
+
+## Remaining on sheets
+
+Types 04 (Update Appointment Info) and 06 (Appointment Cancelled), across all
+clinics. Both carry more fields than 02 and 03 and should be read properly
+before a Hub equivalent is written — 04 in particular writes treatment outcome
+and value, which is the data the billing figures depend on.
