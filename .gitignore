@@ -7,3 +7,11 @@ out
 *.tsbuildinfo
 next-env.d.ts
 .turbo
+
+# Internal audit write-ups. These name individuals and attribute faults to
+# them, and one contains a performance judgement about a named employee, so a
+# repo teammates can read is the wrong home for them. They were committed by an
+# accidental `git add -A` and removed from tracking in this commit; both remain
+# on disk. Ignored so the same mistake cannot repeat.
+earl-audit-findings.md
+audit-summary-for-joshua.md
