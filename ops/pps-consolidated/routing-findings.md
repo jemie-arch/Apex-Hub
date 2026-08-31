@@ -148,3 +148,42 @@ Williston bills 2 consults on one charge that did not succeed, so nothing was
 collected; worth confirming rather than chasing.
 
 I have not changed any client record, any charge, or any sync configuration.
+
+---
+
+# Kind Dental: found it
+
+Kind Dental is billed for **27 consultations across 14 charges** and the Hub holds
+**zero appointments**. The cause is a contradiction in the data, and it is now a row
+you can look at rather than a day of digging.
+
+The calendar `Ortho & New Patient Exam | Dr. Vohra` is in **both** lists:
+
+- `excluded_calendars`, by id `Il8ovGGMeIc7dbtkmB2N`
+- `included_calendars`, by name, with this reason recorded:
+  > Active, publicly bookable 45-minute Service calendar on a real PatientSync
+  > chair; confirmed new-patient consultations in a GoHighLevel UI audit on
+  > 2026-08-24. Second consults live on a separate calendar in this account.
+
+The appointments sync applies the exclusion, so that calendar is never read, so no
+appointment ever lands. `crm-appointments.ts` already carries a comment about this
+exact pair — an earlier fix stopped the missing-calendar alert from contradicting
+the fetch, which made the problem *visible*. It could not resolve it, because which
+list is right is a judgement, not a code path.
+
+**The judgement already exists.** Somebody audited that calendar in the GoHighLevel
+UI on 24 Aug and wrote down that it holds new-patient consultations. The exclusion
+row is the older, stale one.
+
+I have not deleted it. Removing that row makes roughly 27 consultations' worth of
+appointments appear at the next sync, which then feeds delivered-against-invoiced —
+a visible change to billing reconciliation, and yours to make rather than mine:
+
+```sql
+delete from excluded_calendars
+where crm_calendar_id = 'Il8ovGGMeIc7dbtkmB2N';
+```
+
+`calendar_list_conflicts` is the new view. Kind Dental is the **only** conflict in
+the system today, so this is one fix and not a class with many instances — but the
+next one will be a row instead of a mystery.
