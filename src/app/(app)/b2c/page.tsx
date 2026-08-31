@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
 import { formatCount, formatMoneyCompact, formatPercent } from '@/lib/format';
 import { bounds, resolveRange } from '@/lib/range';
+import { OutcomeRow, type QueueAppointment } from '@/components/b2c/OutcomeRow';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
   const db = serviceClient();
   const { start, end } = bounds(range.from, range.to);
 
-  const [appointments, locations, groups] = await Promise.all([
+  const [appointments, locations, groups, queue] = await Promise.all([
     db
       .from('appointments')
       .select(
@@ -50,6 +51,25 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
       .limit(400),
     db.from('clients').select('id, name, group_id, timezone'),
     db.from('client_groups').select('id, name, currency'),
+    /*
+     * The call centre's work queue, and deliberately NOT bounded by the date
+     * range above.
+     *
+     * The range exists so the numbers describe a period. A queue does the
+     * opposite job: an appointment that happened three months ago and still has
+     * no outcome is the one most worth chasing, and a date filter is exactly
+     * what would hide it. Bounded instead by "already happened" and "nobody has
+     * said what happened yet".
+     */
+    db
+      .from('appointments')
+      .select(
+        'id, client_id, patient_name, scheduled_at, showed, showed_source, second_consult_showed, cc_on_file, financing_approved, outcome, value_cents',
+      )
+      .lte('scheduled_at', new Date().toISOString())
+      .eq('outcome', 'pending')
+      .order('scheduled_at', { ascending: false })
+      .limit(100),
   ]);
 
   if (appointments.error) throw appointments.error;
@@ -135,6 +155,28 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
     };
   });
 
+  /*
+   * Practice name comes from the same map the table uses, so a clinic renamed
+   * in GoHighLevel reads the same in both places.
+   */
+  const queueRows: QueueAppointment[] = (queue.error ? [] : (queue.data ?? [])).map(
+    (row) => ({
+      id: row.id,
+      patientName: row.patient_name,
+      practice: row.client_id
+        ? (locationById.get(row.client_id)?.name ?? null)
+        : null,
+      scheduledAt: row.scheduled_at,
+      showed: row.showed,
+      showedSource: row.showed_source,
+      secondConsultShowed: row.second_consult_showed,
+      ccOnFile: row.cc_on_file,
+      financingApproved: row.financing_approved,
+      outcome: row.outcome ?? 'pending',
+      valueCents: row.value_cents,
+    }),
+  );
+
   return (
     <>
       <PageHeader
@@ -184,6 +226,48 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
           hint={revenueCents === 0 ? 'no case value recorded' : 'on started treatments'}
         />
       </section>
+
+      {queueRows.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-sm font-semibold text-fg">
+              Waiting on an outcome
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              {formatCount(queueRows.length)} appointment
+              {queueRows.length === 1 ? ' has' : 's have'} happened with nobody
+              saying what came of {queueRows.length === 1 ? 'it' : 'them'}.
+              Recording it here writes straight to the Hub — no form, no
+              spreadsheet in between.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              Not filtered by the date range above, on purpose: an appointment
+              from three months ago with no outcome is the one most worth
+              chasing, and a date filter is what would hide it.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">
+                    {titleCase(patient.singular)}
+                  </th>
+                  <th className="px-4 py-3 font-medium">When</th>
+                  <th className="px-4 py-3 font-medium">Attended?</th>
+                  <th className="px-4 py-3 font-medium">Outcome</th>
+                  <th className="px-4 py-3 font-medium">&nbsp;</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queueRows.map((row) => (
+                  <OutcomeRow key={row.id} appointment={row} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <ConsultationsTable
         rows={tableRows}
