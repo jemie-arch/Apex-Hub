@@ -17,13 +17,19 @@
  * recordings webhook. Make can set a header, so there is no query-string
  * fallback here — it would put the secret in access logs for no benefit.
  *
+ * How a payload becomes a set of column changes lives in
+ * lib/webhooks/consultation-payload, which is pure and separately exercised by
+ * scripts/check-outcome-payload.ts. What is left here is the part that needs a
+ * database: deciding which appointment is meant.
+ *
  * Two things it will not do.
  *
  * It will not guess which appointment is meant. Resolution is by GoHighLevel
- * appointment id, and nothing else. Matching on a patient name and a date is
- * what the stat-sheet import does, and the reconciliation page exists because
- * that matching is unreliable — a spelling difference silently becomes a
- * second appointment. No id, 422.
+ * appointment id, or by GoHighLevel contact id for the update form, which
+ * carries no appointment id. Both are ids. Matching on a patient name and a date
+ * is what the stat-sheet import does, and the reconciliation page exists because
+ * that matching is unreliable — a spelling difference silently becomes a second
+ * appointment. Neither id, 422.
  *
  * It will not turn silence into data. An absent field is left alone rather than
  * written as false or null. A form submitted with the attendance question blank
@@ -44,111 +50,14 @@
  * patient, so both consultations share a row and have to be told apart by hand.
  * The Hub holds one row per appointment. The appointment id already says which
  * consultation was cancelled, so there is nothing to decide.
- *
- * The appointment-update form (PPS type 04) carries no appointment id at all —
- * it is a form filled in about a patient, not an event on a calendar. Those
- * resolve by GoHighLevel contact id, which is still an id and not a name-and-date
- * guess. See resolveByContact below for which of a contact's appointments wins.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { serverEnv } from '@/lib/env';
 import { serviceClient } from '@/lib/supabase/service';
-import type { Database, TablesUpdate } from '@/types/database';
+import { readConsultationPayload } from '@/lib/webhooks/consultation-payload';
 
 export const dynamic = 'force-dynamic';
-
-type Outcome = Database['public']['Enums']['appointment_outcome'];
-
-/** Outcomes the appointment_outcome enum accepts. */
-const OUTCOMES: readonly Outcome[] = [
-  'pending',
-  'quoted',
-  'won',
-  'lost',
-  'follow_up',
-  'unqualified',
-];
-
-/**
- * What the GoHighLevel forms actually send for a yes/no question, mapped once.
- *
- * The forms are not consistent — some send "Yes", some "TRUE", the CCM
- * trackers send "Showed" and "No Show" — so the mapping is deliberately
- * generous on input and strict on output. Anything unrecognised returns
- * undefined and the field is left untouched, which is the whole point: an
- * unmapped spelling must not become a false.
- */
-function readTri(value: unknown): boolean | undefined {
-  if (typeof value === 'boolean') return value;
-  const text = String(value ?? '').trim().toLowerCase();
-  if (text === '') return undefined;
-  if (['yes', 'y', 'true', '1', 'showed', 'show', 'attended', 'complete'].includes(text)) {
-    return true;
-  }
-  if (['no', 'n', 'false', '0', 'no show', 'no-show', 'noshow', 'missed', 'dna'].includes(text)) {
-    return false;
-  }
-  return undefined;
-}
-
-function asString(value: unknown): string | null {
-  if (typeof value === 'string' && value.trim() !== '') return value.trim();
-  if (typeof value === 'number') return String(value);
-  return null;
-}
-
-/**
- * Money in minor units, or undefined.
- *
- * Undefined and zero are different answers. Zero means treatment started and
- * nothing was charged; undefined means nobody said. Collapsing them would put
- * free treatments into the won column at zero value and quietly drag the
- * average case value down.
- */
-function readCents(value: unknown): number | undefined {
-  const text = asString(value);
-  if (text === null) return undefined;
-  const cleaned = text.replace(/[^0-9.]/g, '');
-  if (cleaned === '') return undefined;
-  const parsed = Number(cleaned);
-  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
-  return Math.round(parsed * 100);
-}
-
-/**
- * Read a field under any of several names.
- *
- * The five PPS form types label the same question differently — "Did they show
- * for their appointment?", "Request Type", plain "showed" — and a consolidated
- * endpoint that demanded one spelling would need a Make module per form to
- * rename things. Accepting the known aliases keeps the Make side to a single
- * pass-through.
- */
-function pick(body: Record<string, unknown>, names: string[]): unknown {
-  for (const name of names) {
-    if (name in body && body[name] !== null && body[name] !== '') {
-      return body[name];
-    }
-  }
-  return undefined;
-}
-
-/**
- * The `calendar` object out of a GoHighLevel webhook, or an empty one.
- *
- * GoHighLevel nests the appointment id and calendar name under `calendar`.
- * Reading that nesting here means a Make scenario can forward the trigger body
- * unchanged, with no mapping step — and a mapping step per form is exactly the
- * per-client work that made 57 copies of each scenario necessary.
- */
-function calendarOf(body: Record<string, unknown>): Record<string, unknown> {
-  const raw = body['calendar'];
-  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-    return raw as Record<string, unknown>;
-  }
-  return {};
-}
 
 export async function POST(request: NextRequest) {
   const env = serverEnv();
@@ -179,26 +88,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Body is not JSON.' }, { status: 422 });
   }
 
-  const calendar = calendarOf(body);
-
-  const appointmentId =
-    asString(
-      pick(body, [
-        'appointment_id',
-        'appointmentId',
-        'crm_appointment_id',
-        'calendar_appointmentId',
-      ]),
-    ) ?? asString(pick(calendar, ['appointmentId', 'id']));
-
-  /*
-   * The update form has no appointment id — it is filled in about a patient
-   * rather than raised against a calendar event. A contact id is still an id,
-   * so this does not reopen the name-and-date matching the endpoint refuses.
-   */
-  const contactId = asString(
-    pick(body, ['contact_id', 'contactId', 'crm_contact_id']),
-  );
+  const { appointmentId, contactId, changes } = readConsultationPayload(body);
 
   if (!appointmentId && !contactId) {
     /*
@@ -229,18 +119,18 @@ export async function POST(request: NextRequest) {
    * Which of a contact's appointments an update form is about.
    *
    * The most recent one that has already happened. A contact who has been
-   * rebooked has a future appointment too, and ordering by date alone would
-   * hand the form's answers to a consultation that has not occurred yet — so a
-   * patient who attended in March and is booked again in May would have March's
-   * outcome written against May.
+   * rebooked has a future appointment too, and ordering by date alone would hand
+   * the form's answers to a consultation that has not occurred yet — so a patient
+   * who attended in March and is booked again in May would have March's outcome
+   * written against May.
    *
    * The stat sheets have this bug: they match on phone, sort by appointment date
    * descending and take the first. It is invisible there because the sheet holds
    * one row per patient, so both bookings are the same row.
    *
-   * If the contact has no past appointment, their earliest upcoming one is used
-   * — a form arriving before the sync has caught up is far more likely to be
-   * about that booking than about nothing.
+   * If the contact has no past appointment, their earliest upcoming one is used —
+   * a form arriving before the sync has caught up is far more likely to be about
+   * that booking than about nothing.
    */
   async function resolveByContact(id: string) {
     const past = await db
@@ -265,8 +155,8 @@ export async function POST(request: NextRequest) {
   /*
    * An appointment id that matches nothing is not a reason to go looking by
    * contact. It means that appointment has not synced, and quietly writing the
-   * answers onto a different appointment of the same patient would be worse
-   * than saying so.
+   * answers onto a different appointment of the same patient would be worse than
+   * saying so.
    */
   const found = appointmentId
     ? await db
@@ -282,10 +172,10 @@ export async function POST(request: NextRequest) {
 
   if (!found.data) {
     /*
-     * 404 rather than creating the appointment. The Hub learns appointments
-     * from the crm-appointments sync; inventing one here from a form payload
-     * would create a second source of truth for whether an appointment exists,
-     * and the reconciliation work exists precisely to remove one of those.
+     * 404 rather than creating the appointment. The Hub learns appointments from
+     * the crm-appointments sync; inventing one here from a form payload would
+     * create a second source of truth for whether an appointment exists, and the
+     * reconciliation work exists precisely to remove one of those.
      */
     return NextResponse.json(
       {
@@ -305,118 +195,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const showed = readTri(
-    pick(body, [
-      'showed',
-      'Did they show for their appointment?',
-      'show_status',
-      'attendance',
-    ]),
-  );
-  const secondShowed = readTri(
-    pick(body, [
-      'second_consult_showed',
-      'Did this patient require a second consultation?',
-    ]),
-  );
-  const ccOnFile = readTri(pick(body, ['cc_on_file', 'CC On File', 'card_on_file']));
-  const financing = readTri(
-    pick(body, ['financing_approved', 'Approved for Credit Plan?']),
-  );
-  const valueCents = readCents(
-    pick(body, [
-      'value',
-      'value_cents',
-      'treatment_value',
-      'If they did start treatment, how much was their total treatment value?',
-    ]),
-  );
-
-  const rawOutcome = asString(
-    pick(body, ['outcome', 'Did they start treatment?', 'result']),
-  );
-  let outcome: Outcome | undefined;
-  if (rawOutcome !== null) {
-    const lower = rawOutcome.toLowerCase();
-    if ((OUTCOMES as readonly string[]).includes(lower)) outcome = lower as Outcome;
-    else if (readTri(rawOutcome) === true) outcome = 'won';
-    else if (readTri(rawOutcome) === false) outcome = 'lost';
-  }
-
-  const notes = asString(
-    pick(body, [
-      'notes',
-      'If they did not start treatment, what was the reason?',
-      'feedback',
-    ]),
-  );
-
-  /**
-   * Cancelled, which is a different fact from not showing up.
-   *
-   * Both spellings of GoHighLevel's own field are accepted, including its
-   * misspelling — the payload really does carry `appoinmentStatus`, and
-   * matching only the correct spelling would silently drop every cancellation.
-   */
-  const statusText = (
-    asString(pick(body, ['status', 'appointment_status', 'cancellation_status'])) ??
-    asString(
-      pick(calendar, ['appoinmentStatus', 'appointmentStatus', 'status']),
-    ) ??
-    ''
-  ).toLowerCase();
-
-  const cancelled =
-    readTri(pick(body, ['cancelled', 'is_cancelled', 'appointment_cancelled'])) ===
-      true ||
-    statusText === 'cancelled' ||
-    statusText === 'canceled';
-
-  const update: TablesUpdate<'appointments'> = {
-    outcome_updated_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  if (cancelled) {
-    update['status'] = 'cancelled';
-    update['cancelled_at'] = new Date().toISOString();
-  }
   /*
-   * A cancellation wins over an attendance answer in the same payload. A
-   * cancelled appointment that also carried "showed: no" would otherwise be
-   * recorded as a no-show, and the two are billed and read differently.
+   * Nothing to write means the payload carried nothing readable. Answered as 422
+   * rather than 200 so a form whose field names have drifted says so on the first
+   * submission instead of appearing to work for a month.
    */
-  if (showed !== undefined && !cancelled) {
-    update['showed'] = showed;
-    update['showed_source'] = 'call_centre';
-  }
-  if (secondShowed !== undefined) update['second_consult_showed'] = secondShowed;
-  if (ccOnFile !== undefined) update['cc_on_file'] = ccOnFile;
-  if (financing !== undefined) update['financing_approved'] = financing;
-  if (valueCents !== undefined) update['value_cents'] = valueCents;
-  if (outcome !== undefined) update['outcome'] = outcome;
-  if (notes !== null) update['notes'] = notes;
-
-  /*
-   * Only the two timestamps means the payload carried nothing readable. Answered
-   * as 422 rather than 200 so a form whose field names have drifted says so on
-   * the first submission instead of appearing to work for a month.
-   */
-  if (Object.keys(update).length === 2) {
+  if (Object.keys(changes).length === 0) {
     return NextResponse.json(
       {
         error:
           'Nothing recognisable to record. The appointment was found but no ' +
           'known field was present, so nothing was written.',
         appointmentId,
+        contactId,
         received: Object.keys(body).slice(0, 40),
       },
       { status: 422 },
     );
   }
 
+  const now = new Date().toISOString();
   const written = await db
     .from('appointments')
-    .update(update)
+    .update({ ...changes, outcome_updated_at: now, updated_at: now })
     .eq('id', found.data.id);
 
   if (written.error) {
@@ -428,8 +229,6 @@ export async function POST(request: NextRequest) {
     appointmentId: appointmentId ?? found.data.crm_appointment_id ?? null,
     resolvedBy: appointmentId ? 'appointment id' : 'contact id',
     patient: found.data.patient_name,
-    recorded: Object.keys(update).filter(
-      (key) => key !== 'updated_at' && key !== 'outcome_updated_at',
-    ),
+    recorded: Object.keys(changes),
   });
 }
