@@ -187,3 +187,47 @@ where crm_calendar_id = 'Il8ovGGMeIc7dbtkmB2N';
 `calendar_list_conflicts` is the new view. Kind Dental is the **only** conflict in
 the system today, so this is one fix and not a class with many instances — but the
 next one will be a row instead of a mystery.
+
+---
+
+# The audit table now covers the fleet, and I had left it behind
+
+`scenario_sheet_targets` held **14 scenarios** while routing held 49 and I had read
+52. Ten findings drawn from fourteen scenarios, displayed without that denominator,
+reads as "the fleet was examined and is nearly clean". It said nothing of the kind.
+
+That is precisely the fault this whole engagement is about, and I introduced it —
+by loading the routing data and not the audit data beside it.
+
+Now loaded: **49 scenarios, 377 sheet-touching modules, 50 distinct spreadsheets.**
+
+## The findings did not move
+
+Still **10**. Every one of the 35 newly loaded scenarios writes to exactly one
+spreadsheet, consistently, with no padding and no split between the row it reads
+and the row it writes.
+
+That is the useful result. The misdirection is **concentrated, not systemic**:
+
+| Finding | Count | Practices |
+|---|---|---|
+| Misdirected write | 6 | Kind Dental, SMYLE Dental Centers East Meadows, Team Dental Swedesboro |
+| Spreadsheet id with stray whitespace | 2 | Dental Solutions |
+| Reads one sheet, writes another | 1 | Z. Eagle Creek Dentistry |
+| One sheet claimed by several scenarios | 1 | (across scenarios) |
+
+Five practices out of forty-nine. Worth knowing before anyone decides how much of
+the fleet needs hand-checking during the cutover: the answer is these five.
+
+Kind Dental appears here **and** in the calendar-list conflict above. Two
+independent faults on the same client, found by two different routes.
+
+## A denominator that travels with the findings
+
+`scenario_audit_coverage` is a new view carrying the counts, the observation dates
+and a ready-made caveat sentence, so a page cannot show the findings without being
+able to say what they cover.
+
+It deliberately does **not** hardcode how many scenarios exist in Make. That number
+changes every time somebody clones one, and a stale denominator reads as
+authoritative while being wrong — worse than having none.
