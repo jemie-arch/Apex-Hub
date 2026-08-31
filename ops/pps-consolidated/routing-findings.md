@@ -193,11 +193,14 @@ next one will be a row instead of a mystery.
 # The audit table now covers the fleet, and I had left it behind
 
 `scenario_sheet_targets` held **14 scenarios** while routing held 49 and I had read
-52. Ten findings drawn from fourteen scenarios, displayed without that denominator,
-reads as "the fleet was examined and is nearly clean". It said nothing of the kind.
+52. I had loaded the routing data and left the audit data behind.
 
-That is precisely the fault this whole engagement is about, and I introduced it —
-by loading the routing data and not the audit data beside it.
+**Correcting myself:** I first wrote that this made the reconciliation panel read as
+a clean verdict on the whole fleet. It did not. That page already prints "Covers the
+N scenarios read so far, last on <date>", and it was honestly saying **14**. Whoever
+built that line had already guarded against exactly this. The defect was the missing
+data, not the display — and I should have checked the page before describing what it
+showed.
 
 Now loaded: **49 scenarios, 377 sheet-touching modules, 50 distinct spreadsheets.**
 
@@ -222,12 +225,19 @@ the fleet needs hand-checking during the cutover: the answer is these five.
 Kind Dental appears here **and** in the calendar-list conflict above. Two
 independent faults on the same client, found by two different routes.
 
-## A denominator that travels with the findings
+## The denominator was already there
 
-`scenario_audit_coverage` is a new view carrying the counts, the observation dates
-and a ready-made caveat sentence, so a page cannot show the findings without being
-able to say what they cover.
+Verified on the live page after loading the data:
 
-It deliberately does **not** hardcode how many scenarios exist in Make. That number
+> Covers the **49** scenarios read so far, last on 31 Aug 2026. A scenario that has
+> not been read does not appear here and is not evidence of a clean one.
+
+`scenario_audit_coverage` is a view I added carrying the same counts plus a canned
+caveat sentence. It is **not load-bearing** — the page computes its own coverage from
+`scenario_sheet_targets` and always did. It is there for anyone querying the findings
+from SQL, where the denominator is easy to forget. Do not treat it as the guard; the
+guard is on the page.
+
+It deliberately does not hardcode how many scenarios exist in Make. That number
 changes every time somebody clones one, and a stale denominator reads as
 authoritative while being wrong — worse than having none.
