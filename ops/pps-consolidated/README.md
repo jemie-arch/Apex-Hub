@@ -172,3 +172,86 @@ same webhook-per-type, same data-store lookup, same header-name mapping.
 
 Do not deactivate a per-client scenario before its clinic is routed and tested.
 An unrouted clinic with its old scenario switched off records nothing at all.
+
+---
+
+# Outcomes to the Hub instead of a stat sheet
+
+A second, separate consolidation: the call centre's outcome data going straight
+into the Hub rather than into a spreadsheet the Hub then imports.
+
+## What the CCM trackers actually do
+
+An assumption worth correcting first. Type 02 is **not** triggered by a
+GoHighLevel form. Its trigger is a Call Center Mastery app webhook,
+`app#call-center-mastery-qeqot5:watchEventsManualPlacement`, and its payload
+**does** carry `calendar.appointmentId` — which matters, because it means an
+appointment can be identified exactly rather than matched on a name.
+
+All the scenario then does is:
+
+- split on `calendar.calendarName` — anything containing `Second_consultation`
+  is a second consult, everything else is a first
+- find the sheet row by phone against column T
+- write `Y` into column J (first) or column K (second), plus the App Date
+
+That is the whole job, and the Hub already models it as `showed` and
+`second_consult_showed`.
+
+## Built, both inactive
+
+**Hub endpoint** — `POST /api/webhooks/consultation-outcome`, guarded by
+`CRON_SECRET` as a Bearer header. Accepts the field aliases the five form types
+use for the same question, so the Make side needs no per-form renaming. Lives on
+branch `feat/call-centre-outcome-queue`.
+
+**Make scenario 6108174** — `02 - PPS - CCM Show Tracker -> HUB [CONSOLIDATED]`,
+inactive, on its own new webhook `2755953`. CCM trigger, router on
+`calendarName`, two HTTP posts. **No Google Sheets module anywhere in it.**
+
+One scenario for every clinic, and unlike type 01 it needs no routing table at
+all — the appointment id identifies the appointment, which identifies the clinic.
+There is no sheet to choose, so there is nothing to choose it with.
+
+Nothing live was touched. The 57 existing type-02 scenarios are untouched and
+still running.
+
+## Before it can run
+
+**Put the secret in the Authorization header.** Both HTTP modules currently read
+`Bearer REPLACE_WITH_CRON_SECRET`. Prefer Make's keychain over pasting the value:
+a header typed into a module is stored in the blueprint in plain text, and
+blueprints are readable by anyone with team access.
+
+**Point Call Center Mastery at hook `2755953`**, ideally for one clinic first,
+leaving the existing scenarios running.
+
+**The endpoint URL will 404 until deployed.** It is set to
+`https://www.apexdentalmarketing.co/api/webhooks/consultation-outcome`, which
+needs `feat/call-centre-outcome-queue` merged and shipped.
+
+## Three things the endpoint deliberately refuses
+
+**It will not guess which appointment is meant.** Resolution is by GoHighLevel
+appointment id only. Name-and-date matching is what the stat-sheet import does,
+and reconciliation exists because that matching is unreliable — a spelling
+difference silently becomes a second appointment. No id: 422, with the keys it
+did receive so a drifted form says what it actually sent.
+
+**It will not create an appointment.** An unknown id answers 404. The Hub learns
+appointments from the `crm-appointments` sync; inventing one from a form payload
+would create a second source of truth for whether an appointment exists, which
+is what the reconciliation work removes. A 404 most likely means the nightly
+sync has not caught up.
+
+**It will not answer 200 having recorded nothing.** Appointment found but no
+known field present is 422 — because a webhook that accepts everything and
+stores nothing is indistinguishable from one that works, and that is how the
+tracker feed went quiet without anyone noticing.
+
+## Still on sheets
+
+Types 03 (CCM No Show), 04 (Update Appointment Info) and 06 (Appointment
+Cancelled) are unchanged across all clinics. 03 is the same shape as 02 with the
+value inverted, so it is the obvious next one; 04 and 06 carry more fields and
+want reading properly first.
