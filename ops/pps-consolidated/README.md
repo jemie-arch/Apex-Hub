@@ -404,3 +404,39 @@ being recorded as a no-show makes it fail, so it is testing something.
 What it does **not** cover is which appointment gets picked, because that needs
 the database. The rebooking rule — most recent appointment that has already
 happened — is still unproven against real rows.
+
+---
+
+## All five hardened against the Hub being unreachable
+
+The consolidated scenarios post over HTTP to a Next.js route. The path they replace
+wrote to Google Sheets, which is a great deal more available than a serverless
+function on a cold start. Shipping the swap without saying so would have traded a
+fault class for an availability regression and called it progress.
+
+Every one of the five now has, and all remain **inactive**:
+
+| Setting | Value | Why |
+|---|---|---|
+| Store incomplete executions | on | A failed run is kept and can be resumed, not lost |
+| Data loss queue | on | Failures park where somebody can see and retry them |
+| Retry handler on each write | 5 attempts, 15s apart | Rides out a cold start or a transient 5xx |
+
+The retry is a `Break` directive on the module's error path, so a failure retries
+and then parks rather than discarding the booking.
+
+**Type 01's data-store lookup deliberately has no retry.** If a clinic has no
+routing row, retrying five times over 75 seconds changes nothing — the record is
+absent, not slow. It errors immediately and parks in the queue, which is the loud
+failure that case deserves. The two sheet operations either side of it do retry,
+because those fail for reasons that pass.
+
+Scenario ids: `6046761`, `6108174`, `6108222`, `6109500`, `6109503`. All
+`isinvalid: false` after the change.
+
+### What this still does not give you
+
+Retries and a queue mean a booking survives the Hub being briefly down. They do not
+make the endpoint idempotent — the same webhook delivered twice writes twice.
+Harmless for an attendance flag or a cancellation, which are the only things sent
+today. It would stop being harmless if the payload ever carried anything additive.
