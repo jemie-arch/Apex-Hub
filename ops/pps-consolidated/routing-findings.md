@@ -241,3 +241,60 @@ guard is on the page.
 It deliberately does not hardcode how many scenarios exist in Make. That number
 changes every time somebody clones one, and a stale denominator reads as
 authoritative while being wrong — worse than having none.
+
+---
+
+# Has any of it actually executed?
+
+The reconciliation page says plainly that a wrong-target finding proves the
+configuration is wrong and not that rows have moved, and that Make's execution
+list cannot settle it. That is correct. But there is a second place to look.
+
+Every booking row carries the GoHighLevel **location name** into column R. So a
+row sitting in one practice's tracker while naming a different practice is a write
+that happened. `tracker_foreign_rows` is that check, over all 1,281 tracker rows —
+every one of which has the field populated, so a clean result means something.
+
+## What it found
+
+| Sheet | Row says it came from | Rows | Period |
+|---|---|---|---|
+| TMJ Sleep Airway Orthodontics - Williston | Airway Orthodontics - VT | 15 | Apr–Jun |
+| TMJ Sleep Airway Orthodontics - Gainesville | Airway Orthodontics - GNV | 10 | Jun–Jul |
+| TMJ Sleep Airway Orthodontics - New York | Airway Orthodontics - NY | 1 | Apr |
+| Art Of Smile: Center for Cosmetic Orthodontics | Art of Smile | 22 | May–Aug |
+| Team Dental N. Liberties | Team Dental N. Liberties Apex | 5 | May–Jul |
+| Team Dental Swedesboro | Team Dental Swedesboro Apex | 3 | Jun–Jul |
+| **Kind Dental** | **Kind Dental (General Dentistry)** | **1** | **20 Aug** |
+
+Six of the seven are **one clinic under two naming conventions** — the Hub and
+GoHighLevel simply disagree on what to call it. Nothing is misrouted.
+
+Those six are also **independent corroboration of the six inferred routing rows**
+filed earlier. I matched "Airway Orthodontics - GNV" to Gainesville by reading an
+abbreviation; the tracker shows GNV-labelled bookings physically landing in the
+Gainesville client's sheet, from a source that had nothing to do with how I
+matched them. Those proposals are now considerably better than a good guess —
+though somebody should still open the sheets before ticking them off.
+
+**One entry is a real cross-account write:** a booking from Kind Dental (General
+Dentistry) sitting in Kind Dental's tracker, 20 Aug. One row. The direction is the
+*reverse* of the configured fault the audit found — the audit shows Kind Dental's
+module 15 writing into the GD sheet, and this row went the other way. So either the
+GD scenario has its own misdirect that has not been audited, or the two accounts
+share something upstream. One row, but worth ten minutes.
+
+## What this does not prove, and I want to be exact
+
+**City Dental Centers has 170 tracker rows, all carrying a location name, and zero
+foreign.** So no Kind Dental booking has been *appended* to City Dental's sheet.
+
+That is not the same as City Dental's sheet being uncorrupted, and the difference
+matters. Kind Dental's two misdirected modules are `updateRow`, not `addRow`. An
+updateRow writes one cell into an existing row, addressed by a row number worked
+out against a *different* spreadsheet — so it overwrites whichever City Dental
+patient happens to occupy that row number, and changes no name. This method is
+blind to that by construction.
+
+Answering it needs the spreadsheet's own revision history, which is outside
+anything I can reach. Flagging it rather than reporting City Dental clean.
