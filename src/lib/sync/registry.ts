@@ -62,7 +62,8 @@ export const SYNCS: Record<string, SyncDefinition> = {
     name: 'payout-hours',
     description:
       'Hubstaff tracked time plus approved paid leave into fortnightly payout ' +
-      'lines — needs HUBSTAFF_TOKEN',
+      'lines — needs HUBSTAFF_TOKEN once, as a seed; the live token then lives ' +
+      'in oauth_tokens because Hubstaff rotates it on every use',
     run: syncPayoutHours,
   },
   'windsor-ads': {

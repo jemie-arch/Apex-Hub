@@ -239,7 +239,11 @@ export function windsorCredentials(): WindsorCredentials {
 }
 
 export interface HubstaffCredentials {
-  token: string;
+  /**
+   * Null once the seed has been removed from the environment, which is the
+   * expected steady state — the live token is in oauth_tokens.
+   */
+  token: string | null;
   apiBase: string;
   organizationId: string | null;
 }
@@ -255,17 +259,18 @@ export interface HubstaffCredentials {
 export function hubstaffCredentials(): HubstaffCredentials {
   const env = serverEnv();
 
-  if (!env.HUBSTAFF_TOKEN) {
-    throw new Error(
-      'Hubstaff is not configured: HUBSTAFF_TOKEN is not set, so payout hours ' +
-        'cannot be read. Create a Personal Access Token in Hubstaff under ' +
-        'Settings then Personal Access Tokens, add it to the environment, and ' +
-        'retry. Nothing else in the app needs it.',
-    );
-  }
-
+  /*
+   * Deliberately does NOT throw on a missing token, unlike its siblings.
+   *
+   * Hubstaff rotates its refresh token on every exchange, so the live
+   * credential lives in oauth_tokens and HUBSTAFF_TOKEN is only a seed for the
+   * very first run. Throwing here would make the integration unusable in its
+   * normal steady state — token in the database, seed long since removed from
+   * the environment — which is exactly backwards. The client decides whether it
+   * has a credential, because only the client can see the database.
+   */
   return {
-    token: env.HUBSTAFF_TOKEN,
+    token: env.HUBSTAFF_TOKEN ?? null,
     apiBase: env.HUBSTAFF_API_BASE,
     organizationId: env.HUBSTAFF_ORGANIZATION_ID ?? null,
   };
