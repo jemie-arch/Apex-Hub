@@ -297,3 +297,83 @@ Types 04 (Update Appointment Info) and 06 (Appointment Cancelled), across all
 clinics. Both carry more fields than 02 and 03 and should be read properly
 before a Hub equivalent is written — 04 in particular writes treatment outcome
 and value, which is the data the billing figures depend on.
+
+---
+
+## Types 04 and 06, built — both inactive
+
+That completes the set. All five event types now have one consolidated scenario
+each, and none of them is switched on.
+
+| Type | Scenario | Hook | Replaces |
+|---|---|---|---|
+| 01 New Appointment Booked | `6046761` | `2755826` | 57 clones |
+| 02 CCM Show Tracker | `6108174` | `2755953` | 55 clones |
+| 03 CCM No Show Tracker | `6108222` | `2755973` | 55 clones |
+| 04 Appointment Update Form | **`6109500`** | **`2756502`** | 57 clones |
+| 06 Appointment Cancelled | **`6109503`** | **`2756504`** | 56 clones |
+
+Neither new scenario contains a Google Sheets module. Both post to
+`POST /api/webhooks/consultation-outcome` with
+`Authorization: Bearer REPLACE_WITH_CRON_SECRET`, which has to be replaced before
+either can work — prefer Make's keychain to pasting the value into the blueprint.
+
+Webhook URLs:
+
+- 04 — `https://hook.us2.make.com/q2lgmsp7kjligjs0j4s6r1lsp3fpefb6`
+- 06 — `https://hook.us2.make.com/ytcyautku3v2wntx995m8g8k274m5jxx`
+
+### What changed in the endpoint to accept them
+
+**Cancellations set the status and nothing else.** The stat sheets write a literal
+`"C"` into the show column, which exists precisely so that cancelled and no-show
+stay distinguishable. The Hub has a `cancelled` status, so a cancellation sets
+`status` and `cancelled_at` and deliberately leaves `showed` alone. If a payload
+somehow carries both a cancellation and "did not show", the cancellation wins.
+
+GoHighLevel's own field is misspelled `appoinmentStatus` in the payload. Both
+spellings are accepted. Matching only the correct one would have dropped every
+cancellation silently.
+
+**The first/second consultation branch is gone, on purpose.** The cloned type-06
+scenarios inspect the calendar name to decide whether to write the `C` into
+column J or column K. They have to, because a stat sheet holds one row per
+*patient* and both consultations share it. The Hub holds one row per
+*appointment*, so the appointment id already says which consultation was
+cancelled. There is nothing left to branch on.
+
+**The update form resolves by contact id.** Type 04 is a form filled in about a
+patient, not an event raised against a calendar, so it carries no appointment id
+at all. The endpoint now accepts `contact_id` — still an id, so this does not
+reopen the name-and-date matching it refuses.
+
+Which of that contact's appointments wins is the interesting part. The cloned
+scenarios match on phone in column T, sort by appointment date descending and take
+the first. **That is wrong for a rebooked patient**: someone who attended in March
+and is booked again in May would have March's outcome written against May's
+consultation. It is invisible in a stat sheet because both bookings are the same
+row. It would not be invisible here, so the endpoint takes the most recent
+appointment that has *already happened*, and only falls back to an upcoming one if
+the contact has no past appointment at all.
+
+**An appointment id that matches nothing does not fall back to the contact.** It
+means that appointment has not synced, and quietly writing the answers onto a
+different appointment for the same patient is worse than a 404 that says so.
+
+### Two faults found in the originals, not reproduced
+
+**Type 04's second route is dead.** The router has two branches: one unfiltered,
+one filtered on `contact_source` containing `Second_consultation`. Both write the
+*same three columns* — Converted to Patient, Treatment Value, Notes — to the *same
+row*. When the filter matches, both fire and write identical values. Whoever added
+it presumably meant it to record the second consultation separately; it does not.
+Observed in `3744099`; not checked across all 57.
+
+**Type 04 matches on phone, not appointment id** — the rebooking fault described
+above.
+
+### Still nothing switched on
+
+Same as before: the secret, then one clinic repointed, then a real appointment
+checked end to end, then the rest in batches with the old scenarios left inactive
+rather than deleted until the numbers agree.
