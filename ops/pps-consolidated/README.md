@@ -377,3 +377,30 @@ above.
 Same as before: the secret, then one clinic repointed, then a real appointment
 checked end to end, then the rest in batches with the old scenarios left inactive
 rather than deleted until the numbers agree.
+
+### The payload reader is now exercised
+
+I shipped the cancellation and contact-id paths without ever running them: both
+sit behind `CRON_SECRET`, so they cannot be poked from outside, and a type check
+proves the shapes line up rather than that the decisions are right.
+
+The part that decides *what to write* is now its own module,
+`src/lib/webhooks/consultation-payload.ts` — pure, no database, no network. An
+App Router route may only export its handlers, so extracting it was the only way
+to reach it at all.
+
+```bash
+npm run check:webhook
+```
+
+Thirty-four checks over real payload shapes, including GoHighLevel's own
+misspelling of `appoinmentStatus`, a cancellation that also claims a no-show, and
+the several ways a blank answer must not become a `false`. No patient data is
+used — the payloads are trimmed skeletons with invented names.
+
+The suite was mutation-checked: removing the guard that stops a cancellation
+being recorded as a no-show makes it fail, so it is testing something.
+
+What it does **not** cover is which appointment gets picked, because that needs
+the database. The rebooking rule — most recent appointment that has already
+happened — is still unproven against real rows.
