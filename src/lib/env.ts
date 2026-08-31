@@ -66,6 +66,25 @@ const serverSchema = z.object({
   HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),
   /** The organisation whose members and time are read. */
   HUBSTAFF_ORGANIZATION_ID: z.string().min(1).optional(),
+  /**
+   * Make.com API token, read scopes only. Optional for the same reason
+   * HUBSTAFF_TOKEN is: without it the scenario audit cannot run, and that must
+   * stop one sync rather than a boot.
+   *
+   * The zone matters. Make shards its API by zone, and a token issued in one
+   * zone is rejected by another with a 401 that reads exactly like a bad key.
+   * Apex is on us2, which is why that is the default.
+   */
+  MAKE_TOKEN: z.string().min(1).optional(),
+  MAKE_API_BASE: z.string().url().default('https://us2.make.com/api/v2'),
+  /**
+   * The Make data store that holds clinic-to-sheet routing. Optional: without it
+   * the export sync stops, which is the correct failure — publishing routing to
+   * the wrong store would point every clinic at the wrong sheet at once.
+   */
+  MAKE_ROUTING_DATA_STORE_ID: z.string().min(1).optional(),
+  /** The team whose scenarios are audited. Discovered when not set. */
+  MAKE_TEAM_ID: z.string().min(1).optional(),
   WINDSOR_API_BASE: z.string().url().default('https://connectors.windsor.ai'),
 
   /**
@@ -269,6 +288,59 @@ export function hubstaffCredentials(): HubstaffCredentials {
     apiBase: env.HUBSTAFF_API_BASE,
     organizationId: env.HUBSTAFF_ORGANIZATION_ID ?? null,
   };
+}
+
+export interface MakeCredentials {
+  token: string;
+  apiBase: string;
+  teamId: string | null;
+}
+
+/**
+ * The Make API token, or a loud error naming the one place to get it.
+ *
+ * Read-only by intent. The scenario audit reads blueprints and never writes, so
+ * a token carrying write scopes buys nothing and risks a great deal — a mistake
+ * on this path would be editing live client automations.
+ */
+export function makeCredentials(): MakeCredentials {
+  const env = serverEnv();
+
+  if (!env.MAKE_TOKEN) {
+    throw new Error(
+      'Make is not configured: MAKE_TOKEN is not set, so the scenario audit ' +
+        'cannot read any blueprints. Create a token in Make under Profile then ' +
+        'API access with the scenarios:read scope, add it to the environment, ' +
+        'and retry. Nothing else in the app needs it.',
+    );
+  }
+
+  return {
+    token: env.MAKE_TOKEN,
+    apiBase: env.MAKE_API_BASE,
+    teamId: env.MAKE_TEAM_ID ?? null,
+  };
+}
+
+/**
+ * The routing data store id, or a loud error.
+ *
+ * Separate from makeCredentials because reading scenarios and writing routing
+ * are different privileges with different consequences, and the audit must keep
+ * working on an environment where routing is not configured yet.
+ */
+export function makeRoutingStoreId(): string {
+  const env = serverEnv();
+
+  if (!env.MAKE_ROUTING_DATA_STORE_ID) {
+    throw new Error(
+      'Clinic routing is not configured: MAKE_ROUTING_DATA_STORE_ID is not ' +
+        'set, so there is no store to publish to. Find the data store id in ' +
+        'Make under Data stores, add it to the environment, and retry.',
+    );
+  }
+
+  return env.MAKE_ROUTING_DATA_STORE_ID;
 }
 
 export interface StripeCredentials {

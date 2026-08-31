@@ -14,6 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
+      // Added by hand pending the next full regeneration, in the shape the
+      // generator produces.
+      pps_clinic_routing: {
+        Row: {
+          client_id: string
+          created_at: string
+          crm_location_id: string
+          notes: string | null
+          practice: string
+          source: string
+          spreadsheet_id: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          crm_location_id: string
+          notes?: string | null
+          practice: string
+          source?: string
+          spreadsheet_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          crm_location_id?: string
+          notes?: string | null
+          practice?: string
+          source?: string
+          spreadsheet_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
+      // Added by hand pending the next full regeneration, in the shape the
+      // generator produces. Safe to lose: a regeneration will emit the real
+      // definitions from the database and overwrite this.
+      scenario_sheet_targets: {
+        Row: {
+          folder: string | null
+          id: number
+          id_was_padded: boolean
+          is_active: boolean
+          label: string | null
+          last_edited_at: string | null
+          last_edited_by: string | null
+          module_id: number
+          observed_at: string
+          operation: string
+          scenario_id: number
+          scenario_name: string
+          spreadsheet_id: string | null
+        }
+        Insert: {
+          folder?: string | null
+          id?: never
+          id_was_padded?: boolean
+          is_active?: boolean
+          label?: string | null
+          last_edited_at?: string | null
+          last_edited_by?: string | null
+          module_id: number
+          observed_at?: string
+          operation: string
+          scenario_id: number
+          scenario_name: string
+          spreadsheet_id?: string | null
+        }
+        Update: {
+          folder?: string | null
+          id?: never
+          id_was_padded?: boolean
+          is_active?: boolean
+          label?: string | null
+          last_edited_at?: string | null
+          last_edited_by?: string | null
+          module_id?: number
+          observed_at?: string
+          operation?: string
+          scenario_id?: number
+          scenario_name?: string
+          spreadsheet_id?: string | null
+        }
+        Relationships: []
+      }
       ad_level_insights: {
         Row: {
           ad_id: string
@@ -2755,6 +2847,71 @@ export type Database = {
       }
     }
     Views: {
+      // Added by hand pending the next full regeneration.
+      pps_routing_export: {
+        Row: {
+          crm_location_id: string | null
+          practice: string | null
+          spreadsheet_id: string | null
+        }
+        Relationships: []
+      }
+      pps_routing_candidates: {
+        Row: {
+          already_routed: boolean | null
+          client_id: string | null
+          crm_location_id: string | null
+          is_exact: boolean | null
+          match_kind: string | null
+          practice: string | null
+          scenario_id: number | null
+          scenario_practice: string | null
+          spreadsheet_id: string | null
+        }
+        Relationships: []
+      }
+      pps_routing_gaps: {
+        Row: {
+          all_candidates: number | null
+          client_id: string | null
+          crm_location_id: string | null
+          exact_candidates: number | null
+          gap: string | null
+          practice: string | null
+        }
+        Relationships: []
+      }
+      // Added by hand pending the next full regeneration. See the note above
+      // scenario_sheet_targets.
+      scenario_primary_sheet: {
+        Row: {
+          folder: string | null
+          is_active: boolean | null
+          last_edited_at: string | null
+          module_count: number | null
+          primary_sheet_id: string | null
+          scenario_id: number | null
+          scenario_name: string | null
+        }
+        Relationships: []
+      }
+      scenario_sheet_findings: {
+        Row: {
+          belongs_to: string | null
+          detail: string | null
+          finding: string | null
+          is_active: boolean | null
+          last_edited_at: string | null
+          last_edited_by: string | null
+          modules: string | null
+          practice: string | null
+          scenario_id: number | null
+          scenario_name: string | null
+          severity: number | null
+          sheet_id: string | null
+        }
+        Relationships: []
+      }
       appointment_exceptions: {
         Row: {
           amount_cents: number | null

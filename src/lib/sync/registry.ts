@@ -12,6 +12,8 @@ import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
 import { syncProvisionPending } from '@/lib/sync/provision-pending';
 import type { SyncFn } from '@/lib/sync/runner';
+import { syncRoutingExport } from '@/lib/sync/routing-export';
+import { syncScenarioAudit } from '@/lib/sync/scenario-audit';
 import { syncStripeCharges } from '@/lib/sync/stripe-charges';
 import { syncWindsorAds } from '@/lib/sync/windsor-ads';
 
@@ -77,6 +79,21 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'Stripe payment intents into billing — which client charges succeeded, ' +
       'were attempted, and failed',
     run: syncStripeCharges,
+  },
+  'routing-export': {
+    name: 'routing-export',
+    description:
+      'Publishes verified clinic-to-sheet routing into the Make data store, so ' +
+      'no scenario has to name a spreadsheet — needs MAKE_TOKEN and ' +
+      'MAKE_ROUTING_DATA_STORE_ID',
+    run: syncRoutingExport,
+  },
+  'scenario-audit': {
+    name: 'scenario-audit',
+    description:
+      'Where every Make booking scenario actually writes, and which of them ' +
+      'address a sheet belonging to a different practice — needs MAKE_TOKEN',
+    run: syncScenarioAudit,
   },
   'appointment-ledger': {
     name: 'appointment-ledger',

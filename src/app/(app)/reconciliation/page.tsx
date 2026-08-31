@@ -59,7 +59,15 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
     to: single(searchParams['to']),
   });
 
-  const [ledger, exceptions, allExceptions, charges, chargeExceptions, backlog] =
+  const [
+    ledger,
+    exceptions,
+    allExceptions,
+    charges,
+    chargeExceptions,
+    backlog,
+    scenarioFindings,
+  ] =
     await Promise.all([
     db
       .from('appointment_ledger')
@@ -120,6 +128,25 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
       .from('unbilled_backlog_by_practice')
       .select('practice, aged_shows, est_value_cents, oldest_days, partly_assumed')
       .order('est_value_cents', { ascending: false }),
+    /*
+     * Where the automations actually write, and where that disagrees with the
+     * practice they belong to.
+     *
+     * On this page because it is the upstream cause of two things below it: a
+     * booking that never reaches the tracker, and a tracker row that appears
+     * twice. Both look like data problems from here and are configuration
+     * problems one system away.
+     *
+     * Severity 1 only. A padded id is worth fixing but not worth a red panel on
+     * the page somebody opens to chase money.
+     */
+    db
+      .from('scenario_sheet_findings')
+      .select(
+        'scenario_id, practice, finding, modules, belongs_to, detail, is_active',
+      )
+      .eq('severity', 1)
+      .order('practice'),
   ]);
 
   if (ledger.error) throw ledger.error;
@@ -128,6 +155,13 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
   if (charges.error) throw charges.error;
   if (chargeExceptions.error) throw chargeExceptions.error;
   if (backlog.error) throw backlog.error;
+  /*
+   * Deliberately not thrown. The audit table is populated by a sync that needs
+   * MAKE_TOKEN, so on an environment without it this view is simply empty —
+   * and an empty extra panel must not take down the page somebody needs to
+   * reconcile a month's billing.
+   */
+  const misdirected = scenarioFindings.error ? [] : (scenarioFindings.data ?? []);
 
   /*
    * Grouped by practice, aged rows only, biggest first. The value is an estimate
@@ -436,6 +470,88 @@ export default async function ReconciliationPage({ searchParams }: PageProps) {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/*
+        Above the historical sections because it is a cause rather than a
+        symptom. A booking that never reached the tracker and a tracker row that
+        appeared twice both read as data problems on this page; when the cause is
+        an automation writing to the wrong file, fixing the rows without fixing
+        the target means doing it again next month.
+      */}
+      {misdirected.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-lg border border-warning bg-surface">
+          <div className="border-b border-warning-subtle px-4 py-3">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-warning">
+              <AlertTriangle size={14} /> Automations writing to the wrong sheet
+            </h2>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              {formatCount(misdirected.length)} module
+              {misdirected.length === 1 ? '' : 's'} across the booking scenarios
+              address a spreadsheet that belongs to a different practice, or read
+              one that nothing in the same scenario writes to. Compared by file
+              id, not by the name Make displays.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs text-fg-subtle">
+              This says the configuration is wrong. It does <b>not</b> say rows
+              have moved — whether a fault has executed has to be checked in the
+              receiving sheet, because Make&rsquo;s execution list cannot answer
+              it.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">Practice</th>
+                  <th className="px-4 py-3 font-medium">Fault</th>
+                  <th className="px-4 py-3 font-medium">Module</th>
+                  <th className="px-4 py-3 font-medium">Writes into</th>
+                </tr>
+              </thead>
+              <tbody>
+                {misdirected.map((row) => (
+                  <tr
+                    key={`${row.scenario_id}-${row.finding}-${row.modules}`}
+                    className="border-b border-line last:border-0"
+                    title={row.detail ?? undefined}
+                  >
+                    <td className="px-4 py-3 text-fg">
+                      {row.practice ?? 'unknown'}
+                      {row.is_active === false && (
+                        <span className="ml-1.5 text-xs text-fg-subtle">
+                          (inactive)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          'inline-block rounded px-2 py-0.5 text-xs font-medium',
+                          row.finding === 'misdirected_write'
+                            ? 'bg-negative-subtle text-negative'
+                            : 'bg-warning-subtle text-warning',
+                        )}
+                      >
+                        {row.finding === 'misdirected_write'
+                          ? 'wrong target'
+                          : row.finding === 'read_write_split'
+                            ? 'reads elsewhere'
+                            : row.finding === 'shared_sheet'
+                              ? 'shared file'
+                              : row.finding}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">{row.modules}</td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {row.belongs_to ?? '—'}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
