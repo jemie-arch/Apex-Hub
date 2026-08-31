@@ -74,3 +74,77 @@ outlived the engagement.
 `5947250` writes to `1 - COPY THIS - Stat Sheet Template`. That is correct — it is the
 scenario the per-client clones are made from. Recorded so nobody later reads it as a
 misdirected write and "fixes" it.
+
+---
+
+# Second pass: the remaining gaps
+
+## Six practices were the same clinic under two names
+
+The Hub and Make name these six differently, so the identity matcher correctly
+refused them. The abbreviations are documented in the sheet names themselves:
+
+| Hub client | Make folder | The read |
+|---|---|---|
+| TMJ Sleep Airway Orthodontics - Gainesville | Airway Orthodontics - GNV | GNV is Gainesville |
+| TMJ Sleep Airway Orthodontics - New York | Airway Orthodontics - NY | — |
+| TMJ Sleep Airway Orthodontics - Ponte Vedra | Airway Orthodontics - FL | sheet is named "FL PV"; PV is Ponte Vedra |
+| TMJ Sleep Airway Orthodontics - Williston | Airway Orthodontics - Williston | sheet is named "VT"; Williston is in Vermont |
+| Art Of Smile: Center for Cosmetic Orthodontics | Art of Smile | Hub name carries a subtitle |
+| Tamara Levit DDS PC | Tamara Levit DDS | Hub name carries a PC suffix |
+
+These are filed as `source = 'inferred'`, not `'derived'`, and the note on each row
+says what the inference was. Reading GNV as Gainesville is a good guess, not an
+identity match, and the person verifying should know which they are looking at.
+
+Ponte Vedra deserves the closest look: Gainesville is also in Florida, so "FL"
+alone does not settle it. It rests on the sheet being named "FL PV".
+
+**No sheet known is now 7 practices, down from 57.**
+
+## The last seven have no automation at all
+
+Evergreen Dental and Orthodontics · Habib Dental Implants · Limestone Hills
+Orthodontics · Metro Dental & Implant Studio · Natalie Yang Orthodontics ·
+Pacific Dental Center · Skyline Implants & Periodontics
+
+None of these has *any* scenario in Make — not just no booking scenario, nothing
+across all 332. All seven were added to the Hub on 21 Aug 2026 and none has a single
+appointment. They look like clients onboarded into the Hub ahead of their automation
+being built. If that is right, they are not a routing gap at all and the consolidated
+scenario will cover them the moment their GoHighLevel workflow points at it.
+
+# Clients billed with no appointments on record
+
+This came out of the same sweep and is not about routing.
+
+Nine active clients have Stripe charges and zero appointments in the Hub —
+35 charges, $12,915. That number is misleading and should not be quoted.
+
+**The Hub's appointment data only covers 7 Jul 2026 to 8 Oct 2026.** Twenty-five of
+those 35 charges occurred before 7 Jul, so there is no appointment data for that
+period for *anyone*. Their absence says nothing.
+
+Ten charges fall inside the window the Hub actually holds:
+
+| Client | Charges | Amount | Consults billed | Succeeded |
+|---|---|---|---|---|
+| Natalie Yang Orthodontics | 2 | $1,000.00 | 0 | 2 |
+| Integrity Dental | 2 | $994.00 | 0 | 1 |
+| Kind Dental | 5 | $971.29 | 6 | 3 |
+| TMJ Sleep Airway Orthodontics - Williston | 1 | $302.82 | 2 | 0 |
+
+Natalie Yang and Integrity bill **zero consults** on those charges, so they are
+almost certainly flat or retainer charges with no appointment to match. Not a gap.
+
+**Kind Dental is the one to look at.** Six consultations billed, three charges
+succeeded, inside the window where the Hub does hold appointments — and it has no
+appointments whatsoever. Its location id is `KiGqpUllGNj1tJyPMpnX`. Either that id
+is wrong, or the appointment sync is not reaching this client. Kind Dental also has
+two separate Make scenarios, "Kind Dental" and "Kind Dental (GD)", writing to two
+different sheets, which may be the same thing seen from the other side.
+
+Williston bills 2 consults on one charge that did not succeed, so nothing was
+collected; worth confirming rather than chasing.
+
+I have not changed any client record, any charge, or any sync configuration.
