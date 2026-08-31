@@ -428,3 +428,69 @@ Worth a glance; not obviously harmful.
 It cannot see spreadsheet ids, so it complements `scenario_sheet_targets` rather than
 replacing it — one finds wrong destinations, the other finds wrong shapes. Between
 them they cover the fleet without reading 226 blueprints.
+
+---
+
+# Every scenario that writes to more than one sheet
+
+With all 56 booking scenarios loaded, this is now a complete list rather than a
+sample. Exactly five touch more than one spreadsheet:
+
+| Practice | Sheets | The second (and third) destination |
+|---|---|---|
+| **Kind Dental** | 3 | Kind Dental (GD) — a sibling · **City Dental Centers — not a sibling** |
+| SMYLE Dental Centers East Meadows | 2 | SMYLE Dental Centers — a sibling |
+| Team Dental Swedesboro | 2 | Team Dental N. Liberties — a sibling |
+| **Art of Smile** | 2 | `1Wt8LSc4…` — **a sheet no other scenario touches** |
+| Z. Eagle Creek Dentistry | 2 | reads one sheet, writes another; neither is its routing sheet |
+
+## This answers the sibling-pairs question
+
+Three of the five are sibling accounts writing into each other: SMYLE East Meadows
+into SMYLE Dental Centers, Team Dental Swedesboro into Team Dental N. Liberties,
+Kind Dental into Kind Dental (GD). Whether that is deliberate — a group wanting one
+combined sheet — or a clone that was never repointed is a business question, but the
+pattern is consistent enough to look deliberate for the two Team Dental and two SMYLE
+accounts.
+
+**Kind Dental into City Dental Centers is the one that is not explainable that way.**
+They are unrelated practices. That is a straightforward error.
+
+## Art of Smile is a cutover blocker
+
+Its scenario has **thirteen sheet operations**, the most in the fleet against a
+standard of eight, split 8 to its own sheet and 5 to `1Wt8LSc4…` — an id that appears
+in no other scenario anywhere. Either Art of Smile legitimately maintains a second
+sheet, or five operations write somewhere nobody is looking.
+
+The sheet audit never flagged it, and the reason is worth recording: the detector
+looks for a module writing into *another practice's primary sheet*. A module writing
+to an unknown sheet matches nothing and so raises nothing. That is a real hole in the
+detector, not just in this practice.
+
+It also blocks consolidation for this clinic specifically. The consolidated scenario
+routes one clinic to one sheet from the routing table. Art of Smile currently writes
+to two, so switching it over silently drops five of its thirteen operations. Somebody
+has to decide what that second sheet is before Art of Smile can move.
+
+# Type 01 has six shapes, and eleven are an older generation
+
+| Count | Shape |
+|---|---|
+| 40 | current: two routers, regexp parser, 8 sheet operations |
+| 11 | older: two `SetVariable2` modules, 3 sheet operations |
+| 5 | current shape, different tail |
+| 1 | Art of Smile, 13 sheet operations |
+| 1 | Z. Snyder Dental Group, 3 operations, update before add |
+| 1 | my clone template, paused |
+
+The eleven on the older three-operation shape do not capture campaign, ad set, ad id
+or offer name — those columns arrived with the newer generation. Any attribution
+report covering those eleven practices is reading blanks that look like absences.
+
+# Type 07 is five scenarios and all are switched off
+
+Three Stripe invoice generators (four Stripe calls each plus a HighLevel contact
+search), one direct-booking sheet writer for Best Care Dental, and a two-call Stripe
+fragment for Village Dental. None active. Recorded so nobody counts them as live
+automation, and so that whoever eventually wires up invoicing knows these exist.
