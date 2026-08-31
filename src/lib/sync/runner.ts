@@ -10,6 +10,7 @@
 import type { Json, SyncTrigger } from '@/types/database';
 
 import { alertSyncFailure } from '@/lib/notify/slack';
+import { NotConfiguredError } from '@/lib/env';
 import { serviceClient } from '@/lib/supabase/service';
 
 export interface SyncCounts {
@@ -197,6 +198,34 @@ export async function runSync(
   try {
     await fn(ctx);
   } catch (error) {
+    /*
+     * An integration with no credentials is not a failure and must not be
+     * reported as one. Recorded exactly the way a disabled sync is — a closed
+     * row with meta.skipped and the reason — so it stays visible on the
+     * dashboard without turning the nightly cycle red every night until
+     * somebody sets a token.
+     */
+    if (error instanceof NotConfiguredError) {
+      await db
+        .from('sync_runs')
+        .update({
+          status: 'success',
+          ended_at: new Date().toISOString(),
+          duration_ms: Date.now() - startedAt,
+          meta: { ...notes, skipped: true, reason: error.message },
+        })
+        .eq('id', runId);
+
+      return {
+        runId,
+        name,
+        status: 'skipped',
+        counts,
+        errors,
+        durationMs: Date.now() - startedAt,
+      };
+    }
+
     fatal = describeError(error);
     errors.push({ message: `fatal: ${fatal}` });
   }
