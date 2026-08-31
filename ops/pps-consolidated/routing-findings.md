@@ -394,8 +394,11 @@ Consultation Show. Two of two, and all 29 share an identical module signature.
 
 So at these practices, cancelling a second consultation writes `C` over the **first**
 consultation's show status. A patient who attended their first consult and later
-cancelled a follow-up has their attended consult recorded as cancelled — which feeds
-the show rate, and a show is the billable event.
+cancelled a follow-up has their attended consult recorded as cancelled.
+
+**Correcting myself: I first wrote that this feeds the show rate. It does not — see
+the blast radius section below.** It corrupts the practice's own stat sheet, which is
+not nothing, but it does not reach any number the Hub reports.
 
 Twenty-eight real practices (the twenty-ninth is Test Clinic):
 
@@ -542,3 +545,41 @@ Spa · OC Healthy Smiles · Ofir Orthodontics · Royal Dentistry Studio · Smile
 Attribution reporting across those eight is reading blanks as absences. Two of them —
 Best Care and Ofir — are also the pair `0001_init.sql` records as having no client in
 the CRM at all.
+
+---
+
+# How far the cancellation fault actually reaches
+
+I claimed the type-06 fault feeds the show rate. Before letting that stand I checked
+where the Hub's attendance data actually comes from.
+
+```
+showed_source   appointments   showed=true   showed=false   showed=null
+crm                      248           191             57             0
+(null)                   121             0              0           121
+```
+
+**Every recorded attendance in the Hub came from the CRM.** Not one row came from a
+stat sheet — `showed_source` has never held anything but `crm`. The funnel on
+/reconciliation reads `tracker_appointments`, which is the single Client Fulfilment
+Tracker, a different spreadsheet from the per-practice stat sheets entirely.
+
+So the blast radius is narrower than I said:
+
+- **Hub attendance and show rate — not affected.** They do not read stat sheets.
+- **The practice's own stat sheet — affected.** That is what the clinic and the call
+  centre look at, and what a delivered-against-invoiced conversation gets pointed at.
+
+Real, worth fixing, and not a corruption of Hub reporting. I should have established
+that before writing "this reaches the numbers", which is the same failure to check a
+structure before describing it that produced two earlier corrections.
+
+## One more thing that fell out of the same query
+
+`second_consult_showed` is null on all 369 appointments. The Hub has **never** recorded
+a second consultation from any source. The CCM trackers have a second-consult branch
+and the stat sheets have a column K for it, but none of that has ever reached here.
+
+That is worth knowing before the consolidated scenarios go live, because they will
+start populating it — so second-consult figures will appear to jump from nothing,
+and that will be the feed starting, not a change in behaviour.
