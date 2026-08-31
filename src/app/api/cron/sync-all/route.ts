@@ -64,6 +64,17 @@ const ORDER = [
   'appointment-ledger',
   'crm-calls',
   /*
+   * 'scenario-audit' is deliberately NOT here yet, for the same reason as
+   * payout-hours below: MAKE_TOKEN is not set, so including it would guarantee
+   * a failed sync every night, and a cycle that always reports a failure is how
+   * a real failure stops being noticed.
+   *
+   * It is registered, so it runs from settings and the CLI the moment the token
+   * exists. Add it here at that point — near the end, since it reads nothing
+   * this cycle writes and it spends one HTTP request per scenario against a
+   * rate-limited API, which is cost the tail can absorb and the head cannot.
+   */
+  /*
    * 'payout-hours' is deliberately NOT here yet.
    *
    * HUBSTAFF_TOKEN is not set, so adding it would guarantee a failed sync every

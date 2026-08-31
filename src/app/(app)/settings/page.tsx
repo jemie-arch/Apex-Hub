@@ -260,6 +260,30 @@ export default async function SettingsPage() {
               tone={process.env.WINDSOR_API_KEY ? 'positive' : 'warning'}
             />
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div>
+              <p className="text-sm font-medium text-fg">
+                Make — clinic routing
+              </p>
+              <p className="text-xs text-fg-subtle">
+                Needs MAKE_TOKEN and MAKE_ROUTING_DATA_STORE_ID. Holds the sheet
+                each clinic&rsquo;s bookings are written to, in one place instead
+                of pasted into every cloned scenario — which is what let four of
+                them start writing into another practice&rsquo;s file.{' '}
+                <Link
+                  href="/settings/clinic-routing"
+                  className="text-accent hover:underline"
+                >
+                  Review clinic routing
+                </Link>
+              </p>
+            </div>
+            <StatusPill
+              value={process.env.MAKE_TOKEN ? 'configured' : 'no api token'}
+              tone={process.env.MAKE_TOKEN ? 'positive' : 'warning'}
+            />
+          </div>
         </div>
       </section>
 
