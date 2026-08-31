@@ -1,0 +1,1066 @@
+{
+  "name": "Slack New Appt. Notification [ADM Ortho Snapshot]",
+  "flow": [
+    {
+      "id": 1,
+      "mapper": {},
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "metadata": {
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": {
+                "editable": "true"
+              },
+              "label": "Slack New Appt. Notification [ADM Ortho Snapshot]"
+            }
+          }
+        },
+        "designer": {
+          "x": -387,
+          "y": 2
+        },
+        "interface": [
+          {
+            "name": "HP - Time Lead In",
+            "type": "text"
+          },
+          {
+            "name": "Time of Appointment",
+            "type": "text"
+          },
+          {
+            "name": "Date of Appointment",
+            "type": "text"
+          },
+          {
+            "name": "If you decide to move forward with treatment, how do you plan to cover the cost?",
+            "type": "text"
+          },
+          {
+            "name": "Direct Clinic Call",
+            "type": "text"
+          },
+          {
+            "name": "Payment Method",
+            "type": "text"
+          },
+          {
+            "name": "Stage Booked",
+            "type": "text"
+          },
+          {
+            "name": "Message",
+            "type": "text"
+          },
+          {
+            "name": "Reschedule Request Time",
+            "type": "text"
+          },
+          {
+            "name": "Did they start treatment?",
+            "type": "text"
+          },
+          {
+            "name": "Did they show for their appointment?",
+            "type": "text"
+          },
+          {
+            "name": "What is the main concern you would like to treat?",
+            "type": "text"
+          },
+          {
+            "name": " Patient Date of Birth",
+            "type": "text"
+          },
+          {
+            "name": "Time 1st Call Minute",
+            "type": "text"
+          },
+          {
+            "name": "Insurance Provider",
+            "type": "text"
+          },
+          {
+            "name": "If they did not start treatment, what was the reason?",
+            "type": "text"
+          },
+          {
+            "name": "SOP Link",
+            "type": "text"
+          },
+          {
+            "name": "Time Now Minute",
+            "type": "text"
+          },
+          {
+            "name": "If they did start treatment, how much was their total treatment value?",
+            "type": "text"
+          },
+          {
+            "name": "Clinic Location",
+            "type": "text"
+          },
+          {
+            "name": "Pain point | Desired Product | Dental History",
+            "type": "text"
+          },
+          {
+            "name": "Policy Beneficiary Name",
+            "type": "text"
+          },
+          {
+            "name": "Have you had a dental cleaning in the last 6 months?",
+            "type": "text"
+          },
+          {
+            "name": "Deposit Collected",
+            "type": "text"
+          },
+          {
+            "name": "Did this patient require a second consultation?",
+            "type": "text"
+          },
+          {
+            "name": "Policy Holder Date of Birth (M/D/Y)",
+            "type": "text"
+          },
+          {
+            "name": "Agent Number",
+            "type": "text"
+          },
+          {
+            "name": "Contact Opted-In Offer",
+            "type": "text"
+          },
+          {
+            "name": "Member ID",
+            "type": "text"
+          },
+          {
+            "name": "Readiness",
+            "type": "text"
+          },
+          {
+            "name": "Should you choose to go through with treatment, how do you plan to pay for the procedure?",
+            "type": "text"
+          },
+          {
+            "name": "Last Call Duration",
+            "type": "text"
+          },
+          {
+            "name": "Feedback",
+            "type": "text"
+          },
+          {
+            "name": "Are you planning to get a dental cleaning done soon?",
+            "type": "text"
+          },
+          {
+            "name": "Reschedule Request Date",
+            "type": "text"
+          },
+          {
+            "name": "Social Security Number",
+            "type": "text"
+          },
+          {
+            "name": "Policy Holder Name",
+            "type": "text"
+          },
+          {
+            "name": "Policy Beneficiary Date of Birth (M/D/Y)",
+            "type": "text"
+          },
+          {
+            "name": "Contact Opt-in CTA",
+            "type": "text"
+          },
+          {
+            "name": "Would you be able to provide the minimum initial deposit for one of the following treatment options?",
+            "type": "text"
+          },
+          {
+            "name": "Policy ID",
+            "type": "text"
+          },
+          {
+            "name": "Occupation",
+            "type": "text"
+          },
+          {
+            "name": "Patient Address",
+            "type": "text"
+          },
+          {
+            "name": "Request Type",
+            "type": "text"
+          },
+          {
+            "name": "Which treatment did the patient opt for?",
+            "type": "text"
+          },
+          {
+            "name": "contact_id",
+            "type": "text"
+          },
+          {
+            "name": "first_name",
+            "type": "text"
+          },
+          {
+            "name": "last_name",
+            "type": "text"
+          },
+          {
+            "name": "full_name",
+            "type": "text"
+          },
+          {
+            "name": "email",
+            "type": "text"
+          },
+          {
+            "name": "phone",
+            "type": "text"
+          },
+          {
+            "name": "tags",
+            "type": "text"
+          },
+          {
+            "name": "country",
+            "type": "text"
+          },
+          {
+            "name": "timezone",
+            "type": "text"
+          },
+          {
+            "name": "date_created",
+            "type": "text"
+          },
+          {
+            "name": "contact_source",
+            "type": "text"
+          },
+          {
+            "name": "full_address",
+            "type": "text"
+          },
+          {
+            "name": "contact_type",
+            "type": "text"
+          },
+          {
+            "name": "location",
+            "spec": [
+              {
+                "name": "name",
+                "type": "text"
+              },
+              {
+                "name": "address",
+                "type": "text"
+              },
+              {
+                "name": "city",
+                "type": "text"
+              },
+              {
+                "name": "state",
+                "type": "text"
+              },
+              {
+                "name": "country",
+                "type": "text"
+              },
+              {
+                "name": "postalCode",
+                "type": "text"
+              },
+              {
+                "name": "fullAddress",
+                "type": "text"
+              },
+              {
+                "name": "id",
+                "type": "text"
+              }
+            ],
+            "type": "collection"
+          },
+          {
+            "name": "user",
+            "spec": [
+              {
+                "name": "firstName",
+                "type": "text"
+              },
+              {
+                "name": "lastName",
+                "type": "text"
+              },
+              {
+                "name": "email",
+                "type": "text"
+              }
+            ],
+            "type": "collection"
+          },
+          {
+            "name": "calendar",
+            "spec": [
+              {
+                "name": "title",
+                "type": "text"
+              },
+              {
+                "name": "selectedTimezone",
+                "type": "text"
+              },
+              {
+                "name": "appointmentId",
+                "type": "text"
+              },
+              {
+                "name": "startTime",
+                "type": "text"
+              },
+              {
+                "name": "endTime",
+                "type": "text"
+              },
+              {
+                "name": "status",
+                "type": "text"
+              },
+              {
+                "name": "appoinmentStatus",
+                "type": "text"
+              },
+              {
+                "name": "address",
+                "type": "text"
+              },
+              {
+                "name": "date_created",
+                "type": "text"
+              },
+              {
+                "name": "created_by",
+                "type": "text"
+              },
+              {
+                "name": "created_by_user_id",
+                "type": "text"
+              },
+              {
+                "name": "created_by_meta",
+                "spec": [
+                  {
+                    "name": "source",
+                    "type": "text"
+                  },
+                  {
+                    "name": "channel",
+                    "type": "text"
+                  }
+                ],
+                "type": "collection"
+              },
+              {
+                "name": "last_updated_by_meta",
+                "spec": [
+                  {
+                    "name": "source",
+                    "type": "text"
+                  },
+                  {
+                    "name": "channel",
+                    "type": "text"
+                  }
+                ],
+                "type": "collection"
+              },
+              {
+                "name": "id",
+                "type": "text"
+              },
+              {
+                "name": "calendarName",
+                "type": "text"
+              }
+            ],
+            "type": "collection"
+          },
+          {
+            "name": "workflow",
+            "spec": [
+              {
+                "name": "id",
+                "type": "text"
+              },
+              {
+                "name": "name",
+                "type": "text"
+              }
+            ],
+            "type": "collection"
+          },
+          {
+            "name": "triggerData",
+            "spec": [],
+            "type": "collection"
+          },
+          {
+            "name": "contact",
+            "spec": [
+              {
+                "name": "attributionSource",
+                "spec": [
+                  {
+                    "name": "sessionSource",
+                    "type": "text"
+                  },
+                  {
+                    "name": "medium",
+                    "type": "text"
+                  },
+                  {
+                    "name": "mediumId",
+                    "type": "text"
+                  }
+                ],
+                "type": "collection"
+              },
+              {
+                "name": "lastAttributionSource",
+                "spec": [
+                  {
+                    "name": "sessionSource",
+                    "type": "text"
+                  },
+                  {
+                    "name": "url",
+                    "type": "text"
+                  },
+                  {
+                    "name": "utmSource",
+                    "type": "text"
+                  },
+                  {
+                    "name": "utmMedium",
+                    "type": "text"
+                  },
+                  {
+                    "name": "utmContent",
+                    "type": "text"
+                  },
+                  {
+                    "name": "utmTerm",
+                    "type": "text"
+                  },
+                  {
+                    "name": "utmKeyword",
+                    "type": "text"
+                  },
+                  {
+                    "name": "utmMatchtype",
+                    "type": "text"
+                  },
+                  {
+                    "name": "referrer",
+                    "type": "text"
+                  },
+                  {
+                    "name": "gclid",
+                    "type": "text"
+                  },
+                  {
+                    "name": "userAgent",
+                    "type": "text"
+                  },
+                  {
+                    "name": "ip",
+                    "type": "text"
+                  },
+                  {
+                    "name": "gaClientId",
+                    "type": "text"
+                  },
+                  {
+                    "name": "gaSessionId",
+                    "type": "text"
+                  },
+                  {
+                    "name": "medium",
+                    "type": "text"
+                  },
+                  {
+                    "name": "mediumId",
+                    "type": "text"
+                  },
+                  {
+                    "name": "adName",
+                    "type": "text"
+                  },
+                  {
+                    "name": "adGroupId",
+                    "type": "text"
+                  },
+                  {
+                    "name": "adId",
+                    "type": "text"
+                  },
+                  {
+                    "name": "gbraid",
+                    "type": "text"
+                  },
+                  {
+                    "name": "wbraid",
+                    "type": "text"
+                  }
+                ],
+                "type": "collection"
+              }
+            ],
+            "type": "collection"
+          },
+          {
+            "name": "attributionSource",
+            "spec": [],
+            "type": "collection"
+          },
+          {
+            "name": "customData",
+            "spec": [],
+            "type": "collection"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          },
+          {
+            "name": "maxResults",
+            "type": "number",
+            "label": "Maximum number of results"
+          }
+        ]
+      },
+      "parameters": {
+        "hook": 2331781,
+        "maxResults": 1
+      }
+    },
+    {
+      "id": 6,
+      "mapper": {
+        "scope": "roundtrip",
+        "variables": [
+          {
+            "name": "Date of Appointment",
+            "value": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY\")}}"
+          },
+          {
+            "name": "Time of Appointment",
+            "value": "{{formatDate(1.calendar.startTime; \"hh:mm A\")}}"
+          }
+        ]
+      },
+      "module": "util:SetVariables",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "variables",
+            "spec": [
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Variable name",
+                "required": true
+              },
+              {
+                "name": "value",
+                "type": "any",
+                "label": "Variable value"
+              }
+            ],
+            "type": "array",
+            "label": "Variables"
+          },
+          {
+            "name": "scope",
+            "type": "select",
+            "label": "Variable lifetime",
+            "required": true,
+            "validate": {
+              "enum": [
+                "roundtrip",
+                "execution"
+              ]
+            }
+          }
+        ],
+        "restore": {
+          "expect": {
+            "scope": {
+              "label": "One cycle"
+            },
+            "variables": {
+              "items": [
+                null,
+                null
+              ]
+            }
+          }
+        },
+        "designer": {
+          "x": -72,
+          "y": 4
+        },
+        "interface": [
+          {
+            "name": "Date of Appointment",
+            "type": "any",
+            "label": "Date of Appointment"
+          },
+          {
+            "name": "Time of Appointment",
+            "type": "any",
+            "label": "Time of Appointment"
+          }
+        ]
+      },
+      "parameters": {}
+    },
+    {
+      "id": 7,
+      "mapper": {
+        "name": "{{1.tags}}"
+      },
+      "module": "util:GetVariable2",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "name",
+            "type": "text",
+            "label": "Variable name",
+            "required": true
+          }
+        ],
+        "restore": {},
+        "designer": {
+          "x": 272,
+          "y": -6
+        },
+        "interface": [
+          {
+            "name": null,
+            "type": "any",
+            "label": null
+          }
+        ]
+      },
+      "parameters": {}
+    },
+    {
+      "id": 12,
+      "mapper": null,
+      "module": "builtin:BasicRouter",
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 2,
+              "filter": {
+                "name": "1st Consultation",
+                "conditions": []
+              },
+              "mapper": {
+                "text": "Hello Admin! A new patient has been qualified and booked.\n\nHere are their details:\n\n[Patient Info]\nName: {{1.full_name}}\nEmail: {{1.email}}\nPhone: {{1.phone}}\nDate of Birth: {{1.` Patient Date of Birth`}}\nAddress: {{1.`Patient Address`}}\n\n\nMain Concern: {{1.`Pain point | Desired Product | Dental History`}}\n\nOccupation: {{1.Occupation}}\nAmount Saved: {{1.`Payment Method`}}\n\nDeposit Collected: {{1.`Deposit Collected`}}\n\n[Appointment Info]\nDate Scheduled: {{6.`Date of Appointment`}}\nTime Scheduled: {{6.`Time of Appointment`}}\n\nThank you!\nTo your success,\nApex Scheduling Team",
+                "parse": false,
+                "mrkdwn": true,
+                "channel": "C0B5PJQS5UG",
+                "channelType": "private",
+                "channelWType": "list"
+              },
+              "module": "slack:CreateMessage",
+              "version": 4,
+              "metadata": {
+                "expect": [
+                  {
+                    "name": "channelWType",
+                    "type": "select",
+                    "label": "Enter a channel ID or name",
+                    "required": true,
+                    "validate": {
+                      "enum": [
+                        "manualy",
+                        "list"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "text",
+                    "type": "text",
+                    "label": "Text"
+                  },
+                  {
+                    "name": "blocks",
+                    "type": "text",
+                    "label": "Blocks"
+                  },
+                  {
+                    "name": "thread_ts",
+                    "type": "text",
+                    "label": "Thread message ID (time stamp)"
+                  },
+                  {
+                    "name": "reply_broadcast",
+                    "type": "boolean",
+                    "label": "Reply broadcast"
+                  },
+                  {
+                    "name": "link_names",
+                    "type": "boolean",
+                    "label": "Link names"
+                  },
+                  {
+                    "name": "parse",
+                    "type": "boolean",
+                    "label": "Parse message text"
+                  },
+                  {
+                    "name": "mrkdwn",
+                    "type": "boolean",
+                    "label": "Use markdown"
+                  },
+                  {
+                    "name": "unfurl_links",
+                    "type": "boolean",
+                    "label": "Unfurl primarily text-based content"
+                  },
+                  {
+                    "name": "unfurl_media",
+                    "type": "boolean",
+                    "label": "Unfurl media content"
+                  },
+                  {
+                    "name": "icon_emoji",
+                    "type": "text",
+                    "label": "Icon emoji"
+                  },
+                  {
+                    "name": "icon_url",
+                    "type": "url",
+                    "label": "Icon url"
+                  },
+                  {
+                    "name": "username",
+                    "type": "text",
+                    "label": "User name"
+                  },
+                  {
+                    "name": "channelType",
+                    "type": "select",
+                    "label": "Channel type",
+                    "required": true,
+                    "validate": {
+                      "enum": [
+                        "public",
+                        "private",
+                        "im",
+                        "mpim"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "channel",
+                    "type": "select",
+                    "label": "Private channel",
+                    "required": true
+                  }
+                ],
+                "restore": {
+                  "expect": {
+                    "parse": {
+                      "mode": "chose"
+                    },
+                    "mrkdwn": {
+                      "mode": "chose"
+                    },
+                    "channel": {
+                      "mode": "chose",
+                      "label": "appts-test"
+                    },
+                    "link_names": {
+                      "mode": "chose"
+                    },
+                    "channelType": {
+                      "label": "Private channel"
+                    },
+                    "channelWType": {
+                      "label": "Select from the list"
+                    },
+                    "unfurl_links": {
+                      "mode": "chose"
+                    },
+                    "unfurl_media": {
+                      "mode": "chose"
+                    },
+                    "reply_broadcast": {
+                      "mode": "chose"
+                    }
+                  },
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "data": {
+                        "scoped": "true",
+                        "connection": "slack3"
+                      },
+                      "label": "ADM - Client Success Slack (apexdentalmar-mdz5358.slack.com - make)"
+                    }
+                  }
+                },
+                "designer": {
+                  "x": 928,
+                  "y": -135
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:slack2,slack3",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ]
+              },
+              "parameters": {
+                "__IMTCONN__": 8962829
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 15,
+              "filter": {
+                "name": "Reschedule",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.tags}}",
+                      "b": "reschedule",
+                      "o": "text:contain"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "text": "Hello Admin! A patient has requested to reschedule.\n\nHere are their details:\n\n[Patient Info]\nName: {{1.full_name}}\nEmail: {{1.email}}\nPhone: {{1.phone}}\nDate of Birth: {{1.` Patient Date of Birth`}}\nAddress: {{1.`Patient Address`}}\n\n\nMain Concern: {{1.`Pain point | Desired Product | Dental History`}}\n\nOccupation: {{1.Occupation}}\nAmount Saved: {{1.`Payment Method`}}\n\nDeposit Collected: {{1.`Deposit Collected`}}\n\n[Appointment Info]\nNew Date Scheduled: {{6.`Date of Appointment`}}\nNew Time Scheduled: {{6.`Time of Appointment`}}\n\nThank you!\nTo your success,\nApex Scheduling Team",
+                "parse": false,
+                "mrkdwn": true,
+                "channel": "C0B5PJQS5UG",
+                "channelType": "private",
+                "channelWType": "list"
+              },
+              "module": "slack:CreateMessage",
+              "version": 4,
+              "metadata": {
+                "expect": [
+                  {
+                    "name": "channelWType",
+                    "type": "select",
+                    "label": "Enter a channel ID or name",
+                    "required": true,
+                    "validate": {
+                      "enum": [
+                        "manualy",
+                        "list"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "text",
+                    "type": "text",
+                    "label": "Text"
+                  },
+                  {
+                    "name": "blocks",
+                    "type": "text",
+                    "label": "Blocks"
+                  },
+                  {
+                    "name": "thread_ts",
+                    "type": "text",
+                    "label": "Thread message ID (time stamp)"
+                  },
+                  {
+                    "name": "reply_broadcast",
+                    "type": "boolean",
+                    "label": "Reply broadcast"
+                  },
+                  {
+                    "name": "link_names",
+                    "type": "boolean",
+                    "label": "Link names"
+                  },
+                  {
+                    "name": "parse",
+                    "type": "boolean",
+                    "label": "Parse message text"
+                  },
+                  {
+                    "name": "mrkdwn",
+                    "type": "boolean",
+                    "label": "Use markdown"
+                  },
+                  {
+                    "name": "unfurl_links",
+                    "type": "boolean",
+                    "label": "Unfurl primarily text-based content"
+                  },
+                  {
+                    "name": "unfurl_media",
+                    "type": "boolean",
+                    "label": "Unfurl media content"
+                  },
+                  {
+                    "name": "icon_emoji",
+                    "type": "text",
+                    "label": "Icon emoji"
+                  },
+                  {
+                    "name": "icon_url",
+                    "type": "url",
+                    "label": "Icon url"
+                  },
+                  {
+                    "name": "username",
+                    "type": "text",
+                    "label": "User name"
+                  },
+                  {
+                    "name": "channelType",
+                    "type": "select",
+                    "label": "Channel type",
+                    "required": true,
+                    "validate": {
+                      "enum": [
+                        "public",
+                        "private",
+                        "im",
+                        "mpim"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "channel",
+                    "type": "select",
+                    "label": "Private channel",
+                    "required": true
+                  }
+                ],
+                "restore": {
+                  "expect": {
+                    "parse": {
+                      "mode": "chose"
+                    },
+                    "mrkdwn": {
+                      "mode": "chose"
+                    },
+                    "channel": {
+                      "mode": "chose",
+                      "label": "appts-test"
+                    },
+                    "link_names": {
+                      "mode": "chose"
+                    },
+                    "channelType": {
+                      "label": "Private channel"
+                    },
+                    "channelWType": {
+                      "label": "Select from the list"
+                    },
+                    "unfurl_links": {
+                      "mode": "chose"
+                    },
+                    "unfurl_media": {
+                      "mode": "chose"
+                    },
+                    "reply_broadcast": {
+                      "mode": "chose"
+                    }
+                  },
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "data": {
+                        "scoped": "true",
+                        "connection": "slack3"
+                      },
+                      "label": "ADM - Client Success Slack (apexdentalmar-mdz5358.slack.com - make)"
+                    }
+                  }
+                },
+                "designer": {
+                  "x": 928,
+                  "y": 165
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:slack2,slack3",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ]
+              },
+              "parameters": {
+                "__IMTCONN__": 8962829
+              }
+            }
+          ]
+        }
+      ],
+      "version": 1,
+      "metadata": {
+        "designer": {
+          "x": 634,
+          "y": -6
+        }
+      },
+      "parameters": {
+        "else": 0
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "designer": {
+      "orphans": []
+    },
+    "scenario": {
+      "dlq": false,
+      "slots": null,
+      "dataloss": false,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "roundtrips": 1,
+      "sequential": false,
+      "freshVariables": false,
+      "confidential": false,
+      "autoCommitTriggerLast": true
+    }
+  }
+}
