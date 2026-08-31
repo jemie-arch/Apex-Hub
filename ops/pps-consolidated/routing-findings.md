@@ -345,3 +345,20 @@ Which variant a practice has is not something you can see without opening it. Wo
 knowing: the consolidated type-06 scenario has no such branch to get wrong, because
 the Hub holds one row per appointment and the appointment id already says which
 consultation was cancelled.
+
+---
+
+# Type-01 coverage is now complete
+
+`scenario_sheet_targets` holds **56 scenarios, 398 modules, 57 distinct sheets**.
+The three type-01 scenarios not in it are two clones of my own and Test Clinic, so
+every real practice's booking scenario has now been read.
+
+Seven of those 56 were a gap I had made: read during the routing work, used for
+routing, never loaded into the audit. All seven are clean — a single spreadsheet
+across every module, no padding, no read/write split.
+
+**The findings did not move. Still 10, still the same five practices.** Across the
+whole fleet of booking scenarios, misdirection is confined to Kind Dental, SMYLE
+Dental Centers East Meadows, Team Dental Swedesboro, Dental Solutions and Eagle
+Creek. That is now a complete statement about type 01 rather than a partial one.
