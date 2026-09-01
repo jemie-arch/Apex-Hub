@@ -3068,6 +3068,7 @@ export type Database = {
         Args: { p_from: string; p_to: string; p_user_id: string }
         Returns: number
       }
+      merge_superseded_tracker_ledger_rows: { Args: never; Returns: number }
       rebuild_appointment_ledger: { Args: never; Returns: Json }
       refresh_client_statuses: { Args: never; Returns: number }
       refresh_onboarding_status: {

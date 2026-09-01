@@ -1,0 +1,888 @@
+{
+ "name": "01 - PPS - New Appointment Booked -> Update sheet - [Kind Dental]",
+ "flow": [
+  {
+   "id": 1,
+   "module": "gateway:CustomWebHook",
+   "version": 1,
+   "mapper": {},
+   "parameters": {
+    "hook": 2109365,
+    "maxResults": 1
+   },
+   "metadata": {
+    "restore": {
+     "parameters": {
+      "hook": {
+       "data": {
+        "editable": "true"
+       },
+       "label": "Abraham Orthodontics"
+      }
+     }
+    },
+    "designer": {
+     "x": -242,
+     "y": 159
+    }
+   }
+  },
+  {
+   "id": 17,
+   "module": "builtin:BasicRouter",
+   "version": 1,
+   "mapper": null,
+   "metadata": {
+    "designer": {
+     "x": 77,
+     "y": 154
+    }
+   },
+   "routes": [
+    {
+     "flow": [
+      {
+       "id": 12,
+       "module": "regexp:Parser",
+       "version": 1,
+       "filter": {
+        "name": "",
+        "conditions": [
+         [
+          {
+           "a": "{{1.contact.attributionSource.url}}",
+           "o": "exist"
+          }
+         ]
+        ]
+       },
+       "mapper": {
+        "text": "{{1.contact.attributionSource.url}}"
+       },
+       "parameters": {
+        "global": false,
+        "pattern": "[?&]utm_id=([^&]+)",
+        "multiline": false,
+        "sensitive": true,
+        "singleline": false,
+        "continueWhenNoRes": false
+       },
+       "metadata": {
+        "restore": {},
+        "designer": {
+         "x": 377,
+         "y": 4
+        }
+       }
+      },
+      {
+       "id": 8,
+       "module": "google-sheets:filterRows",
+       "version": 2,
+       "mapper": {
+        "from": "share",
+        "limit": "1",
+        "filter": [
+         [
+          {
+           "a": "Q",
+           "b": "{{1.calendar.appointmentId}}",
+           "o": "text:equal"
+          }
+         ]
+        ],
+        "orderBy": "D",
+        "sheetId": "MASTER",
+        "fieldType": "string",
+        "sortOrder": "desc",
+        "spreadsheetId": "1AyUqTchUOiL_oUlXPuEe2PDyFKqHAGqv4UwioFWvwaA",
+        "tableFirstRow": "A1:CZ1",
+        "includesHeaders": true,
+        "valueRenderOption": "FORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING"
+       },
+       "parameters": {
+        "__IMTCONN__": 6237841
+       },
+       "metadata": {
+        "restore": {
+         "expect": {
+          "from": {
+           "label": "Select from all"
+          },
+          "orderBy": {
+           "mode": "chose",
+           "label": "Date Added (D)"
+          },
+          "sheetId": {
+           "mode": "chose",
+           "label": "MASTER"
+          },
+          "fieldType": {
+           "mode": "chose",
+           "label": "String"
+          },
+          "sortOrder": {
+           "mode": "chose",
+           "label": "Descending"
+          },
+          "tableFirstRow": {
+           "label": "A-CZ"
+          },
+          "includesHeaders": {
+           "mode": "chose",
+           "label": "Yes"
+          },
+          "valueRenderOption": {
+           "mode": "chose",
+           "label": "Formatted value"
+          },
+          "dateTimeRenderOption": {
+           "mode": "chose",
+           "label": "Formatted string"
+          }
+         },
+         "parameters": {
+          "__IMTCONN__": {
+           "data": {
+            "scoped": "true",
+            "connection": "google"
+           },
+           "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+          }
+         }
+        },
+        "designer": {
+         "x": 694,
+         "y": 11
+        }
+       }
+      },
+      {
+       "id": 9,
+       "module": "builtin:BasicRouter",
+       "version": 1,
+       "mapper": null,
+       "metadata": {
+        "designer": {
+         "x": 994,
+         "y": 11
+        }
+       },
+       "routes": [
+        {
+         "flow": [
+          {
+           "id": 2,
+           "module": "google-sheets:addRow",
+           "version": 2,
+           "filter": {
+            "name": "",
+            "conditions": [
+             [
+              {
+               "a": "{{8.`__ROW_NUMBER__`}}",
+               "o": "notexist"
+              },
+              {
+               "a": "{{1.contact.attributionSource.utmMedium}}",
+               "b": "paid",
+               "o": "text:notcontain"
+              }
+             ]
+            ]
+           },
+           "mapper": {
+            "from": "drive",
+            "mode": "select",
+            "values": {
+             "0": "{{1.full_name}}",
+             "1": "{{1.email}}",
+             "2": "{{1.phone}}",
+             "3": "{{formatDate(1.date_created; \"MM/DD/YYYY\")}}",
+             "4": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}",
+             "7": "{{1.`Clinic Location`}}",
+             "16": "{{1.calendar.appointmentId}}",
+             "17": "{{1.location.name}}",
+             "18": "{{1.location.id}}",
+             "19": "'{{1.phone}}",
+             "22": "{{formatDate(1.calendar.date_created; \"MM/DD/YYYY\")}}",
+             "23": "{{12.`$1`}}",
+             "24": "{{1.contact.attributionSource.campaign}}",
+             "26": "{{1.contact.attributionSource.utmMedium}}"
+            },
+            "sheetId": "MASTER",
+            "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1AyUqTchUOiL_oUlXPuEe2PDyFKqHAGqv4UwioFWvwaA",
+            "includesHeaders": true,
+            "insertDataOption": "INSERT_ROWS",
+            "useColumnHeaders": false,
+            "valueInputOption": "USER_ENTERED",
+            "insertUnformatted": false
+           },
+           "parameters": {
+            "__IMTCONN__": 6237841
+           },
+           "metadata": {
+            "restore": {
+             "expect": {
+              "from": {
+               "label": "My Drive"
+              },
+              "mode": {
+               "label": "Search by path"
+              },
+              "sheetId": {
+               "label": "MASTER"
+              },
+              "spreadsheetId": {
+               "path": [
+                "PPS - Clinic NP Tracker Sheets",
+                "Apex Kind Dental - Stat Sheet"
+               ]
+              },
+              "includesHeaders": {
+               "label": "Yes"
+              },
+              "insertDataOption": {
+               "mode": "chose",
+               "label": "Insert rows"
+              },
+              "useColumnHeaders": {
+               "label": "No"
+              },
+              "valueInputOption": {
+               "mode": "chose",
+               "label": "User entered"
+              },
+              "insertUnformatted": {
+               "mode": "chose"
+              }
+             },
+             "parameters": {
+              "__IMTCONN__": {
+               "data": {
+                "scoped": "true",
+                "connection": "google"
+               },
+               "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+              }
+             }
+            },
+            "designer": {
+             "x": 993,
+             "y": -443
+            }
+           }
+          }
+         ]
+        },
+        {
+         "flow": [
+          {
+           "id": 10,
+           "module": "google-sheets:updateRow",
+           "version": 2,
+           "filter": {
+            "name": "Exists?",
+            "conditions": [
+             [
+              {
+               "a": "{{8.`__ROW_NUMBER__`}}",
+               "o": "exist"
+              }
+             ]
+            ]
+           },
+           "mapper": {
+            "from": "drive",
+            "mode": "select",
+            "values": {
+             "4": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}"
+            },
+            "sheetId": "MASTER",
+            "rowNumber": "{{8.`__ROW_NUMBER__`}}",
+            "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1MAOgIGlnAlF-3FyZRFwhQdVhp2HwWingBMRoet_fKS0",
+            "includesHeaders": true,
+            "useColumnHeaders": false,
+            "valueInputOption": "USER_ENTERED"
+           },
+           "parameters": {
+            "__IMTCONN__": 6237841
+           },
+           "metadata": {
+            "restore": {
+             "expect": {
+              "from": {
+               "label": "My Drive"
+              },
+              "mode": {
+               "label": "Search by path"
+              },
+              "sheetId": {
+               "label": "MASTER"
+              },
+              "spreadsheetId": {
+               "path": [
+                "PPS - Clinic NP Tracker Sheets",
+                "City Dental Centers - Stat Sheet"
+               ]
+              },
+              "includesHeaders": {
+               "label": "Yes"
+              },
+              "useColumnHeaders": {
+               "label": "No"
+              },
+              "valueInputOption": {
+               "mode": "chose",
+               "label": "User entered"
+              }
+             },
+             "parameters": {
+              "__IMTCONN__": {
+               "data": {
+                "scoped": "true",
+                "connection": "google"
+               },
+               "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+              }
+             }
+            },
+            "designer": {
+             "x": 1393,
+             "y": 18
+            }
+           }
+          }
+         ]
+        },
+        {
+         "flow": [
+          {
+           "id": 15,
+           "module": "google-sheets:addRow",
+           "version": 2,
+           "filter": {
+            "name": "",
+            "conditions": [
+             [
+              {
+               "a": "{{8.`__ROW_NUMBER__`}}",
+               "o": "notexist"
+              },
+              {
+               "a": "{{1.contact.attributionSource.utmMedium}}",
+               "b": "paid",
+               "o": "text:equal"
+              }
+             ]
+            ]
+           },
+           "mapper": {
+            "from": "drive",
+            "mode": "select",
+            "values": {
+             "0": "{{1.full_name}}",
+             "1": "{{1.email}}",
+             "2": "{{1.phone}}",
+             "3": "{{formatDate(1.date_created; \"MM/DD/YYYY\")}}",
+             "4": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}",
+             "7": "{{1.`Clinic Location`}}",
+             "16": "{{1.calendar.appointmentId}}",
+             "17": "{{1.location.name}}",
+             "18": "{{1.location.id}}",
+             "19": "'{{1.phone}}",
+             "22": "{{formatDate(1.calendar.date_created; \"MM/DD/YYYY\")}}",
+             "23": "{{12.`$1`}}",
+             "25": "{{1.contact.attributionSource.utmTerm}}",
+             "27": "{{1.contact.lastAttributionSource.utmContent}}"
+            },
+            "sheetId": "MASTER",
+            "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1K5GmuVnOkksTGMB98sCqIcX9Kl7z7ErjXGHlLO4Omcw",
+            "includesHeaders": true,
+            "insertDataOption": "INSERT_ROWS",
+            "useColumnHeaders": false,
+            "valueInputOption": "USER_ENTERED",
+            "insertUnformatted": false
+           },
+           "parameters": {
+            "__IMTCONN__": 6237841
+           },
+           "metadata": {
+            "restore": {
+             "expect": {
+              "from": {
+               "label": "My Drive"
+              },
+              "mode": {
+               "label": "Search by path"
+              },
+              "sheetId": {
+               "label": "MASTER"
+              },
+              "spreadsheetId": {
+               "path": [
+                "PPS - Clinic NP Tracker Sheets",
+                "Kind Dental (General Dentistry) - Stat Sheet Template"
+               ]
+              },
+              "includesHeaders": {
+               "label": "Yes"
+              },
+              "insertDataOption": {
+               "mode": "chose",
+               "label": "Insert rows"
+              },
+              "useColumnHeaders": {
+               "label": "No"
+              },
+              "valueInputOption": {
+               "mode": "chose",
+               "label": "User entered"
+              },
+              "insertUnformatted": {
+               "mode": "chose"
+              }
+             },
+             "parameters": {
+              "__IMTCONN__": {
+               "data": {
+                "scoped": "true",
+                "connection": "google"
+               },
+               "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+              }
+             }
+            },
+            "designer": {
+             "x": 1195,
+             "y": -368
+            }
+           }
+          }
+         ]
+        },
+        {
+         "flow": [
+          {
+           "id": 16,
+           "module": "google-sheets:addRow",
+           "version": 2,
+           "filter": {
+            "name": "",
+            "conditions": [
+             [
+              {
+               "a": "{{8.`__ROW_NUMBER__`}}",
+               "o": "notexist"
+              },
+              {
+               "a": "{{1.contact.attributionSource.utmMedium}}",
+               "b": "{{paid",
+               "o": "text:contain"
+              }
+             ]
+            ]
+           },
+           "mapper": {
+            "from": "drive",
+            "mode": "select",
+            "values": {
+             "0": "{{1.full_name}}",
+             "1": "{{1.email}}",
+             "2": "{{1.phone}}",
+             "3": "{{formatDate(1.date_created; \"MM/DD/YYYY\")}}",
+             "4": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}",
+             "7": "{{1.`Clinic Location`}}",
+             "16": "{{1.calendar.appointmentId}}",
+             "17": "{{1.location.name}}",
+             "18": "{{1.location.id}}",
+             "19": "'{{1.phone}}",
+             "22": "{{formatDate(1.calendar.date_created; \"MM/DD/YYYY\")}}",
+             "23": "{{12.`$1`}}",
+             "25": "{{1.contact.attributionSource.utmTerm}}"
+            },
+            "sheetId": "MASTER",
+            "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1AyUqTchUOiL_oUlXPuEe2PDyFKqHAGqv4UwioFWvwaA",
+            "includesHeaders": true,
+            "insertDataOption": "INSERT_ROWS",
+            "useColumnHeaders": false,
+            "valueInputOption": "USER_ENTERED",
+            "insertUnformatted": false
+           },
+           "parameters": {
+            "__IMTCONN__": 6237841
+           },
+           "metadata": {
+            "restore": {
+             "expect": {
+              "from": {
+               "label": "My Drive"
+              },
+              "mode": {
+               "label": "Search by path"
+              },
+              "sheetId": {
+               "label": "MASTER"
+              },
+              "spreadsheetId": {
+               "path": [
+                "PPS - Clinic NP Tracker Sheets",
+                "Apex Kind Dental - Stat Sheet"
+               ]
+              },
+              "includesHeaders": {
+               "label": "Yes"
+              },
+              "insertDataOption": {
+               "mode": "chose",
+               "label": "Insert rows"
+              },
+              "useColumnHeaders": {
+               "label": "No"
+              },
+              "valueInputOption": {
+               "mode": "chose",
+               "label": "User entered"
+              },
+              "insertUnformatted": {
+               "mode": "chose"
+              }
+             },
+             "parameters": {
+              "__IMTCONN__": {
+               "data": {
+                "scoped": "true",
+                "connection": "google"
+               },
+               "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+              }
+             }
+            },
+            "designer": {
+             "x": 1326,
+             "y": -206
+            }
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "flow": [
+      {
+       "id": 19,
+       "module": "google-sheets:filterRows",
+       "version": 2,
+       "filter": {
+        "name": "",
+        "conditions": [
+         [
+          {
+           "a": "{{1.contact.attributionSource.url}}",
+           "o": "notexist"
+          }
+         ]
+        ]
+       },
+       "mapper": {
+        "from": "share",
+        "limit": "1",
+        "filter": [
+         [
+          {
+           "a": "Q",
+           "b": "{{1.calendar.appointmentId}}",
+           "o": "text:equal"
+          }
+         ]
+        ],
+        "orderBy": "D",
+        "sheetId": "MASTER",
+        "fieldType": "string",
+        "sortOrder": "desc",
+        "spreadsheetId": "1AyUqTchUOiL_oUlXPuEe2PDyFKqHAGqv4UwioFWvwaA",
+        "tableFirstRow": "A1:CZ1",
+        "includesHeaders": true,
+        "valueRenderOption": "FORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING"
+       },
+       "parameters": {
+        "__IMTCONN__": 6237841
+       },
+       "metadata": {
+        "restore": {
+         "expect": {
+          "from": {
+           "label": "Select from all"
+          },
+          "orderBy": {
+           "mode": "chose",
+           "label": "Date Added (D)"
+          },
+          "sheetId": {
+           "mode": "chose",
+           "label": "MASTER"
+          },
+          "fieldType": {
+           "mode": "chose",
+           "label": "String"
+          },
+          "sortOrder": {
+           "mode": "chose",
+           "label": "Descending"
+          },
+          "tableFirstRow": {
+           "label": "A-CZ"
+          },
+          "includesHeaders": {
+           "mode": "chose",
+           "label": "Yes"
+          },
+          "valueRenderOption": {
+           "mode": "chose",
+           "label": "Formatted value"
+          },
+          "dateTimeRenderOption": {
+           "mode": "chose",
+           "label": "Formatted string"
+          }
+         },
+         "parameters": {
+          "__IMTCONN__": {
+           "data": {
+            "scoped": "true",
+            "connection": "google"
+           },
+           "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+          }
+         }
+        },
+        "designer": {
+         "x": 375,
+         "y": 307
+        }
+       }
+      },
+      {
+       "id": 20,
+       "module": "builtin:BasicRouter",
+       "version": 1,
+       "mapper": null,
+       "metadata": {
+        "designer": {
+         "x": 675,
+         "y": 307
+        }
+       },
+       "routes": [
+        {
+         "flow": [
+          {
+           "id": 21,
+           "module": "google-sheets:addRow",
+           "version": 2,
+           "filter": {
+            "name": "",
+            "conditions": [
+             [
+              {
+               "a": "{{19.`__ROW_NUMBER__`}}",
+               "o": "notexist"
+              }
+             ]
+            ]
+           },
+           "mapper": {
+            "from": "drive",
+            "mode": "select",
+            "values": {
+             "0": "{{1.full_name}}",
+             "1": "{{1.email}}",
+             "2": "{{1.phone}}",
+             "3": "{{formatDate(1.date_created; \"MM/DD/YYYY\")}}",
+             "4": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}",
+             "7": "{{1.`Clinic Location`}}",
+             "16": "{{1.calendar.appointmentId}}",
+             "17": "{{1.location.name}}",
+             "18": "{{1.location.id}}",
+             "19": "'{{1.phone}}",
+             "22": "{{formatDate(1.calendar.date_created; \"MM/DD/YYYY\")}}",
+             "24": "{{1.contact.attributionSource.campaign}}",
+             "26": "{{1.contact.attributionSource.utmMedium}}"
+            },
+            "sheetId": "MASTER",
+            "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1AyUqTchUOiL_oUlXPuEe2PDyFKqHAGqv4UwioFWvwaA",
+            "includesHeaders": true,
+            "insertDataOption": "INSERT_ROWS",
+            "useColumnHeaders": false,
+            "valueInputOption": "USER_ENTERED",
+            "insertUnformatted": false
+           },
+           "parameters": {
+            "__IMTCONN__": 6237841
+           },
+           "metadata": {
+            "restore": {
+             "expect": {
+              "from": {
+               "label": "My Drive"
+              },
+              "mode": {
+               "label": "Search by path"
+              },
+              "sheetId": {
+               "label": "MASTER"
+              },
+              "spreadsheetId": {
+               "path": [
+                "PPS - Clinic NP Tracker Sheets",
+                "Apex Kind Dental - Stat Sheet"
+               ]
+              },
+              "includesHeaders": {
+               "label": "Yes"
+              },
+              "insertDataOption": {
+               "mode": "chose",
+               "label": "Insert rows"
+              },
+              "useColumnHeaders": {
+               "label": "No"
+              },
+              "valueInputOption": {
+               "mode": "chose",
+               "label": "User entered"
+              },
+              "insertUnformatted": {
+               "mode": "chose"
+              }
+             },
+             "parameters": {
+              "__IMTCONN__": {
+               "data": {
+                "scoped": "true",
+                "connection": "google"
+               },
+               "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+              }
+             }
+            },
+            "designer": {
+             "x": 997,
+             "y": 237
+            }
+           }
+          }
+         ]
+        },
+        {
+         "flow": [
+          {
+           "id": 22,
+           "module": "google-sheets:updateRow",
+           "version": 2,
+           "filter": {
+            "name": "Exists?",
+            "conditions": [
+             [
+              {
+               "a": "{{19.`__ROW_NUMBER__`}}",
+               "o": "exist"
+              }
+             ]
+            ]
+           },
+           "mapper": {
+            "from": "drive",
+            "mode": "select",
+            "values": {
+             "4": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}"
+            },
+            "sheetId": "MASTER",
+            "rowNumber": "{{19.`__ROW_NUMBER__`}}",
+            "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1MAOgIGlnAlF-3FyZRFwhQdVhp2HwWingBMRoet_fKS0",
+            "includesHeaders": true,
+            "useColumnHeaders": false,
+            "valueInputOption": "USER_ENTERED"
+           },
+           "parameters": {
+            "__IMTCONN__": 6237841
+           },
+           "metadata": {
+            "restore": {
+             "expect": {
+              "from": {
+               "label": "My Drive"
+              },
+              "mode": {
+               "label": "Search by path"
+              },
+              "sheetId": {
+               "label": "MASTER"
+              },
+              "spreadsheetId": {
+               "path": [
+                "PPS - Clinic NP Tracker Sheets",
+                "City Dental Centers - Stat Sheet"
+               ]
+              },
+              "includesHeaders": {
+               "label": "Yes"
+              },
+              "useColumnHeaders": {
+               "label": "No"
+              },
+              "valueInputOption": {
+               "mode": "chose",
+               "label": "User entered"
+              }
+             },
+             "parameters": {
+              "__IMTCONN__": {
+               "data": {
+                "scoped": "true",
+                "connection": "google"
+               },
+               "label": "Josh@apex (joshua@apexdentalmarketing.net)"
+              }
+             }
+            },
+            "designer": {
+             "x": 1024,
+             "y": 447
+            }
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "metadata": {
+  "instant": true,
+  "version": 1,
+  "designer": {
+   "orphans": []
+  },
+  "scenario": {
+   "dlq": false,
+   "slots": null,
+   "dataloss": false,
+   "maxErrors": 3,
+   "autoCommit": true,
+   "roundtrips": 1,
+   "sequential": false,
+   "confidential": false,
+   "freshVariables": false,
+   "autoCommitTriggerLast": true
+  }
+ }
+}

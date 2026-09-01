@@ -1257,3 +1257,586 @@ The same applies to the precedence rule. Until it ships, `/b2c` and the webhook
 are still last-writer-wins against a practice's portal answer. No practice has
 answered yet, so nothing is at risk today; that stops being true on the first
 one.
+
+---
+
+# Retiring type 01: the manifest — 1 Sep 2026
+
+The standing rule is that nothing gets deactivated without stating what it does
+and why. This is that statement, for all 58 per-client
+`01 - PPS - New Appointment Booked` scenarios (56 active, 2 already off).
+
+## They cannot reach the Hub. Proven twice, independently.
+
+**Structurally.** Reading `usedPackages` for all 58: every one uses only
+`gateway`, `builtin`, `google-sheets`, and some `regexp` and `util`. **Not one
+has an `http` module.** There is no mechanism by which any of them could post to
+the Hub even if somebody wanted it to.
+
+| Package | Scenarios using it |
+|---|---|
+| gateway | 58 |
+| builtin | 58 |
+| google-sheets | 58 |
+| regexp | 46 |
+| util | 12 |
+| **http** | **0** |
+
+**Empirically.** `appointments.source` is `crm` on all 369 rows, and there are
+zero `appointment_ledger` rows carrying a `crm_appointment_id` that the CRM sync
+did not create. Nothing has ever entered the Hub from one of these scenarios.
+
+So their entire output is the spreadsheet row. Switching them off removes a
+spreadsheet write and nothing else — there is no Hub feed to port, which is why
+this is a retirement rather than a migration.
+
+## Five need a decision before they are switched off
+
+Everything else is uniform: one scenario, one sheet, eight modules. These five
+are not, and switching them off changes something beyond "the stat sheet stops
+being written".
+
+| Scenario | Practice | Sheets | What is different |
+|---|---|---|---|
+| `5950336` | **Kind Dental** | **3** | misdirected_write — also writes into City Dental Centers and Kind Dental (GD). Retiring it *stops* two cross-account leaks. Good, but somebody should know those two practices' sheets will stop receiving rows they were never supposed to get. |
+| `5950112` | **Art of Smile** | 2 | Not a fault — `0024` cleared it as a deliberate dual-write to a second file with its own lookup. **That second sheet has no other writer.** Retiring this stops it being maintained, and somebody has to decide whether it still matters. |
+| `5973526` | SMYLE East Meadows | 2 | misdirected_write into SMYLE Dental Centers' sheet. Retiring stops the leak. |
+| `5974519` | Team Dental Swedesboro | 2 | misdirected_write into Team Dental N. Liberties. Retiring stops the leak — and this is the one case where an overwrite of real data could not be ruled out. |
+| `4176278` | Eagle Creek | 2 | read_write_split — reads a file nothing writes, so its dedupe never matches and every booking appends a duplicate. Retiring stops the duplicates. |
+
+Plus `5970743` (Dental Solutions) with a `padded_id`, and `4176701`
+(OC Healthy Smiles) sharing a file with Stanton — neither changes the retirement
+decision, but both stop mattering once the writes stop.
+
+Four of the six are faults that **retirement fixes**. Only Art of Smile's second
+sheet is something that would be lost.
+
+## Why nothing has been switched off yet
+
+The blocker is not technical and it has not moved: **no practice is using the
+portal.** `showed_source = 'client'` is zero across all 369 appointments, and
+`outcome_updated_at` has never been set.
+
+The stat sheet is still a practice's only window on their own numbers. Switching
+off the writes today would take that away and replace it with a portal nobody
+has been told to open. The order stands:
+
+1. Practices are pointed at their portal link — 75 already exist and work.
+2. `showed_source = 'client'` climbs off zero. That is the adoption signal.
+3. **Then** deactivate the 57, leaving them present and reversible.
+4. Delete only after a full billing cycle closes with the numbers agreeing.
+
+Steps 3 and 4 are ten minutes of work. Step 1 is the project, and it is not an
+engineering task.
+
+## The four cross-account faults are fixed — 1 Sep 2026
+
+Repaired rather than retired. Retiring these would have stopped the damage *and*
+taken each practice's sheet away; repointing stops the damage and keeps the
+sheet, so it strictly dominates — and it holds whether Sheets is retired next
+month or never.
+
+| Scenario | Practice | Was | Now |
+|---|---|---|---|
+| `5950336` | Kind Dental | modules 10 & 22 wrote into **City Dental Centers**, module 15 into **Kind Dental (GD)** | all 8 Sheets modules point at Kind Dental's own file |
+| `5973526` | SMYLE East Meadows | module 16 wrote into **SMYLE Dental Centers** | all 8 point at its own file |
+| `5974519` | Team Dental Swedesboro | modules 10 & 22 wrote into **Team Dental N. Liberties** | all 8 point at its own file |
+| `4176278` | Eagle Creek | lookup read `1h1MnNra…`, a file nothing writes | lookup reads the file it writes to |
+
+All four remain **active**, `isinvalid: false`, hooks unchanged. Verified by
+re-reading each blueprint: no foreign spreadsheet id survives in any of them.
+
+**Why repointing and not deletion.** Modules 10 and 22 are the *"row already
+exists"* branches. Deleting them would have removed each practice's update path
+entirely, so a repeat booking would append a duplicate instead of updating —
+trading one fault for another. Worse, in their broken state they looked up a row
+number in the practice's own sheet and then applied it to a *different*
+practice's sheet, so the row they overwrote was arbitrary.
+
+**Backups are in `ops/pps-consolidated/blueprints/`**, one `-before.json` per
+scenario, which is the restore path. This is a deliberate departure from "clone
+before you edit": a Make clone would contain the same misdirected modules and
+`scenario_sheet_findings` would report it as a second offender, so the backup
+would create the fault it exists to protect against. A file in git does not.
+
+Two side effects worth naming. The blueprints were sent without their
+`metadata.expect` blocks, which are Make's derived UI caches and are rebuilt when
+a scenario is opened — the stale display labels that made this audit necessary go
+with them. And the stored `samples` were dropped, which removes a copy of real
+patient data from each blueprint.
+
+### A fifth fault, found in all of them, and not fixed
+
+Every one of these scenarios splits new patients three ways on `utmMedium`:
+
+| Module | Condition | Destination |
+|---|---|---|
+| 2 | does **not** contain `paid` | own sheet |
+| 15 | **equals** `paid` | own sheet |
+| 16 | contains **`{{paid`** | own sheet |
+
+Module 16's comparison value is a **broken merge tag** — the literal characters
+`{{paid`. No real value contains that, so the branch can never fire. Which means
+a booking whose `utmMedium` *contains* "paid" but does not *equal* it — say
+`paid_social` — matches no branch at all and **is never written to the sheet**.
+
+It is in **45 of 45** type-01 blueprints on hand, so it is in the template and
+almost certainly all 58.
+
+Left unfixed deliberately, for two reasons. Correcting `{{paid` to `paid` would
+make modules 15 and 16 both fire on `utmMedium = "paid"`, producing a duplicate
+row — so the fix is a rewrite of the branch logic, not a one-character edit. And
+the impact is unevidenced: the only paid-social sample on record carries
+`utmMedium = "Broad | Apple Tree/Avondale | 10 mil | [25-50]"`, which contains no
+"paid" and correctly takes module 2.
+
+**It cannot be measured from the Hub**, which is its own finding:
+`appointments.utm_medium` is **null on all 369 rows**. The column exists and the
+sync never fills it, so no attribution question can be answered from the Hub
+today — and this particular gap cannot be sized without reading GoHighLevel
+directly.
+
+---
+
+# The three practices missing from the Hub — 1 Sep 2026
+
+Chasing the largest remaining item: Kind Dental has never had an appointment in
+the Hub, Village Dental has had none since 22 July, and VDNE (General Dentistry)
+has none ever. All three are active clients.
+
+## Kind Dental: already diagnosed, already recorded, still not acted on
+
+`calendar_list_conflicts` — the view added in `0019` — has carried the answer
+since 24 August:
+
+> `Il8ovGGMeIc7dbtkmB2N` · **Ortho & New Patient Exam | Dr. Vohra**
+> *"Active, publicly bookable 45-minute Service calendar on a real PatientSync
+> chair; confirmed new-patient consultations in a GoHighLevel UI audit on
+> 2026-08-24. Second consults live on a separate calendar in this account."*
+> appointments held **0** · charges held **15** · consults billed **28**
+
+Somebody opened GoHighLevel and confirmed this is the practice's real
+new-patient consultation calendar. It is nonetheless in `excluded_calendars`,
+reason "Not the practice booking calendar". That single exclusion is why the Hub
+has zero appointments for Kind Dental, why 15 charges are held, and why 28
+consults were billed against nothing.
+
+Removing it is one statement:
+
+```sql
+delete from excluded_calendars where crm_calendar_id = 'Il8ovGGMeIc7dbtkmB2N';
+```
+
+Not run here. It is a billing decision — it makes 28 consults visible and
+releases 15 held charges — and that is the practice's commercial relationship,
+not a data fix.
+
+## VDNE (General Dentistry) is not a separate GoHighLevel location
+
+It has no `crm_location_id`, which read like a missing value to be filled in.
+It is not. Reading both stat sheets' Location ID column directly:
+
+| Sheet | Data rows | Location ID found | Location Name |
+|---|---|---|---|
+| VDNE (General Dentistry) | 32 | `QfjLxc7h8uj4YZkryYUA` ×29 | Village Dental of New England |
+| VDNE (main) | 117 | `QfjLxc7h8uj4YZkryYUA` ×29 (of 102 filled) | Village Dental of New England |
+
+**The same id, and the same name, in both.** There is one GoHighLevel location
+writing into two spreadsheets. The "(General Dentistry)" client in the Hub is a
+Hub-side split with no CRM counterpart.
+
+So the field must stay null. Assigning `QfjLxc7h8uj4YZkryYUA` to it would give
+two clients the same location id, and every id-keyed lookup in this system —
+routing, sync attribution, the consolidated data store — would then have two
+answers to a question that must have one.
+
+What it actually needs is a decision: either the two Hub clients merge, or the
+split is deliberate and something other than a location id has to distinguish
+them. The GD sheet's last row is **13 July**; the main sheet runs to **31
+August**, which suggests the split has already lapsed in practice.
+
+## Village Dental's own gap is narrowed but not closed
+
+Its three Hub appointments all came from calendar `85cKh87AJV8VWnd8I0g5`, which
+is **not excluded**, and they stop on 22 July. Its stat sheet has bookings
+through 31 August. So the practice kept booking, the sync kept working for other
+clients, and this location's bookings stopped arriving.
+
+The most likely reading is that bookings moved to a different calendar after 22
+July — one either excluded or never seen. Confirming that needs GoHighLevel's
+calendar list for the location, which needs API access, which needs the token
+bridge `6003601` that is still `isinvalid`. That chain is now the blocker on the
+last of the three.
+
+## Kind Dental's consultation calendar is no longer excluded — 1 Sep 2026
+
+Run on Jemie's instruction:
+
+```sql
+delete from excluded_calendars where crm_calendar_id = 'Il8ovGGMeIc7dbtkmB2N';
+```
+
+`Ortho & New Patient Exam | Dr. Vohra`, excluded on 22 Aug with the reason "Not
+the practice booking calendar", and confirmed two days later by a GoHighLevel UI
+audit to be exactly that. `calendar_list_conflicts` is now **empty**.
+
+To restore it, if the audit turns out to have been wrong:
+
+```sql
+insert into excluded_calendars (crm_calendar_id, client_id, calendar_name, reason, excluded_at)
+values ('Il8ovGGMeIc7dbtkmB2N', 'd9f78b83-e6e2-4e58-ba4b-0c8fdf76857f',
+        'Ortho & New Patient Exam | Dr. Vohra', 'Not the practice booking calendar',
+        '2026-08-22 17:42:28.187218+00');
+```
+
+### What this does and does not do
+
+**No money has moved.** This changes what the `crm-appointments` sync is allowed
+to read. It does not bill anything, release anything, or alter a charge. The 15
+held charges and 28 billed consults are still exactly where they were.
+
+**Kind Dental still shows 0 appointments** and will until the next nightly sync
+runs — the exclusion governs reading, and nothing has read since. That is the
+check: after the next run, `appointments` for
+`d9f78b83-e6e2-4e58-ba4b-0c8fdf76857f` should stop being zero for the first time.
+
+If it is still zero afterwards, the Vohra calendar was not the whole story and
+the remaining six exclusions need the same GoHighLevel scrutiny — particularly
+` {{location.name}} Virtual Calendar `, the other judgement call from 22 Aug,
+which nobody has audited. The five `Do Not Book` PatientSync mirrors are almost
+certainly correct and should stay.
+
+Only once real appointments land can the billing question be answered properly:
+28 consults were billed against zero appointments, and until there are
+appointments to compare them to, nobody can say which of the 28 were owed.
+
+### It worked, and the nightly sync is clean for the first time
+
+The 18:00 cron run on 1 Sep, the first since the exclusion was removed:
+
+| | Before | After |
+|---|---|---|
+| Kind Dental appointments in the Hub | **0**, ever | **7** |
+| `crm-appointments` run status | `partial`, every night | **`success`** |
+| Errors on the run | **2**, every night | **0** |
+
+All seven of Kind Dental's appointments are on calendar `Il8ovGGMeIc7dbtkmB2N`
+— the Vohra calendar — spanning 5 Aug to 1 Sep. That is direct proof the
+exclusion was the sole cause, not a contributing factor.
+
+Both nightly errors were about this one calendar, and both had been describing
+the fix for ten days:
+
+> *"1 calendar(s) are named in both excluded_calendars and included_calendars.
+> Exclusion wins, so they are NOT being read — which means somebody added them as
+> consultation calendars and is still getting no appointments from them. One of
+> the two entries is wrong and a person has to decide which."*
+
+Somebody had already added the Vohra calendar to `included_calendars` after the
+24 Aug UI audit. It stayed in `excluded_calendars` as well, exclusion won, and
+the sync said so out loud every single night into a field nobody read.
+
+The second error listed Kind Dental's whole calendar inventory, which explains
+why nothing else could have covered for it: five `Do Not Book` PatientSync
+mirrors, a `{{location.name}} Virtual Calendar`, a
+`{{clinic.use}} Second_consultation`, and `Joshua Jung's Personal Calendar`. Not
+one of the readable ones is a new-patient consultation calendar.
+
+### One consequence, handled
+
+That run started at 18:00:23, roughly as PR #2 merged, so it executed the
+**pre-merge** code and re-incremented `reschedule_count` on 292 rows — exactly
+the regression predicted before merging. `0026`'s reset was re-run; both columns
+are back to 0 and null.
+
+From the next nightly run onward the deployed fix compares instants, so this
+should stay at zero without intervention. **That is the one thing still worth
+checking tomorrow:** if `reschedule_count` is non-zero again after the 2 Sep run,
+the deploy did not take.
+
+### Still open on the billing question
+
+28 consults were billed and 15 charges are held against what was, until today,
+zero appointments. There are now seven. Whether those seven reconcile against
+the 28 is a separate exercise, and it needs the appointment ledger rather than
+this table.
+
+---
+
+# The ledger rebuild now fails, and it is a consequence of the Kind Dental fix
+
+Ran `appointment-ledger` manually at 18:07 to link the seven new appointments.
+It aborted:
+
+```
+fatal: duplicate key value violates unique constraint "appointment_ledger_tracker_key"
+Key (tracker_source_tab, tracker_source_row)=(Appointment Data, 46) already exists.
+```
+
+**No damage.** The ledger is still 1,344 rows and nothing was linked; the
+function is atomic and rolled back.
+
+## What the bug is
+
+`rebuild_appointment_ledger()` inserts CRM appointments as ledger rows first,
+then matches tracker rows to them on client + patient name + date, then stamps
+the tracker key onto the matched CRM row:
+
+```sql
+merged as (
+  update appointment_ledger l
+  set tracker_source_tab = p.tab,
+      tracker_source_row = p.source_row, ...
+  from paired p
+  where l.id = p.ledger_id and p.ledger_id is not null
+)
+```
+
+If that tracker row **already has its own tracker-only ledger row**, two rows now
+carry the same `(tracker_source_tab, tracker_source_row)` and the unique index
+rejects it. The merge never removes the row it is superseding.
+
+It has been dormant since the ledger was built, because it only fires the first
+time a practice goes from *"tracker rows, no CRM appointments"* to *"both"* — a
+transition no practice had made. Kind Dental made it this evening.
+
+## Blast radius: three rows, one practice, no money
+
+| tracker row | date | outcome | billing state | amount | billed | Stripe intent |
+|---|---|---|---|---|---|---|
+| 102 | 7 Aug | showed | billable | £0 | no | no |
+| 21 | 19 Aug | pending | pending | £0 | no | no |
+| 46 | 20 Aug | pending | pending | £0 | no | no |
+
+None carries money, a `billed_at`, or a payment intent.
+
+## Why it matters more than three rows
+
+The function is one statement. Three colliding rows abort the **entire** rebuild,
+so **the 06:04 run tomorrow will fail the same way** and the reconciliation stops
+updating fleet-wide — including the numbers it reported this morning:
+
+- 45 charge lines totalling **$11,836.75** that cannot be tied to an appointment
+- 455 delivered consultations worth an estimated **$102,592.66** unbilled past 30 days
+- 27 appointments billed without a recorded show, or vanished while still open
+
+Those figures go stale until the rebuild runs again.
+
+## Two ways out
+
+**Patch the function** — the right fix. In the `merged` CTE, delete the
+superseded tracker-only row as part of the merge, so one appointment keeps one
+ledger row: the CRM-keyed one, enriched from the tracker. This also covers the
+next practice to make the same transition, which Village Dental will do the
+moment its calendar is found. It is a change to billing reconciliation logic and
+has no test harness, which is why it is not done here.
+
+**Clear the three rows** — unblocks tonight. They carry no money and the rebuild
+recreates them correctly from `tracker_appointments`. But it recurs for the next
+practice, so it buys time rather than fixing anything.
+
+Recommend the patch, with the three-row clear only if the reconciliation numbers
+are needed before someone can review a function change.
+
+## Patched, and the rebuild runs clean again
+
+`0030` adds `merge_superseded_tracker_ledger_rows()`, called from
+`appointment-ledger.ts` immediately before the rebuild.
+
+It is a separate function rather than a change to `rebuild_appointment_ledger`
+on purpose. The superseded rows can be identified without any of that function's
+internals — they are tracker-only ledger rows whose patient and date already
+exist as a real appointment — so the fix stays small enough to read in one
+sitting and 177 lines of billing logic stay untouched.
+
+It matches the `appointments` table rather than CRM-keyed ledger rows, because
+at the point it runs those ledger rows do not exist: step 1 of the rebuild is
+what creates them. That is also why the collision could never be seen in the
+ledger's resting state, only mid-rebuild.
+
+**Rows in `waived`, `disputed` or `on_hold` are deliberately left alone.**
+`attribute_ledger_charges()` resets and re-derives `billing_state`, `billed_at`,
+`stripe_payment_intent_id` and `amount_cents` from `billing_charges` on every
+run, so a superseded row carries nothing durable — except those three states,
+which are a person's decision. If one ever collides the rebuild will abort
+exactly as it did today, and that is the right outcome: somebody disputed a
+charge, and a merge should not quietly decide what happens to it. None exist
+today, fleet-wide.
+
+### Verified
+
+```
+merge_superseded_tracker_ledger_rows()  ->  3 rows removed
+rebuild_appointment_ledger()            ->  from_crm 386 · rows_total 1358
+                                            matched_both 294 · billed_rows 342
+```
+
+| | |
+|---|---|
+| Duplicate tracker keys anywhere in the ledger | **0** |
+| Kind Dental ledger rows | 36 — 32 tracker + 7 CRM − 3 merged |
+| Kind Dental rows linked to a CRM appointment | **7** |
+| Kind Dental rows now carrying **both** feeds | **3** |
+
+The reconciliation is live again, so tonight's numbers are current rather than
+frozen at this morning's. The three rows that aborted it are now single rows
+carrying both a CRM appointment id and their tracker origin — which is what the
+ledger was built to produce.
+
+---
+
+# Billed for consultations that were not delivered — 1 Sep 2026
+
+With the ledger rebuilding again, the billing question Kind Dental raised is
+answerable fleet-wide. It is not a Kind Dental problem.
+
+| Outcome recorded | Rows billed | Practices | Amount |
+|---|---|---|---|
+| showed | 315 | 28 | $60,829.32 |
+| **no_show** | **17** | **11** | **$3,230.34** |
+| **outcome never recorded** | **9** | **7** | **$1,659.33** |
+| **cancelled** | **1** | **1** | **$202.91** |
+
+**27 charges totalling $5,092.58** are against consultations that either did not
+happen or were never confirmed to have happened — about 7.7% of billed value.
+
+That 27 is not a coincidence. It is the same 27 the nightly exception report has
+been printing for months: *"27 appointment(s) are either billed without a
+recorded show or vanished from the CRM while still open."* The view was right;
+nobody had put a number on it.
+
+## Per practice
+
+| Practice | No-show | Cancelled | Never recorded | Amount |
+|---|---|---|---|---|
+| Anaheim Smile Center | 3 | – | 2 | **$1,014.55** |
+| Bespoke Orthodontics | 2 | – | 1 | $608.73 |
+| Hancock and Johnston Dentistry | 2 | – | – | $456.55 |
+| Wilmington Family Dental | – | – | 2 | $405.82 |
+| Bling Dental | 1 | 1 | – | $405.82 |
+| Snyder Dental Group | 2 | – | – | $405.82 |
+| TMJ Sleep Airway Orthodontics – Williston | 2 | – | – | $302.82 |
+| DNA Dental Studio | 1 | – | – | $202.91 |
+| Smile and Implant Center of Rockland | – | – | 1 | $202.91 |
+| Diamond Dental | – | – | 1 | $202.91 |
+| HEB Family Dentistry | 1 | – | – | $202.91 |
+| Magic Dental | 1 | – | – | $202.91 |
+| Kind Dental | 1 | – | 1 | $175.10 |
+| Lightning Orthodontics | – | – | 1 | $151.41 |
+| Team Dental N. Liberties | 1 | – | – | $151.41 |
+
+15 practices, 15 Mar – 27 Aug.
+
+The three categories are not equally wrong. A **no-show** or **cancelled** charge
+is billed for something the record says did not occur. An **outcome never
+recorded** charge may be perfectly good — nobody answered the survey, which is
+the adoption problem — but it is billed without evidence, which is the same
+position to be in if a client asks.
+
+## Kind Dental specifically, now that it has appointments
+
+36 ledger rows. 21 billed at $1,838.55, spanning 21 Apr – 20 Jul, and **not one
+of them has a CRM appointment behind it**.
+
+Removing the exclusion fixed the future, not the past. The sync's window reaches
+back to 7 July at the earliest, so consultations billed before then can never
+gain calendar corroboration — the tracker sheet remains the only evidence they
+happened. Of the 21, two are questionable on their face: one billed against a
+recorded no-show and one where no outcome was ever recorded.
+
+## Not recommended: fixing the `{{paid` defect
+
+The broken merge tag in all 58 type-01 scenarios is real, but it should be left
+alone.
+
+Its effect is unmeasurable from here — `appointments.utm_medium` is null on all
+369 rows, and a dropped booking leaves no row to count. And the replacement
+already does not have it: the consolidated scenario `6046761` writes every
+booking through one `addRow` with no `utmMedium` branch at all. Editing 58 live
+scenarios to repair a fault that the retirement deletes, with no way to show it
+has ever fired, is work spent on a system being switched off.
+
+---
+
+# Task 3, the coverage gap: as closed as it goes without GoHighLevel
+
+The gap was **27** appointments per fortnight present in the Client Fulfilment
+Tracker and absent from the Hub. It is now **25**, and it is no longer a
+fleet-wide problem — it is one practice.
+
+| Practice | Rows | Status |
+|---|---|---|
+| Village Dental of New England | 9 | blocked — bookings stopped reaching the Hub on 22 Jul |
+| Village Dental (General Dentistry) | 9 | blocked — needs a merge decision, not a data fix |
+| Art Of Smile | 2 | needs a per-row GoHighLevel lookup |
+| **Kind Dental** | **2** *(was 4)* | **halved by removing the calendar exclusion** |
+| Bling Dental · The Smile Patio | 1 each | per-row lookup |
+| Lightning Orthodontics | 1 | a tracker typo — see below |
+
+**18 of the remaining 25 are Village Dental**, across its two Hub clients. Both
+threads run into the same wall: one needs somebody to decide whether the two
+clients are one practice, the other needs GoHighLevel's calendar list.
+
+## The name matcher is not the problem
+
+Worth recording, because it was the obvious suspect and it is innocent. Seventeen
+unlinked tracker rows across eight practices have a Hub appointment on the same
+day, which looks like failed name matching. It is not:
+
+| | |
+|---|---|
+| Unlinked rows with a same-day Hub appointment | 17 |
+| …whose first name matches the appointment's | **1** |
+| …differing only by whitespace | **0** |
+
+They are different patients seen on the same day. A practice books several
+consultations a day, so "same date" was never much of a signal. Only one row in
+seventeen is even a candidate for a spelling miss.
+
+So the residual gap is genuinely missing CRM appointments, not appointments the
+Hub holds and failed to recognise. No fuzzy-matching work is warranted; it would
+manufacture false links against a problem that does not exist.
+
+## The one clear data error, and why it is not fixed here
+
+Tracker row 173, Lightning Orthodontics: `booked_for` **2 Aug 2027**, created
+17 Jul 2026 — **381 days ahead**, with no appointment status. Almost certainly
+2026 mistyped as 2027.
+
+Not corrected in the database, because the Client Fulfilment Tracker is the
+source and the next import would write the typo straight back. It is a one-cell
+edit in that sheet, and it is somebody's to make rather than mine to guess: a
+381-day lead time is implausible, not impossible.
+
+It is worth making. A 2027 date keeps the row permanently "upcoming", so it will
+sit in the exception and backlog views indefinitely without ever resolving.
+
+## Making the Hub answer the Village Dental question itself
+
+The sync already fetched the answer and threw it away. When a location returns
+no events it lists that location's calendars — but it only recorded them when
+the practice had **no** consultation calendar. A practice that has one and
+returned nothing anyway was recorded nowhere, so the two states nobody can tell
+apart from outside stayed indistinguishable:
+
+- a genuinely quiet fortnight, and
+- bookings landing on a calendar the sync has not been told about.
+
+Village Dental is the second, and working that out meant reading GoHighLevel by
+hand. `crm-appointments.ts` now emits `read_nothing_despite_a_calendar` — the
+practice, and every calendar it holds with **id, name and whether it is
+excluded**.
+
+Ids as well as names, because a name is what gets renamed. Recorded as a note
+rather than an error: a quiet fortnight is not a fault, and an alert that fires
+on one would be ignored within a week.
+
+It costs nothing. The listing call was already being made on exactly these
+locations — this keeps the result instead of discarding it.
+
+**It answers the question from the next run after deploy, not today.** For today
+the answer is a two-minute look in GoHighLevel: open Village Dental's
+sub-account, Settings → Calendars, and compare what is there against the one
+calendar the Hub reads, `85cKh87AJV8VWnd8I0g5`, plus the five in
+`excluded_calendars`. Any calendar in neither list, holding bookings after
+22 July, is the answer.

@@ -1,0 +1,225 @@
+{
+ "name": "01 - PPS - New Appointment Booked -> Update sheet - [Eagle Creek Dentistry]",
+ "flow": [
+  {
+   "id": 1,
+   "module": "gateway:CustomWebHook",
+   "version": 1,
+   "mapper": {},
+   "parameters": {
+    "hook": 1902229,
+    "maxResults": 1
+   },
+   "metadata": {
+    "designer": {
+     "x": 0,
+     "y": 150
+    }
+   }
+  },
+  {
+   "id": 3,
+   "module": "util:SetVariable2",
+   "version": 1,
+   "mapper": {
+    "name": "App - Date",
+    "scope": "roundtrip",
+    "value": "{{formatDate(1.calendar.startTime; \"MM/DD/YYYY hh:mm\")}}"
+   },
+   "parameters": {},
+   "metadata": {
+    "designer": {
+     "x": 300,
+     "y": 150
+    },
+    "advanced": true
+   }
+  },
+  {
+   "id": 4,
+   "module": "util:SetVariable2",
+   "version": 1,
+   "mapper": {
+    "name": "Created - Date",
+    "scope": "roundtrip",
+    "value": "{{formatDate(1.date_created; \"MM/DD/YYYY\")}}"
+   },
+   "parameters": {},
+   "metadata": {
+    "designer": {
+     "x": 600,
+     "y": 150
+    },
+    "advanced": true
+   }
+  },
+  {
+   "id": 8,
+   "module": "google-sheets:filterRows",
+   "version": 2,
+   "mapper": {
+    "from": "drive",
+    "limit": "1",
+    "filter": [
+     [
+      {
+       "a": "Q",
+       "b": "{{1.calendar.appointmentId}}",
+       "o": "text:equal"
+      }
+     ]
+    ],
+    "orderBy": "D",
+    "sheetId": "MASTER",
+    "fieldType": "string",
+    "sortOrder": "desc",
+    "spreadsheetId": "1QyKIYRnfZnhv12GOa0sXIoyJT7DmvwUIlbpFUFIrbcU",
+    "tableFirstRow": "A1:CZ1",
+    "includesHeaders": true,
+    "valueRenderOption": "FORMATTED_VALUE",
+    "dateTimeRenderOption": "FORMATTED_STRING"
+   },
+   "parameters": {
+    "__IMTCONN__": 6237841
+   },
+   "metadata": {
+    "designer": {
+     "x": 900,
+     "y": 150
+    }
+   }
+  },
+  {
+   "id": 9,
+   "module": "builtin:BasicRouter",
+   "version": 1,
+   "mapper": null,
+   "metadata": {
+    "designer": {
+     "x": 1200,
+     "y": 150
+    }
+   },
+   "routes": [
+    {
+     "flow": [
+      {
+       "id": 2,
+       "module": "google-sheets:addRow",
+       "version": 2,
+       "filter": {
+        "name": "",
+        "conditions": [
+         [
+          {
+           "a": "{{8.`__ROW_NUMBER__`}}",
+           "o": "notexist"
+          }
+         ]
+        ]
+       },
+       "mapper": {
+        "from": "drive",
+        "mode": "select",
+        "values": {
+         "0": "{{1.full_name}}",
+         "1": "{{1.email}}",
+         "2": "'{{1.phone}}",
+         "3": "{{4.`Created - Date`}}",
+         "4": "{{3.`App - Date`}}",
+         "7": "{{1.contact_source}}",
+         "16": "{{1.calendar.appointmentId}}",
+         "17": "{{1.location.name}}",
+         "18": "{{1.location.id}}",
+         "19": "'{{1.phone}}",
+         "23": "{{1.contact.lastAttributionSource.campaign}}",
+         "24": "{{1.contact.lastAttributionSource.utmMedium}}",
+         "25": "{{1.contact.lastAttributionSource.utmContent}}",
+         "26": "{{1.`Please select the treatment you are interested in:`}}",
+         "27": "{{1.FirstTimestamp}}"
+        },
+        "sheetId": "MASTER",
+        "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1QyKIYRnfZnhv12GOa0sXIoyJT7DmvwUIlbpFUFIrbcU",
+        "includesHeaders": true,
+        "insertDataOption": "INSERT_ROWS",
+        "useColumnHeaders": false,
+        "valueInputOption": "USER_ENTERED",
+        "insertUnformatted": false
+       },
+       "parameters": {
+        "__IMTCONN__": 6237841
+       },
+       "metadata": {
+        "designer": {
+         "x": 1500,
+         "y": 0
+        }
+       }
+      }
+     ]
+    },
+    {
+     "flow": [
+      {
+       "id": 10,
+       "module": "google-sheets:updateRow",
+       "version": 2,
+       "filter": {
+        "name": "",
+        "conditions": [
+         [
+          {
+           "a": "{{8.`__ROW_NUMBER__`}}",
+           "o": "exist"
+          }
+         ]
+        ]
+       },
+       "mapper": {
+        "from": "drive",
+        "mode": "select",
+        "values": {
+         "4": "{{3.`App - Date`}}"
+        },
+        "sheetId": "MASTER",
+        "rowNumber": "{{8.`__ROW_NUMBER__`}}",
+        "spreadsheetId": "/1fJ_xozsYzPvFwdGrdjpe0zf1yan_xECs/1QyKIYRnfZnhv12GOa0sXIoyJT7DmvwUIlbpFUFIrbcU",
+        "includesHeaders": true,
+        "useColumnHeaders": false,
+        "valueInputOption": "USER_ENTERED"
+       },
+       "parameters": {
+        "__IMTCONN__": 6237841
+       },
+       "metadata": {
+        "designer": {
+         "x": 1500,
+         "y": 300
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "metadata": {
+  "instant": true,
+  "version": 1,
+  "designer": {
+   "orphans": []
+  },
+  "scenario": {
+   "dlq": false,
+   "slots": null,
+   "dataloss": false,
+   "maxErrors": 3,
+   "autoCommit": true,
+   "roundtrips": 1,
+   "sequential": false,
+   "confidential": false,
+   "freshVariables": false,
+   "autoCommitTriggerLast": true
+  }
+ }
+}

@@ -136,6 +136,20 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
   }[] = [];
 
   /*
+   * Practices that hold a readable consultation calendar and still returned no
+   * events. Distinct from missingCalendar: that one means "nothing to read
+   * from", this one means "read from the right place and it was empty", which
+   * is either a genuinely quiet fortnight or bookings landing on a calendar
+   * nobody has admitted. The list is recorded so the second case can be told
+   * apart without opening GoHighLevel.
+   */
+  const silentWithCalendar: {
+    clientId: string;
+    practice: string;
+    calendars: { id: string; name: string; excluded: boolean }[];
+  }[] = [];
+
+  /*
    * Calendars that pass the name test and still are not consultations.
    *
    * Every one of them is called "... Booking Calendar", so the name rule lets
@@ -392,6 +406,33 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
             has: calendars
               .map((calendar) => (calendar.name ?? '').trim())
               .filter((name) => name !== ''),
+          });
+        } else {
+          /*
+           * Has a readable consultation calendar and still returned nothing.
+           *
+           * This was the blind spot. A practice with no calendar is reported
+           * above; a practice with one that has simply gone quiet was reported
+           * nowhere, so the two states that matter — "no bookings this
+           * fortnight" and "bookings are happening somewhere we are not
+           * looking" — were indistinguishable from outside.
+           *
+           * Village Dental is the case that exposed it: its stat sheet filled
+           * to 31 Aug while the Hub last saw an appointment on 22 Jul, and
+           * working out why meant reading GoHighLevel by hand. The calendar
+           * list is already fetched here, so recording it costs one more note
+           * and answers the question next time without leaving the Hub.
+           *
+           * Ids as well as names, because a name is what gets renamed.
+           */
+          silentWithCalendar.push({
+            clientId: client.id,
+            practice: client.name,
+            calendars: calendars.map((calendar) => ({
+              id: calendar.id,
+              name: (calendar.name ?? '').trim(),
+              excluded: excludedCalendars.has(calendar.id),
+            })),
           });
         }
       } catch {
@@ -705,6 +746,15 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         'those events.',
       { events: skippedByCalendar },
     );
+  }
+
+  /*
+   * Reported even though it is not an error. A practice can legitimately have a
+   * quiet fortnight, so raising this would cry wolf — but the list is the first
+   * thing anybody needs when a practice's sheet is filling and the Hub is not.
+   */
+  if (silentWithCalendar.length > 0) {
+    ctx.note('read_nothing_despite_a_calendar', silentWithCalendar);
   }
 
   if (missingCalendar.length > 0) {
