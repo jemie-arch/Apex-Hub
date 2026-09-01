@@ -542,9 +542,23 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
         continue;
       }
 
-      // A moved booking is the same booking. Update it, and keep a record of
-      // where it came from so the reschedule is visible rather than silent.
-      const moved = current.scheduled_at !== event.startsAt;
+      /*
+       * A moved booking is the same booking. Update it, and keep a record of
+       * where it came from so the reschedule is visible rather than silent.
+       *
+       * Compare instants, not the strings that spell them. These two sides
+       * format the same moment differently — `event.startsAt` is an
+       * `toISOString()` result ("...T14:30:00.000Z") while Postgres hands back
+       * "...T14:30:00+00:00" — so `!==` was true on every pass for every
+       * appointment. That made this branch fire on every sync: it copied
+       * scheduled_at into rescheduled_from (a no-op, which is why all 364 rows
+       * had the two fields identical) and incremented reschedule_count, so the
+       * counter recorded sync passes rather than reschedules and the client
+       * portal told practices their appointments had moved up to 17 times.
+       */
+      const moved =
+        new Date(current.scheduled_at).getTime() !==
+        new Date(event.startsAt).getTime();
 
       /*
        * Attendance is the one field both sides report, and they can disagree.
