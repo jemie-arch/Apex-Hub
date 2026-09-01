@@ -64,9 +64,13 @@ export default async function PortalCreativesPage({ params }: PageProps) {
     return (
       <article className="panel overflow-hidden rounded-lg border border-line bg-surface">
         {ad.creative_thumb_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- remote ad
-          // thumbnails come from the ad platform's CDN on domains we do not
-          // control, so they cannot be listed for next/image.
+          // Remote ad thumbnails come from the ad platform's CDN on domains we
+          // do not control, so they cannot be listed for next/image.
+          //
+          // The directive has to sit on the line directly above the element:
+          // wrapped onto a second line it silences the comment beneath it and
+          // nothing else, which is what it was doing here.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={ad.creative_thumb_url}
             alt=""
