@@ -1257,3 +1257,141 @@ The same applies to the precedence rule. Until it ships, `/b2c` and the webhook
 are still last-writer-wins against a practice's portal answer. No practice has
 answered yet, so nothing is at risk today; that stops being true on the first
 one.
+
+---
+
+# Retiring type 01: the manifest — 1 Sep 2026
+
+The standing rule is that nothing gets deactivated without stating what it does
+and why. This is that statement, for all 58 per-client
+`01 - PPS - New Appointment Booked` scenarios (56 active, 2 already off).
+
+## They cannot reach the Hub. Proven twice, independently.
+
+**Structurally.** Reading `usedPackages` for all 58: every one uses only
+`gateway`, `builtin`, `google-sheets`, and some `regexp` and `util`. **Not one
+has an `http` module.** There is no mechanism by which any of them could post to
+the Hub even if somebody wanted it to.
+
+| Package | Scenarios using it |
+|---|---|
+| gateway | 58 |
+| builtin | 58 |
+| google-sheets | 58 |
+| regexp | 46 |
+| util | 12 |
+| **http** | **0** |
+
+**Empirically.** `appointments.source` is `crm` on all 369 rows, and there are
+zero `appointment_ledger` rows carrying a `crm_appointment_id` that the CRM sync
+did not create. Nothing has ever entered the Hub from one of these scenarios.
+
+So their entire output is the spreadsheet row. Switching them off removes a
+spreadsheet write and nothing else — there is no Hub feed to port, which is why
+this is a retirement rather than a migration.
+
+## Five need a decision before they are switched off
+
+Everything else is uniform: one scenario, one sheet, eight modules. These five
+are not, and switching them off changes something beyond "the stat sheet stops
+being written".
+
+| Scenario | Practice | Sheets | What is different |
+|---|---|---|---|
+| `5950336` | **Kind Dental** | **3** | misdirected_write — also writes into City Dental Centers and Kind Dental (GD). Retiring it *stops* two cross-account leaks. Good, but somebody should know those two practices' sheets will stop receiving rows they were never supposed to get. |
+| `5950112` | **Art of Smile** | 2 | Not a fault — `0024` cleared it as a deliberate dual-write to a second file with its own lookup. **That second sheet has no other writer.** Retiring this stops it being maintained, and somebody has to decide whether it still matters. |
+| `5973526` | SMYLE East Meadows | 2 | misdirected_write into SMYLE Dental Centers' sheet. Retiring stops the leak. |
+| `5974519` | Team Dental Swedesboro | 2 | misdirected_write into Team Dental N. Liberties. Retiring stops the leak — and this is the one case where an overwrite of real data could not be ruled out. |
+| `4176278` | Eagle Creek | 2 | read_write_split — reads a file nothing writes, so its dedupe never matches and every booking appends a duplicate. Retiring stops the duplicates. |
+
+Plus `5970743` (Dental Solutions) with a `padded_id`, and `4176701`
+(OC Healthy Smiles) sharing a file with Stanton — neither changes the retirement
+decision, but both stop mattering once the writes stop.
+
+Four of the six are faults that **retirement fixes**. Only Art of Smile's second
+sheet is something that would be lost.
+
+## Why nothing has been switched off yet
+
+The blocker is not technical and it has not moved: **no practice is using the
+portal.** `showed_source = 'client'` is zero across all 369 appointments, and
+`outcome_updated_at` has never been set.
+
+The stat sheet is still a practice's only window on their own numbers. Switching
+off the writes today would take that away and replace it with a portal nobody
+has been told to open. The order stands:
+
+1. Practices are pointed at their portal link — 75 already exist and work.
+2. `showed_source = 'client'` climbs off zero. That is the adoption signal.
+3. **Then** deactivate the 57, leaving them present and reversible.
+4. Delete only after a full billing cycle closes with the numbers agreeing.
+
+Steps 3 and 4 are ten minutes of work. Step 1 is the project, and it is not an
+engineering task.
+
+## The four cross-account faults are fixed — 1 Sep 2026
+
+Repaired rather than retired. Retiring these would have stopped the damage *and*
+taken each practice's sheet away; repointing stops the damage and keeps the
+sheet, so it strictly dominates — and it holds whether Sheets is retired next
+month or never.
+
+| Scenario | Practice | Was | Now |
+|---|---|---|---|
+| `5950336` | Kind Dental | modules 10 & 22 wrote into **City Dental Centers**, module 15 into **Kind Dental (GD)** | all 8 Sheets modules point at Kind Dental's own file |
+| `5973526` | SMYLE East Meadows | module 16 wrote into **SMYLE Dental Centers** | all 8 point at its own file |
+| `5974519` | Team Dental Swedesboro | modules 10 & 22 wrote into **Team Dental N. Liberties** | all 8 point at its own file |
+| `4176278` | Eagle Creek | lookup read `1h1MnNra…`, a file nothing writes | lookup reads the file it writes to |
+
+All four remain **active**, `isinvalid: false`, hooks unchanged. Verified by
+re-reading each blueprint: no foreign spreadsheet id survives in any of them.
+
+**Why repointing and not deletion.** Modules 10 and 22 are the *"row already
+exists"* branches. Deleting them would have removed each practice's update path
+entirely, so a repeat booking would append a duplicate instead of updating —
+trading one fault for another. Worse, in their broken state they looked up a row
+number in the practice's own sheet and then applied it to a *different*
+practice's sheet, so the row they overwrote was arbitrary.
+
+**Backups are in `ops/pps-consolidated/blueprints/`**, one `-before.json` per
+scenario, which is the restore path. This is a deliberate departure from "clone
+before you edit": a Make clone would contain the same misdirected modules and
+`scenario_sheet_findings` would report it as a second offender, so the backup
+would create the fault it exists to protect against. A file in git does not.
+
+Two side effects worth naming. The blueprints were sent without their
+`metadata.expect` blocks, which are Make's derived UI caches and are rebuilt when
+a scenario is opened — the stale display labels that made this audit necessary go
+with them. And the stored `samples` were dropped, which removes a copy of real
+patient data from each blueprint.
+
+### A fifth fault, found in all of them, and not fixed
+
+Every one of these scenarios splits new patients three ways on `utmMedium`:
+
+| Module | Condition | Destination |
+|---|---|---|
+| 2 | does **not** contain `paid` | own sheet |
+| 15 | **equals** `paid` | own sheet |
+| 16 | contains **`{{paid`** | own sheet |
+
+Module 16's comparison value is a **broken merge tag** — the literal characters
+`{{paid`. No real value contains that, so the branch can never fire. Which means
+a booking whose `utmMedium` *contains* "paid" but does not *equal* it — say
+`paid_social` — matches no branch at all and **is never written to the sheet**.
+
+It is in **45 of 45** type-01 blueprints on hand, so it is in the template and
+almost certainly all 58.
+
+Left unfixed deliberately, for two reasons. Correcting `{{paid` to `paid` would
+make modules 15 and 16 both fire on `utmMedium = "paid"`, producing a duplicate
+row — so the fix is a rewrite of the branch logic, not a one-character edit. And
+the impact is unevidenced: the only paid-social sample on record carries
+`utmMedium = "Broad | Apple Tree/Avondale | 10 mil | [25-50]"`, which contains no
+"paid" and correctly takes module 2.
+
+**It cannot be measured from the Hub**, which is its own finding:
+`appointments.utm_medium` is **null on all 369 rows**. The column exists and the
+sync never fills it, so no attribution question can be answered from the Hub
+today — and this particular gap cannot be sized without reading GoHighLevel
+directly.
