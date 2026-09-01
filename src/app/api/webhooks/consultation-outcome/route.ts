@@ -13,9 +13,22 @@
  * where they keep using the GoHighLevel form they already know, so the workflow
  * does not have to change on the same day the storage does.
  *
- * Guarded by CRON_SECRET as `Authorization: Bearer <secret>`, matching the
- * recordings webhook. Make can set a header, so there is no query-string
- * fallback here — it would put the secret in access logs for no benefit.
+ * Guarded by SERVICE_API_KEY as `Authorization: Bearer <secret>`, not by
+ * CRON_SECRET. env.ts draws that line and says why: SERVICE_API_KEY "is pasted
+ * into Make, so it can be rotated without touching the cron schedule."
+ *
+ * The distinction is the whole point. CRON_SECRET is required for the app to
+ * boot and is what the nightly sync authenticates with; it should never leave
+ * Vercel. A secret that has been copied into a third-party automation platform
+ * needs to be rotatable on an afternoon's notice, and rotating CRON_SECRET
+ * means every cron route stops until each consumer is updated.
+ *
+ * The bearer comparison is constant-time, matching /api/tokens/ghl. A plain
+ * !== leaks the position of the first differing character to anyone who can
+ * time the response, which is enough to recover a secret one byte at a time.
+ *
+ * Make can set a header, so there is no query-string fallback — it would put
+ * the secret in access logs for no benefit.
  *
  * How a payload becomes a set of column changes lives in
  * lib/webhooks/consultation-payload, which is pure and separately exercised by
@@ -53,24 +66,43 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { serverEnv } from '@/lib/env';
+import { serviceApiKey } from '@/lib/env';
 import { serviceClient } from '@/lib/supabase/service';
 import { readConsultationPayload } from '@/lib/webhooks/consultation-payload';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
-  const env = serverEnv();
+/** Constant-time bearer check, the same shape as /api/tokens/ghl. */
+function authorised(request: NextRequest): boolean {
+  const header = request.headers.get('authorization');
+  if (!header?.startsWith('Bearer ')) return false;
 
-  if (!env.CRON_SECRET) {
+  const provided = header.slice('Bearer '.length);
+  const expected = serviceApiKey();
+
+  if (provided.length !== expected.length) return false;
+
+  let mismatch = 0;
+  for (let index = 0; index < provided.length; index += 1) {
+    mismatch |= provided.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+  return mismatch === 0;
+}
+
+export async function POST(request: NextRequest) {
+  let allowed: boolean;
+  try {
+    allowed = authorised(request);
+  } catch (error) {
+    // SERVICE_API_KEY missing: say so rather than returning a bare 401, which
+    // would look like a wrong key and send somebody hunting the wrong problem.
     return NextResponse.json(
-      { error: 'CRON_SECRET is not set, so this endpoint cannot authenticate.' },
+      { error: error instanceof Error ? error.message : 'not configured' },
       { status: 503 },
     );
   }
 
-  const header = request.headers.get('authorization');
-  if (header !== `Bearer ${env.CRON_SECRET}`) {
+  if (!allowed) {
     return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
   }
 

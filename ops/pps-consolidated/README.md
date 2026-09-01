@@ -219,7 +219,7 @@ still running.
 ## Before it can run
 
 **Put the secret in the Authorization header.** Both HTTP modules currently read
-`Bearer REPLACE_WITH_CRON_SECRET`. Prefer Make's keychain over pasting the value:
+`Bearer the SERVICE_API_KEY keychain key`. Prefer Make's keychain over pasting the value:
 a header typed into a module is stored in the blueprint in plain text, and
 blueprints are readable by anyone with team access.
 
@@ -315,7 +315,7 @@ each, and none of them is switched on.
 
 Neither new scenario contains a Google Sheets module. Both post to
 `POST /api/webhooks/consultation-outcome` with
-`Authorization: Bearer REPLACE_WITH_CRON_SECRET`, which has to be replaced before
+`Authorization: Bearer the SERVICE_API_KEY keychain key`, which has to be replaced before
 either can work — prefer Make's keychain to pasting the value into the blueprint.
 
 Webhook URLs:
@@ -440,3 +440,41 @@ Retries and a queue mean a booking survives the Hub being briefly down. They do 
 make the endpoint idempotent — the same webhook delivered twice writes twice.
 Harmless for an attendance flag or a cancellation, which are the only things sent
 today. It would stop being harmless if the payload ever carried anything additive.
+
+---
+
+## The secret is SERVICE_API_KEY, not CRON_SECRET
+
+I built this endpoint on `CRON_SECRET` because the recordings webhook uses it. That
+was wrong, and `env.ts` says so in a comment I read past:
+
+> Shared secret for machine-to-machine routes that hand out CRM tokens. Separate from
+> CRON_SECRET on purpose: this one is pasted into Make, so it can be rotated without
+> touching the cron schedule.
+
+The distinction matters. `CRON_SECRET` is required for the app to boot and is what the
+nightly sync authenticates with — it should never leave Vercel. A secret copied into a
+third-party automation platform has to be rotatable on an afternoon's notice, and
+rotating `CRON_SECRET` stops every cron route until each consumer is updated.
+
+So `/api/webhooks/consultation-outcome` now takes **`SERVICE_API_KEY`**.
+
+It also now uses the constant-time comparison from `/api/tokens/ghl`. The plain `!==`
+I had written leaks the position of the first differing character to anyone who can
+time the response, which is enough to recover a secret one byte at a time.
+
+### What this changes for setup
+
+`SERVICE_API_KEY` is **optional** in the schema, so it may not be set yet. Check:
+
+```
+GET https://www.apexdentalmarketing.co/api/webhooks/consultation-outcome
+```
+
+A `503` naming SERVICE_API_KEY means it is unset. A `401` means it is set and your
+bearer was wrong or absent.
+
+If it is unset, generate 32+ random characters, set it in Vercel, and use the same
+value for the Make keychain key. Nothing else depends on it yet, so it can be created
+fresh rather than hunted for — which is easier than finding an existing `CRON_SECRET`,
+and safer, because that one should stay where it is.
