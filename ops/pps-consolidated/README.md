@@ -1755,3 +1755,58 @@ already does not have it: the consolidated scenario `6046761` writes every
 booking through one `addRow` with no `utmMedium` branch at all. Editing 58 live
 scenarios to repair a fault that the retirement deletes, with no way to show it
 has ever fired, is work spent on a system being switched off.
+
+---
+
+# Task 3, the coverage gap: as closed as it goes without GoHighLevel
+
+The gap was **27** appointments per fortnight present in the Client Fulfilment
+Tracker and absent from the Hub. It is now **25**, and it is no longer a
+fleet-wide problem — it is one practice.
+
+| Practice | Rows | Status |
+|---|---|---|
+| Village Dental of New England | 9 | blocked — bookings stopped reaching the Hub on 22 Jul |
+| Village Dental (General Dentistry) | 9 | blocked — needs a merge decision, not a data fix |
+| Art Of Smile | 2 | needs a per-row GoHighLevel lookup |
+| **Kind Dental** | **2** *(was 4)* | **halved by removing the calendar exclusion** |
+| Bling Dental · The Smile Patio | 1 each | per-row lookup |
+| Lightning Orthodontics | 1 | a tracker typo — see below |
+
+**18 of the remaining 25 are Village Dental**, across its two Hub clients. Both
+threads run into the same wall: one needs somebody to decide whether the two
+clients are one practice, the other needs GoHighLevel's calendar list.
+
+## The name matcher is not the problem
+
+Worth recording, because it was the obvious suspect and it is innocent. Seventeen
+unlinked tracker rows across eight practices have a Hub appointment on the same
+day, which looks like failed name matching. It is not:
+
+| | |
+|---|---|
+| Unlinked rows with a same-day Hub appointment | 17 |
+| …whose first name matches the appointment's | **1** |
+| …differing only by whitespace | **0** |
+
+They are different patients seen on the same day. A practice books several
+consultations a day, so "same date" was never much of a signal. Only one row in
+seventeen is even a candidate for a spelling miss.
+
+So the residual gap is genuinely missing CRM appointments, not appointments the
+Hub holds and failed to recognise. No fuzzy-matching work is warranted; it would
+manufacture false links against a problem that does not exist.
+
+## The one clear data error, and why it is not fixed here
+
+Tracker row 173, Lightning Orthodontics: `booked_for` **2 Aug 2027**, created
+17 Jul 2026 — **381 days ahead**, with no appointment status. Almost certainly
+2026 mistyped as 2027.
+
+Not corrected in the database, because the Client Fulfilment Tracker is the
+source and the next import would write the typo straight back. It is a one-cell
+edit in that sheet, and it is somebody's to make rather than mine to guess: a
+381-day lead time is implausible, not impossible.
+
+It is worth making. A 2027 date keeps the row permanently "upcoming", so it will
+sit in the exception and backlog views indefinitely without ever resolving.
