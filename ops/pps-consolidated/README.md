@@ -1509,3 +1509,54 @@ certainly correct and should stay.
 Only once real appointments land can the billing question be answered properly:
 28 consults were billed against zero appointments, and until there are
 appointments to compare them to, nobody can say which of the 28 were owed.
+
+### It worked, and the nightly sync is clean for the first time
+
+The 18:00 cron run on 1 Sep, the first since the exclusion was removed:
+
+| | Before | After |
+|---|---|---|
+| Kind Dental appointments in the Hub | **0**, ever | **7** |
+| `crm-appointments` run status | `partial`, every night | **`success`** |
+| Errors on the run | **2**, every night | **0** |
+
+All seven of Kind Dental's appointments are on calendar `Il8ovGGMeIc7dbtkmB2N`
+— the Vohra calendar — spanning 5 Aug to 1 Sep. That is direct proof the
+exclusion was the sole cause, not a contributing factor.
+
+Both nightly errors were about this one calendar, and both had been describing
+the fix for ten days:
+
+> *"1 calendar(s) are named in both excluded_calendars and included_calendars.
+> Exclusion wins, so they are NOT being read — which means somebody added them as
+> consultation calendars and is still getting no appointments from them. One of
+> the two entries is wrong and a person has to decide which."*
+
+Somebody had already added the Vohra calendar to `included_calendars` after the
+24 Aug UI audit. It stayed in `excluded_calendars` as well, exclusion won, and
+the sync said so out loud every single night into a field nobody read.
+
+The second error listed Kind Dental's whole calendar inventory, which explains
+why nothing else could have covered for it: five `Do Not Book` PatientSync
+mirrors, a `{{location.name}} Virtual Calendar`, a
+`{{clinic.use}} Second_consultation`, and `Joshua Jung's Personal Calendar`. Not
+one of the readable ones is a new-patient consultation calendar.
+
+### One consequence, handled
+
+That run started at 18:00:23, roughly as PR #2 merged, so it executed the
+**pre-merge** code and re-incremented `reschedule_count` on 292 rows — exactly
+the regression predicted before merging. `0026`'s reset was re-run; both columns
+are back to 0 and null.
+
+From the next nightly run onward the deployed fix compares instants, so this
+should stay at zero without intervention. **That is the one thing still worth
+checking tomorrow:** if `reschedule_count` is non-zero again after the 2 Sep run,
+the deploy did not take.
+
+### Still open on the billing question
+
+28 consults were billed and 15 charges are held against what was, until today,
+zero appointments. There are now seven. Whether those seven reconcile against
+the 28 is a separate exercise, and it needs the appointment ledger rather than
+this table.
