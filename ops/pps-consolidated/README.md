@@ -1637,3 +1637,48 @@ practice, so it buys time rather than fixing anything.
 
 Recommend the patch, with the three-row clear only if the reconciliation numbers
 are needed before someone can review a function change.
+
+## Patched, and the rebuild runs clean again
+
+`0030` adds `merge_superseded_tracker_ledger_rows()`, called from
+`appointment-ledger.ts` immediately before the rebuild.
+
+It is a separate function rather than a change to `rebuild_appointment_ledger`
+on purpose. The superseded rows can be identified without any of that function's
+internals — they are tracker-only ledger rows whose patient and date already
+exist as a real appointment — so the fix stays small enough to read in one
+sitting and 177 lines of billing logic stay untouched.
+
+It matches the `appointments` table rather than CRM-keyed ledger rows, because
+at the point it runs those ledger rows do not exist: step 1 of the rebuild is
+what creates them. That is also why the collision could never be seen in the
+ledger's resting state, only mid-rebuild.
+
+**Rows in `waived`, `disputed` or `on_hold` are deliberately left alone.**
+`attribute_ledger_charges()` resets and re-derives `billing_state`, `billed_at`,
+`stripe_payment_intent_id` and `amount_cents` from `billing_charges` on every
+run, so a superseded row carries nothing durable — except those three states,
+which are a person's decision. If one ever collides the rebuild will abort
+exactly as it did today, and that is the right outcome: somebody disputed a
+charge, and a merge should not quietly decide what happens to it. None exist
+today, fleet-wide.
+
+### Verified
+
+```
+merge_superseded_tracker_ledger_rows()  ->  3 rows removed
+rebuild_appointment_ledger()            ->  from_crm 386 · rows_total 1358
+                                            matched_both 294 · billed_rows 342
+```
+
+| | |
+|---|---|
+| Duplicate tracker keys anywhere in the ledger | **0** |
+| Kind Dental ledger rows | 36 — 32 tracker + 7 CRM − 3 merged |
+| Kind Dental rows linked to a CRM appointment | **7** |
+| Kind Dental rows now carrying **both** feeds | **3** |
+
+The reconciliation is live again, so tonight's numbers are current rather than
+frozen at this morning's. The three rows that aborted it are now single rows
+carrying both a CRM appointment id and their tracker origin — which is what the
+ledger was built to produce.

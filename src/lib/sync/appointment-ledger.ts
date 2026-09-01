@@ -32,6 +32,26 @@ interface RebuildResult {
 export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
 
+  /*
+   * First, retire tracker-only rows that a CRM appointment has caught up with.
+   *
+   * The rebuild matches a tracker row to a CRM appointment and stamps the
+   * tracker key onto the CRM row, without removing the tracker-only row it
+   * supersedes — so both would carry the same key and the unique index aborts
+   * the whole rebuild. It only bites the first time a practice crosses from
+   * "tracker rows, no CRM appointments" to "both", which is why it sat dormant
+   * until Kind Dental's consultation calendar stopped being excluded.
+   *
+   * Separate from the rebuild on purpose: the superseded rows can be found
+   * without any of that function's internals, so this stays reviewable and 177
+   * lines of billing logic stay untouched. See migration 0030.
+   */
+  const superseded = await db.rpc('merge_superseded_tracker_ledger_rows');
+  if (superseded.error) throw superseded.error;
+  if ((superseded.data ?? 0) > 0) {
+    ctx.note('superseded_tracker_rows', superseded.data as number);
+  }
+
   const rebuilt = await db.rpc('rebuild_appointment_ledger');
   if (rebuilt.error) throw rebuilt.error;
 
