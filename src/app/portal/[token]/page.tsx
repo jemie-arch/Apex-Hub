@@ -101,14 +101,27 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
   let showed = 0;
   let won = 0;
   let revenueCents = 0;
+  let valuedWon = 0;
+  let answered = 0;
   let awaiting = 0;
 
   for (const row of rows) {
     if (row.showed === true) showed += 1;
     if (row.outcome === 'pending') awaiting += 1;
+    else answered += 1;
     if (row.outcome === 'won') {
       won += 1;
-      revenueCents += row.value_cents ?? 0;
+      /*
+       * Only a priced win adds to the total. `?? 0` was arithmetically
+       * harmless — adding nothing changes nothing — but it made an unpriced
+       * win indistinguishable from a free treatment, and the card below has to
+       * tell those apart. The tracker backfill in 0031 produced 58 wins with no
+       * value at all, because the tracker has no treatment-value column.
+       */
+      if (row.value_cents !== null) {
+        revenueCents += row.value_cents;
+        valuedWon += 1;
+      }
     }
   }
 
@@ -138,6 +151,30 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
   const patient = tenant.vocabulary.endUser;
   const showLocation = locations.length > 1;
 
+  /*
+   * What sits under the "Started treatment" number.
+   *
+   * This is the card a practice reads as "did the advertising work", and until
+   * migration 0031 it rendered 0 with a "$0 in value" hint on every portal in
+   * the fleet — beside an Ad spend card showing real money. The sum was correct
+   * and the message was false: nobody had ever written an outcome, because the
+   * 918 answers sitting in tracker_appointments.status_if_showed were not read
+   * by anything.
+   *
+   * Four states, because "nobody answered", "answered, none won", "won but
+   * unpriced" and "won and priced" are genuinely different things and only the
+   * last of them has a dollar figure worth printing. Zero is reserved for the
+   * case where somebody actually said no.
+   */
+  const treatmentHint = (() => {
+    if (answered === 0) return 'no outcomes recorded yet';
+    if (won === 0) return `none of ${formatCount(answered)} recorded`;
+    if (valuedWon === 0) return 'treatment value not recorded';
+    const total = formatMoneyCompact(revenueCents, group.currency);
+    if (valuedWon === won) return `${total} in value`;
+    return `${total} across ${formatCount(valuedWon)} of ${formatCount(won)}`;
+  })();
+
   return (
     <>
       <p className="mb-6 text-sm text-fg-muted">
@@ -162,8 +199,8 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
         />
         <KPICard
           label="Started treatment"
-          value={formatCount(won)}
-          hint={`${formatMoneyCompact(revenueCents, group.currency)} in value`}
+          value={formatCount(answered === 0 ? null : won)}
+          hint={treatmentHint}
           icon={<CircleDollarSign size={16} />}
         />
         <KPICard
