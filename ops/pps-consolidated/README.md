@@ -1395,3 +1395,75 @@ the impact is unevidenced: the only paid-social sample on record carries
 sync never fills it, so no attribution question can be answered from the Hub
 today — and this particular gap cannot be sized without reading GoHighLevel
 directly.
+
+---
+
+# The three practices missing from the Hub — 1 Sep 2026
+
+Chasing the largest remaining item: Kind Dental has never had an appointment in
+the Hub, Village Dental has had none since 22 July, and VDNE (General Dentistry)
+has none ever. All three are active clients.
+
+## Kind Dental: already diagnosed, already recorded, still not acted on
+
+`calendar_list_conflicts` — the view added in `0019` — has carried the answer
+since 24 August:
+
+> `Il8ovGGMeIc7dbtkmB2N` · **Ortho & New Patient Exam | Dr. Vohra**
+> *"Active, publicly bookable 45-minute Service calendar on a real PatientSync
+> chair; confirmed new-patient consultations in a GoHighLevel UI audit on
+> 2026-08-24. Second consults live on a separate calendar in this account."*
+> appointments held **0** · charges held **15** · consults billed **28**
+
+Somebody opened GoHighLevel and confirmed this is the practice's real
+new-patient consultation calendar. It is nonetheless in `excluded_calendars`,
+reason "Not the practice booking calendar". That single exclusion is why the Hub
+has zero appointments for Kind Dental, why 15 charges are held, and why 28
+consults were billed against nothing.
+
+Removing it is one statement:
+
+```sql
+delete from excluded_calendars where crm_calendar_id = 'Il8ovGGMeIc7dbtkmB2N';
+```
+
+Not run here. It is a billing decision — it makes 28 consults visible and
+releases 15 held charges — and that is the practice's commercial relationship,
+not a data fix.
+
+## VDNE (General Dentistry) is not a separate GoHighLevel location
+
+It has no `crm_location_id`, which read like a missing value to be filled in.
+It is not. Reading both stat sheets' Location ID column directly:
+
+| Sheet | Data rows | Location ID found | Location Name |
+|---|---|---|---|
+| VDNE (General Dentistry) | 32 | `QfjLxc7h8uj4YZkryYUA` ×29 | Village Dental of New England |
+| VDNE (main) | 117 | `QfjLxc7h8uj4YZkryYUA` ×29 (of 102 filled) | Village Dental of New England |
+
+**The same id, and the same name, in both.** There is one GoHighLevel location
+writing into two spreadsheets. The "(General Dentistry)" client in the Hub is a
+Hub-side split with no CRM counterpart.
+
+So the field must stay null. Assigning `QfjLxc7h8uj4YZkryYUA` to it would give
+two clients the same location id, and every id-keyed lookup in this system —
+routing, sync attribution, the consolidated data store — would then have two
+answers to a question that must have one.
+
+What it actually needs is a decision: either the two Hub clients merge, or the
+split is deliberate and something other than a location id has to distinguish
+them. The GD sheet's last row is **13 July**; the main sheet runs to **31
+August**, which suggests the split has already lapsed in practice.
+
+## Village Dental's own gap is narrowed but not closed
+
+Its three Hub appointments all came from calendar `85cKh87AJV8VWnd8I0g5`, which
+is **not excluded**, and they stop on 22 July. Its stat sheet has bookings
+through 31 August. So the practice kept booking, the sync kept working for other
+clients, and this location's bookings stopped arriving.
+
+The most likely reading is that bookings moved to a different calendar after 22
+July — one either excluded or never seen. Confirming that needs GoHighLevel's
+calendar list for the location, which needs API access, which needs the token
+bridge `6003601` that is still `isinvalid`. That chain is now the blocker on the
+last of the three.
