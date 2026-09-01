@@ -507,7 +507,17 @@ So it is now a guard rather than an argument. Three filters:
 | 4, sheet lookup | `{{2.spreadsheet_id}}` exists, and the clinic is not switched off |
 | 6, addRow | `{{1.calendar.appointmentId}}` exists |
 
-An unroutable payload now stops at the trigger: no error, no retry, no queue entry,
-nothing written. A clinic with no routing row still parks loudly, which is the
-behaviour that was wanted — the difference is that a payload with no clinic *at all*
-is now simply ignored rather than treated as a failed delivery.
+An unroutable payload now stops at **module 2's filter**, not at the trigger. That
+distinction matters when reading execution history: the webhook still accepts the
+payload and dequeues it, so you will see a short **terminated** execution rather than
+nothing at all. Terminated is the correct outcome here — no error, no retry, no queue
+entry, nothing written — but somebody expecting silence would reasonably wonder
+whether the guard had failed.
+
+A clinic that has a location id but no routing row still parks loudly, which is the
+behaviour that was wanted. The change is only that a payload naming no clinic at all
+is now ignored rather than treated as a failed delivery.
+
+Module 7, the updateRow branch, deliberately has no id guard and does not need one:
+reaching it means module 4 returned a row, which means an appointment id already
+matched.
