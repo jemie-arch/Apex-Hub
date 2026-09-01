@@ -1810,3 +1810,33 @@ edit in that sheet, and it is somebody's to make rather than mine to guess: a
 
 It is worth making. A 2027 date keeps the row permanently "upcoming", so it will
 sit in the exception and backlog views indefinitely without ever resolving.
+
+## Making the Hub answer the Village Dental question itself
+
+The sync already fetched the answer and threw it away. When a location returns
+no events it lists that location's calendars — but it only recorded them when
+the practice had **no** consultation calendar. A practice that has one and
+returned nothing anyway was recorded nowhere, so the two states nobody can tell
+apart from outside stayed indistinguishable:
+
+- a genuinely quiet fortnight, and
+- bookings landing on a calendar the sync has not been told about.
+
+Village Dental is the second, and working that out meant reading GoHighLevel by
+hand. `crm-appointments.ts` now emits `read_nothing_despite_a_calendar` — the
+practice, and every calendar it holds with **id, name and whether it is
+excluded**.
+
+Ids as well as names, because a name is what gets renamed. Recorded as a note
+rather than an error: a quiet fortnight is not a fault, and an alert that fires
+on one would be ignored within a week.
+
+It costs nothing. The listing call was already being made on exactly these
+locations — this keeps the result instead of discarding it.
+
+**It answers the question from the next run after deploy, not today.** For today
+the answer is a two-minute look in GoHighLevel: open Village Dental's
+sub-account, Settings → Calendars, and compare what is there against the one
+calendar the Hub reads, `85cKh87AJV8VWnd8I0g5`, plus the five in
+`excluded_calendars`. Any calendar in neither list, holding bookings after
+22 July, is the answer.
