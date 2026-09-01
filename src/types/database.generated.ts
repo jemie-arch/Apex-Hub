@@ -517,6 +517,12 @@ export type Database = {
           scheduled_end_at: string | null
           second_consult_showed: boolean | null
           showed: boolean | null
+          outcome_source: string | null
+          second_consult_required: boolean | null
+          treatment_opted_for: string | null
+          deposit_collected: boolean | null
+          payment_method: string | null
+          insurance_provider: string | null
           showed_source: string | null
           source: string
           status: Database["public"]["Enums"]["appointment_status"]
@@ -560,6 +566,12 @@ export type Database = {
           scheduled_end_at?: string | null
           second_consult_showed?: boolean | null
           showed?: boolean | null
+          outcome_source?: string | null
+          second_consult_required?: boolean | null
+          treatment_opted_for?: string | null
+          deposit_collected?: boolean | null
+          payment_method?: string | null
+          insurance_provider?: string | null
           showed_source?: string | null
           source?: string
           status?: Database["public"]["Enums"]["appointment_status"]
@@ -603,6 +615,12 @@ export type Database = {
           scheduled_end_at?: string | null
           second_consult_showed?: boolean | null
           showed?: boolean | null
+          outcome_source?: string | null
+          second_consult_required?: boolean | null
+          treatment_opted_for?: string | null
+          deposit_collected?: boolean | null
+          payment_method?: string | null
+          insurance_provider?: string | null
           showed_source?: string | null
           source?: string
           status?: Database["public"]["Enums"]["appointment_status"]

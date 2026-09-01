@@ -15,6 +15,7 @@ import { revalidatePath } from 'next/cache';
 
 import { resolvePortal, type PortalContext } from '@/lib/portal';
 import { serviceClient } from '@/lib/supabase/service';
+import { applyPrecedence } from '@/lib/outcomes/precedence';
 import type { Database } from '@/types/database';
 
 type LeadQuality = Database['public']['Enums']['lead_quality'];
@@ -119,16 +120,20 @@ export async function saveConsultationOutcome(input: {
   const ccOnFile = tri(input.ccOnFile);
   const financing = tri(input.financing);
 
-  const written = await db
-    .from('appointments')
-    .update({
+  /*
+   * 'unknown' leaves the stored answer alone rather than clearing it — "we have
+   * not asked yet" is not the same as "no".
+   *
+   * Stamping the source is what stops anyone else overwriting this: the clinic
+   * was in the room, so their answer outranks the calendar's and the call
+   * centre's. applyPrecedence sets both source columns and, for a 'client'
+   * writer, never drops anything — the practice always wins.
+   */
+  const { changes } = applyPrecedence(
+    {},
+    {
       outcome: input.outcome as AppointmentOutcome,
-      // 'unknown' leaves the stored answer alone rather than clearing it —
-      // "we have not asked yet" is not the same as "no".
-      //
-      // Stamping the source is what stops the next CRM sync overwriting this:
-      // the clinic was in the room, so their answer outranks the calendar's.
-      ...(showed === null ? {} : { showed, showed_source: 'client' }),
+      ...(showed === null ? {} : { showed }),
       ...(secondShowed === null ? {} : { second_consult_showed: secondShowed }),
       ...(ccOnFile === null ? {} : { cc_on_file: ccOnFile }),
       ...(financing === null ? {} : { financing_approved: financing }),
@@ -137,8 +142,13 @@ export async function saveConsultationOutcome(input: {
         ? {}
         : { lead_quality: input.leadQuality as LeadQuality }),
       ...(input.notes.trim() === '' ? {} : { notes: input.notes.trim() }),
-      outcome_updated_at: new Date().toISOString(),
-    })
+    },
+    'client',
+  );
+
+  const written = await db
+    .from('appointments')
+    .update({ ...changes, outcome_updated_at: new Date().toISOString() })
     .eq('id', input.appointmentId);
 
   if (written.error) {

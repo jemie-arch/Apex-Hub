@@ -570,3 +570,690 @@ unhappy module and names the reason.
 
 It blocks nothing here. The Token Bridge caches a GoHighLevel token for other
 scenarios, calls a different endpoint, and has been broken since 20 August.
+
+---
+
+# The pilot is live — Dental Illusions, 1 Sep 2026
+
+One clinic, one event type. `6046761` is **active** and receiving type-01
+bookings for Dental Illusions only.
+
+| | |
+|---|---|
+| Clinic | Dental Illusions, location `tM8YmF72Rll1N142yYrt` |
+| Sheet | `1mqdtHdN3wPiowBH8FskrZUwUxE5eo7bYkcAS9zpPndU`, tab MASTER |
+| GHL workflow | `001. New Appointment -> Make -> Send Email Form - PPS v6.1`, action `01 PPS Make [TO CHANGE]` |
+| Repointed from | hook `2589408` (`6mhd4kpz...`) |
+| Repointed to | hook `2755826` (`wihxahuu...`) |
+| Old scenario | `5970597`, left **active** on its old hook |
+
+The other four consolidated scenarios stay inactive, and the other four
+GoHighLevel custom values still point at the per-client hooks, so types
+02/03/04/06 are untouched for every clinic including this one.
+
+## The URL went in the action, not the custom value
+
+The workflow read its URL from a shared custom value,
+`PPS-System > 01 - PPS - New Appointment Booked -> Update sheet`. Editing that
+would have repointed every workflow in the location that reads it, and nothing
+proves only one does. The literal URL went into the action instead, which is
+provably scoped to one workflow.
+
+The custom value still holds the old hook, unchanged. That makes it the rollback
+artefact: re-inserting the token restores the old routing without anyone having
+to know what the old URL was.
+
+## The queued payloads were checked before activation, not after
+
+Both items sitting on hook `2755826` were 1 byte and parsed to `{}`. On
+activation they ran as two 1-operation Successes at 10:50:18 and wrote nothing —
+module 2's filter requires `{{1.location.id}}`, and an empty body has none.
+
+Predicted behaviour, observed. **When reading execution history, ignore those
+two runs.** A real booking shows more than one operation; a 1-operation run is a
+payload that was filtered out.
+
+## Two things flagged during the cutover, both real
+
+**`6046761` has no HTTP module and never calls the Hub.** Correct, and by
+design — type 01 writes to Google Sheets via the routing store. So the
+`SERVICE_API_KEY` / key `215007` verification proves nothing about this
+scenario's write path.
+
+What does cover it: all three Sheets modules use Google connection
+**`6237841`** — the *same connection* Dental Illusions' live scenario `5970597`
+already uses to write to this same sheet. The auth on the pilot path is not
+unproven; it is the credential that has been doing this job in production.
+
+**Module 4's dedupe filters on positional column `Q`.** Also correct, and it
+qualifies the claim that the consolidated scenario maps by header name. The
+*writes* do — modules 6 and 7 use `useColumnHeaders: true` with header-keyed
+values. The *lookup* cannot: Make's `google-sheets:filterRows` takes a column
+letter, and offers no header-name form.
+
+For this clinic it is settled. `5970597`'s own lookup is byte-identical —
+`Q` equals `{{1.calendar.appointmentId}}`, `orderBy: D`, `sortOrder: desc`,
+`tableFirstRow: A1:CZ1` — and Make's own cached label for that column reads
+`Appointment ID (Q)`. The consolidated scenario reproduces the proven
+configuration rather than introducing a new one.
+
+Fleet-wide it is **open, and it gates the batch rollout, not the pilot**:
+columns A-V are identical across all three sheet layouts and Q sits inside that
+range, so Q should be Appointment ID everywhere — but that came from reading the
+`addRow` header arrays, not the `filterRows` columns. The check is to read the
+filter column out of each live type-01 blueprint. If all 57 say `Q`, the
+consolidated scenario inherits the fleet's existing behaviour exactly and adds
+no risk. Any that disagree are a clinic that needs its own answer before it
+moves.
+
+## One field fixed before the first booking
+
+Module 4 read `from: "drive"`. Under that setting Make declares `spreadsheetId`
+as type **file** and expects the Drive-picker path form, `/folderId/fileId` —
+but the data store supplies a bare id. Modules 6 and 7 are unaffected because
+`mode: "map"` makes their id a mapped text field; `filterRows` offers no `mode`,
+so `from` is the only control.
+
+Changed to `from: "share"`, which declares `spreadsheetId` as type **text** and
+is the setting `5970597` uses with a bare id against this exact sheet. It may
+well have worked either way — Make probably splits the path and takes the last
+segment — but "probably" is not what a pilot is for. Worst case had been a
+loud one: module 4 errors, retries five times, parks in the queue, writes
+nothing.
+
+`isinvalid: false` after the change, hook intact, queue empty.
+
+## Deliberately not changed during the pilot
+
+The scenario is still named `[CONSOLIDATED - inactive, for review]` and still
+carries the `needs audit` label, while being active. That is exactly the
+frozen-label fault this engagement exists to remove, and it should be corrected
+— but not now. Renaming is behaviourally inert, and a mid-pilot edit gives
+"what changed?" a second answer if anything misbehaves. It happens when the
+first real booking has passed.
+
+## What proof looks like
+
+1. `6046761` shows an execution with **more than one operation**
+2. A new row in the MASTER tab of `1mqdtHdN...`
+3. The row lands in the correct columns for all fourteen mapped headers
+4. Nothing in `5970597`
+
+Rollback if any of those is wrong: re-insert the custom-value token in action
+`01 PPS Make [TO CHANGE]`, or paste
+`https://hook.us2.make.com/6mhd4kpz3rvc2ectx39d9fbpph0erycq`, then deactivate
+`6046761`. `5970597` never stopped, so service resumes on the next booking.
+
+## The fleet-wide `Q` gate is closed — all 57 checked
+
+Read the `filterRows` dedupe out of every live per-client type-01 blueprint.
+**57 of 57 are identical**: filter column `Q` compared against
+`{{1.calendar.appointmentId}}` with `text:equal`, `orderBy: D`, `sortOrder: desc`,
+`tableFirstRow: A1:CZ1`, `sheetId: MASTER`. No deviations, including the twelve
+older-generation scenarios (ids in the 3.7M–5.1M range) that predate the bulk
+clone and were the ones most likely to differ.
+
+Make's own cached column label reads `Appointment ID (Q)` in each. So the
+consolidated scenario's positional lookup reproduces the fleet's existing
+behaviour exactly and introduces no new risk at the batch rollout. The gate that
+was open is now shut.
+
+Method note: this is a blueprint-level check, not a spreadsheet-level one. It
+proves every scenario *asks* for column Q, and that Make's cache agreed when the
+sheet was last picked. If a practice has since inserted a column before Q, its
+current scenario is already looking in the wrong place and the consolidated one
+inherits that — the fault would predate the cutover rather than be caused by it.
+
+### Three things the sweep surfaced
+
+**Eagle Creek's read_write_split is worse than recorded, and consolidating fixes
+it.** `4176278`'s lookup reads `1h1MnNra5nGzjHnX14ThfP2t7b546yqOwwD7A4pFu-A4`
+while both its writes target `1QyKIYRnfZnhv12GOa0sXIoyJT7DmvwUIlbpFUFIrbcU`. The
+read sheet's cached column list is the 26-column layout, where Appointment ID
+sits at **P**, not Q — so that lookup could never match even if it were reading
+the right file. Every booking appends a duplicate; the update branch never runs.
+The routing row already points at the write target, so the consolidated scenario
+reads and writes the same file and the fault disappears on cutover.
+
+**Stanton's shared sheet is confirmed by id, not inference.** `5111292` reads and
+writes `1Wb0dfuUMZxWoAe_DkpVHlLU1FTwo56XX-XEkamFOJbM`, which is also OC Healthy
+Smiles' own primary target in `4176701`. Two scenarios, one file, both treating it
+as theirs. Stanton stays out of the routing store until somebody opens that file
+and decides whose it is.
+
+**Snyder and Stanton write different values from everyone else.** Snyder's
+`3816566` update branch writes real `adSetId` and `adId` into columns Y and Z,
+where the other 55 write `utmMedium` and `utmContent` — Snyder is the one practice
+whose attribution columns mean what their headers say. Stanton's `5111292` writes
+a raw `{{1.calendar.startTime}}` into App Date instead of a formatted date.
+Consolidating changes both. Neither is a blocker, but both are a visible change to
+that practice's sheet and should be said out loud before those two are repointed.
+
+### Still unroutable, and now confirmed active
+
+`3744209` Best Care Dental and `4176885` Ofir Orthodontics are both live and have
+no routing row, because `0001_init.sql` deliberately left them unmatched — no
+client of that name exists in the CRM. `5947250` ADM Ortho Snapshot and `4327540`
+Test Clinic are internal. Four active type-01 scenarios that cannot move until
+somebody decides what they are.
+
+## The synthetic test found a real defect — 1 Sep 2026
+
+Rather than wait for a booking to exercise a scenario that had never run in its
+current form, the whole path was driven end to end against an internal sheet.
+
+**The target.** `NWJb5XTSNeLOVKCxhP6L`, the ADM Snapshot Account, added to the
+routing store pointing at `11Gr6-P7i44B0_NSZUe7M4WE_FoWQxIYz4cvfYMyxJik` — the
+sheet its own scenario `5947250` already writes to, taken from that blueprint.
+Internal, no client reads it. Adding the row also routes the snapshot account
+like every other clinic, so it is not only a test fixture.
+
+**Run 1 — the new-patient path works.** A synthetic payload posted to hook
+`2755826` produced a 5-operation success: webhook → datastore → regex →
+filterRows → addRow. So `from: "share"` on module 4 accepts a bare mapped id,
+which was the unexercised change.
+
+The row's fourteen mapped values landed under their own header names, verified by
+reading the sheet back as CSV and aligning headers to values. **Appointment ID
+landed at index 16 — column Q** — so the positional lookup and the header-name
+write agree on this layout. Columns 22, 24, 26 and 28 (Date Booked, Campaign
+Name, Ad Set Name, Ad Name) are empty, which is exactly the documented cost of
+writing only the intersection of the three layouts.
+
+**Run 2 — the dedupe did not hold.** The identical payload posted again used
+**6 operations**, not 5, and the sheet grew to two rows. Both router branches had
+fired: the existing row was updated *and* a duplicate was appended.
+
+The cause was module 6's filter, written here as
+
+```
+"conditions": [[ROW_NUMBER notexist], [appointmentId exists]]
+```
+
+Two condition groups. In a Make blueprint the outer array is **OR** and the inner
+array is AND, so that reads "the row was not found **OR** an appointment id
+exists" — and the second half is true on every real payload. The addRow branch
+therefore fired unconditionally, including on payloads that had matched.
+
+This was introduced by me, in the change that added an appointment-id guard to
+stop empty payloads appending blank rows. The 57 cloned scenarios do not have it:
+their equivalent filter is a single condition in a single group, so there was no
+OR to get wrong. The guard was also redundant — module 2 already drops a payload
+with no `location.id`, which is what the empty bodies were.
+
+**Fixed** by collapsing both conditions into one AND group. Run 3, with the same
+payload, used 5 operations and left the row count at two: match → updateRow only,
+nothing appended.
+
+### What it would have cost
+
+GoHighLevel re-fires the booking workflow on appointment updates — a reschedule,
+a confirmation — so a second webhook for the same appointment is ordinary
+traffic, not an edge case. Every one would have appended a duplicate row to the
+clinic's stat sheet, and duplicates in the MASTER tab are what the appointment-id
+dedupe exists to prevent in the first place.
+
+Dental Illusions was exposed from activation at 14:50 until the fix at 15:59.
+**No client data was affected**: the only executions in that window were the two
+`{}` queue items and these three synthetic posts. No real booking arrived.
+
+The lesson is narrow and worth keeping: a filter that reads correctly in English
+can still be wrong in the blueprint, and the only way to tell is to run it. Three
+posts against an internal sheet found what the reasoning had missed twice.
+
+### Left behind
+
+Two synthetic rows in `11Gr6-P7i…`, both with Appointment ID
+`CONSOLIDATION-TEST-20260901`. **That file is `1 - COPY THIS - Stat Sheet
+Template`** — the sheet new clinics are cloned from — so the rows should be
+deleted before the next clinic is onboarded, or they propagate. The consolidated
+scenario has no delete module, so this needs a person in Sheets.
+
+### Still unproven
+
+The four step-3 checks against a real Dental Illusions booking. What the
+synthetic run proves is the mechanism — routing, lookup, header mapping, dedupe.
+What it cannot prove is that GoHighLevel's real payload carries the field names
+the mapping expects, because the payload here was hand-built from the field paths
+in the blueprint rather than captured from GoHighLevel.
+
+### The OR fault does not exist in the other four
+
+Checked every filter in `6108174`, `6108222`, `6109500` and `6109503` after
+finding it in `6046761`. All of them use a single condition in a single group —
+the CCM pair split on `calendarName`, 04 requires `contact_id`, 06 requires
+`calendar.appointmentId` — so there is no OR to get wrong. `6046761` was the only
+scenario where a second condition was added, and therefore the only one that
+could have this fault. Closed.
+
+While reading them: **`6109503` has `dlqCount: 1`**, left from the live
+end-to-end cancellation proof — a synthetic appointment id the Hub correctly
+answered 404, which `handleErrors: true` parked. Inert, but it should be cleared
+so the queue means something the next time it is looked at.
+
+### The real payload carries the field names the mapping expects
+
+The synthetic test proved the mechanism but used a payload built from the
+blueprint's own field paths, which cannot catch a mapping that names a field
+GoHighLevel does not send. Checked against the sample GoHighLevel actually
+delivered, stored in live scenario `5970597` — field names and presence only, no
+values read.
+
+Twelve of the fourteen mapped paths are present. The two that are not,
+`contact.attributionSource.campaign` and the intake question
+`Please select the treatment you are interested in:`, are absent because that
+sample is a **direct calendar booking** — no ad campaign, no intake form. Dental
+Design Studios' sample (`4167561`), a Facebook lead, carries both populated. So
+the mapping is right and those two fields are conditional on lead source; a
+direct booking correctly writes Campaign ID and Offer Name empty.
+
+Stated precisely, because the number flatters: 44 stored samples were readable,
+but they are the same ADM test booking cloned across scenarios — one payload
+shape, not 44. The paid-social shape is evidenced by one sample, not many.
+
+---
+
+# Decision, 1 Sep 2026: Google Sheets is being retired
+
+Jemie's call. The pilot rollout stops here, and the extension prompt was halted
+before the two verification jobs ran. What follows is what that changes, checked
+against the data rather than assumed.
+
+## Type 01 contributes nothing to the Hub, so it is deleted rather than rebuilt
+
+The instinct is that dropping Sheets means rebuilding 57 booking scenarios
+against a Hub endpoint. It does not. Two facts:
+
+- `appointments.source` is **only ever `crm`**, across all 369 rows. No
+  appointment has ever entered the Hub from a Make scenario or a sheet.
+- There are **zero** `appointment_ledger` rows carrying a `crm_appointment_id`
+  that the CRM sync did not create.
+
+So the type-01 scenarios' only output is the spreadsheet row. The Hub already
+learns every one of those appointments independently, from the
+`crm-appointments` sync. Retire the sheet and the 57 scenarios have no remaining
+job — there is nothing to port.
+
+That also retires, unused: the `pps_clinic_routing` table and its Settings page,
+the `routing-export` sync, data store `137975` and its 43 records, the three-way
+sheet-layout analysis, the header-name mapping compromise, the column-`Q`
+dedupe, and every finding in `scenario_sheet_findings`. They exist to answer
+"which spreadsheet?", and the question stops being asked.
+
+## What the sheet is still carrying, and it is smaller than it looks
+
+The tracker does surface appointments the CRM sync lacks — **27 in the last
+fourteen days**. That is the number to clear before the sheet can stop being a
+source. It is not a systemic gap; it decomposes into causes already on record:
+
+| Rows | Practice | Cause |
+|---|---|---|
+| 9 | Village Dental of New England (General Dentistry) | has **no `crm_location_id`** — already logged as unroutable |
+| 9 | Village Dental of New England | has a location id but no same-day appointment matches; needs a look |
+| 4 | Kind Dental | almost certainly the excluded Dr. Vohra calendar `Il8ovGGMeIc7dbtkmB2N`, an open decision |
+| 2 | Art of Smile | one has a same-day appointment in the Hub, so likely a match failure, not missing data |
+| 1 | Lightning Orthodontics | dated 2027-08-02 — a tracker typo |
+| 2 | The Smile Patio, Bling Dental | one row each, uninvestigated |
+
+Two named accounts explain two thirds of it. Neither is a reason to keep 57
+spreadsheets.
+
+## What survives, and it is the good half
+
+`POST /api/webhooks/consultation-outcome` and the four scenarios that already
+post to it — 02, 03, 04 and 06 — are the pattern, not the exception. They contain
+no Google Sheets module at all. The work done on them stands unchanged.
+
+`appointments` and `appointment_ledger` already model the stat sheet: 41 columns
+in the ledger against 28 in the sheet, and several of the sheet's are redundant
+(Month is derived, Appt. Date Time duplicates App Date, Phone (+) duplicates
+Phone). Genuinely absent: Additional Notes, Confirm?, Make Remarks, Offer Name,
+First Called.
+
+## Correction: the replacement is already built, and already live
+
+I wrote above that `user_profiles` holds two users and no practice has ever
+logged in, and concluded that replacing the sheet meant deciding whether to give
+practices Hub accounts. That was wrong, and wrong in the direction that matters.
+
+**Practices do not need accounts.** The portal is token-based: one per client
+group, at `/portal/[token]`, gated by `portal_enabled`. Checked:
+
+| | |
+|---|---|
+| Client groups | **75** |
+| With a portal token | **75** |
+| With the portal enabled | **75** |
+| Active clients not in a group | **0** |
+
+Every practice already has a live portal.
+
+**The survey is the stat sheet, and provisioning says so.** From
+`src/config/provisioning.ts`, on the `*Client Stats Sheet URL` custom value:
+
+> The stat sheet and the portal are the same thing seen twice: the sheet's green
+> columns — did they attend, did they attend a second time, did they convert,
+> were they approved for credit, what was it worth — are exactly the
+> post-appointment survey, and the portal is where a practice answers it. So the
+> value points at the portal rather than at a spreadsheet somebody has to
+> maintain by hand.
+
+New sub-accounts are provisioned with that custom value pointing at the portal.
+The decision to stop using Sheets is not a change of direction — it is the
+direction the system was already built for.
+
+`portal-actions.ts` writes `outcome`, `showed` with **`showed_source: 'client'`**,
+`second_consult_showed`, `financing_approved`, `value_cents` and
+`outcome_updated_at`. Those are sheet columns J, K, L, M and N. The appointment
+detail page tells the practice "nothing you type here is overwritten by our
+systems", and that promise is kept by the `clinicAnswered` guard in
+`crm-appointments.ts`, which stops the CRM sync replacing an answer whose
+`showed_source` is `client`.
+
+Three writers are already distinguished by provenance: `crm` from the sync,
+`call_centre` from the outcome webhook that types 02/03/04/06 post to, and
+`client` from the portal.
+
+## So the gap is adoption, not engineering
+
+| | |
+|---|---|
+| Appointments with a practice-supplied answer (`showed_source = 'client'`) | **0** |
+| Appointments whose outcome has ever been updated | **0** |
+
+Not one practice has ever answered the survey. The portal is finished, enabled
+for all 75 groups, and unused — while the same five answers keep being typed into
+spreadsheets. Nothing needs building for practices to stop using Sheets; they
+need to be told to use the link they already have.
+
+## Immediately outstanding from the halted pilot
+
+- Dental Illusions is still routed to `6046761`, which still writes to Sheets.
+  It works and it is one URL either way; leaving it costs nothing until the
+  replacement exists, and rolling back is its own small risk. Needs a decision,
+  not urgency.
+- Two synthetic rows remain in `1 - COPY THIS - Stat Sheet Template`
+  (`11Gr6-P7i…`), Appointment ID `CONSOLIDATION-TEST-20260901`. They only matter
+  if a clinic is onboarded from that template before Sheets is retired — which
+  may now be never. Lower priority than it was, not zero.
+
+---
+
+# Retiring the sheets: what each feed actually contributes
+
+Before deciding what to switch off, measured what the CRM sync already delivers
+without any Make scenario involved. Across 369 appointments:
+
+| | |
+|---|---|
+| Created by the sync (`source = 'crm'`) | **369 of 369** |
+| Status known, including cancellations | all; **24** cancelled |
+| Attendance known (`showed` set) | **248**, every one `showed_source = 'crm'` |
+| Attendance from the call centre | **0** |
+| Attendance from the practice | **0** |
+| Outcome / treatment value ever recorded | **0** |
+
+That settles which scenarios are load-bearing:
+
+| Type | What it feeds | Verdict |
+|---|---|---|
+| **01** New Appointment Booked | the spreadsheet row, nothing else | **redundant** — the sync creates every appointment |
+| **06** Appointment Cancelled | cancellation | **redundant** — the sync already sets `status = 'cancelled'` on 24 |
+| **02 / 03** CCM show / no-show | attendance | **supplementary** — the sync answers 248 of 369, so these corroborate and cover the other 121 sooner |
+| **04** Appointment Update Form | outcome, treatment value, notes | **the only feed carrying something nobody else has** — and it overlaps the portal survey exactly |
+
+So retiring Google Sheets does not mean replacing five feeds. It means deleting
+two outright, keeping two as a faster second opinion on attendance, and making
+one deliberate choice about who answers the outcome question.
+
+## Order of operations
+
+The sheet is still a practice's window on their own numbers. Switching off the
+writes before anybody is using the portal takes that away, so the order is not
+negotiable:
+
+1. **Practices start using the portal.** 75 live portals already exist; the link
+   is the only thing missing. Nothing technical blocks this.
+2. **Watch `showed_source = 'client'` climb from zero.** That figure is the
+   adoption metric — it is the count of answers a practice gave directly.
+3. **Then deactivate the type-01 clones**, 57 of them, leaving them present.
+   Nothing downstream notices: the Hub never read them.
+4. **Then 06**, the same way.
+5. **Only then delete**, once a full billing cycle has closed with the numbers
+   agreeing.
+
+02 and 03 stay until the CRM's attendance is shown to be as timely as the call
+centre's. 04 waits on the question below.
+
+## The one question retirement does not answer
+
+Type 04's form and the portal survey capture the same five answers. They differ
+in **who is answering**: the GoHighLevel form is filled in on the call centre's
+side and lands as `showed_source = 'call_centre'`; the portal is filled in by
+the practice and lands as `'client'`, which the sync then refuses to overwrite.
+
+Both are legitimate and the Hub already tells them apart. But keeping both means
+the same question has two front doors, and the practice's answer silently wins.
+Worth choosing on purpose rather than discovering later.
+
+---
+
+# The coverage gap is not a Sheets problem
+
+27 appointments in the last fortnight exist in the tracker and not in the Hub.
+That number was the stated blocker on retiring the sheets. It is not one, for
+two reasons.
+
+**First, it comes from a different file.** All 27 carry
+`tracker_source_tab = 'Appointment Data'` — the single Client Fulfilment Tracker,
+not any of the 57 per-clinic stat sheets. Retiring the stat sheets does not touch
+it.
+
+**Second, the cause is three specific accounts, and it predates all of this.**
+
+| Practice | CRM location id | Hub appointments ever | Latest | Tracker-only rows | Excluded calendars |
+|---|---|---|---|---|---|
+| **Kind Dental** | present | **0** | — | 32 | **7** |
+| **Village Dental of New England** | present | **3** | **22 Jul 2026** | **109** | 5 |
+| **VDNE (General Dentistry)** | **none** | **0** | — | 28 | 0 |
+| *(comparable practices)* | present | 13–43 | current | few | 0 |
+
+Kind Dental has **never** had an appointment in the Hub, and Village Dental has
+had none for six weeks, while both are active clients being billed. This is the
+same fault behind the earlier "27 consults billed against 0 appointments" figure
+for Kind Dental — now explained.
+
+`included_calendars` is empty for every client, so exclusion is the only
+mechanism in play and the sync reads everything not excluded.
+
+**What each case needs:**
+
+- **VDNE (General Dentistry)** — no `crm_location_id`, so it is invisible to the
+  sync by construction. Fixable as soon as somebody supplies the GoHighLevel
+  location id. Its own stat sheet carries a Location ID column, which is how the
+  other 42 were verified.
+- **Kind Dental** — all seven of its calendars are excluded. Five are genuine
+  `Do Not Book` PatientSync mirrors. Two are judgement calls made on 22 Aug:
+  `Ortho & New Patient Exam | Dr. Vohra` and ` {{location.name}} Virtual Calendar `.
+  If the practice's real booking calendar is among them, that exclusion is why
+  the Hub has nothing. Note the unrendered merge tag in that name — the fleet's
+  standard calendar is literally called ` {{location.name}} Booking Calendar `,
+  so a `{{...}}` in a calendar name is normal, not corruption.
+- **Village Dental** — its five exclusions all look correct, which makes the
+  silence since 22 July harder to explain. Needs its GoHighLevel calendar list
+  read, which needs API access.
+
+None of these is caused by, or fixed by, Google Sheets. They are a live
+reporting and billing fault that would still be there if every spreadsheet
+vanished tonight — and arguably more visible once it did.
+
+---
+
+# Three writers, one row: the precedence rule — 1 Sep 2026
+
+The same eight questions can be answered from three places. Until now there was
+no rule about which answer survived, so whoever wrote last won.
+
+## What was wrong
+
+`showed_source` has always recorded who said whether a patient attended, and
+`crm-appointments.ts` reads it to stop the nightly sync overwriting a practice's
+answer. That is the promise the portal makes on screen: *"Nothing you type here
+is overwritten by our systems."*
+
+The other half of the survey had no such marker, and **two** write paths ignored
+the question entirely:
+
+- `/api/webhooks/consultation-outcome` — the GoHighLevel update form
+- `/b2c/actions.ts` — the call centre's own screen
+
+Both wrote `outcome`, `value_cents`, `financing_approved`, `cc_on_file` and
+`notes` unconditionally. A call-centre submission arriving an hour after a
+practice filled in their portal would silently replace their treatment value.
+Not live — no practice has answered yet and 02/03/04 are inactive — but
+load-bearing the moment either changes, and it is the stat sheets' own fault
+reproduced in Postgres: last writer wins, no record of who that was.
+
+## The rule
+
+**The practice is authoritative, and anyone else may fill a blank but may not
+overwrite an answer.**
+
+`0027` adds `appointments.outcome_source`, mirroring `showed_source`, so the
+outcome half has a provenance column too. `src/lib/outcomes/precedence.ts` holds
+the decision, and all three write paths now go through it.
+
+Two groups, because there are two provenance columns and two kinds of knowledge:
+
+| Group | Columns | Governed by |
+|---|---|---|
+| Attendance | `showed`, `second_consult_showed` | `showed_source` |
+| Outcome | `outcome`, `value_cents`, `financing_approved`, `cc_on_file`, `notes`, `lead_quality` | `outcome_source` |
+
+The split matters: the calendar legitimately knows whether somebody turned up,
+and legitimately does not know what the treatment was worth.
+
+Filtering is **per column, not per group** — a call centre chasing a
+half-finished form still fills the boxes the practice left blank. Locking them
+out of the whole row would make the feature useless for its actual purpose.
+
+Two details worth keeping:
+
+- **`outcome = 'pending'` is not an answer.** It is the column default and the
+  portal spells it "Not decided yet". Treating it as answered would lock the
+  call centre out of every row a practice opened and did not finish.
+- **A dropped field is reported, never swallowed.** `/b2c` says which fields the
+  practice had already answered; the webhook returns them as `keptFromPractice`.
+  A form that says "saved" while discarding half a submission is how somebody
+  comes to trust a number that is not theirs.
+
+`npm run check:precedence` — 31 checks. Mutation-tested: removing the guard
+takes it to 20/31, so it is testing the rule rather than describing it.
+
+## /b2c already was the call-centre queue
+
+Worth recording, because it nearly got built twice. `/b2c` is "every patient
+consultation across every client, in one list", with a `pending` queue and an
+inline outcome form that already wrote `showed_source: 'call_centre'`. It maps
+to a `consultations` capability in `permissions.ts`. Nothing needed building —
+it needed the precedence rule above, and people granted the capability.
+
+A per-agent queue was considered and rejected on the data: `booked_by_user_id`
+is null on all 369 appointments, so "my bookings" would be empty. The shared
+cross-client queue is the only one that can work today. **316 appointments are
+past and still unanswered**, which is what that queue is looking at.
+
+---
+
+# Keeping what the call centre already collects
+
+The GoHighLevel update form asks about twenty questions. Make forwarded three.
+`0028` adds columns for four more that have a real consumer here —
+`treatment_opted_for`, `deposit_collected`, `payment_method`,
+`insurance_provider` — and scenario `6109500` now sends them, plus attendance,
+which it was also discarding.
+
+`Readiness` and `Stage Booked` were deliberately left out: call-centre funnel
+internals with no reader on this side, and a column nobody queries looks like
+data, ages badly, and makes the next person assume something depends on it.
+
+The four are free text (bar the boolean) because the option lists live in a form
+somebody else owns. An enum would turn a new dropdown value into a failed
+webhook, and losing a whole submission to protect a column's tidiness is the
+wrong trade. A lone `-` is how that form spells "not answered" — real payloads
+carry it for cash patients — so it is read as absent rather than stored.
+
+These sit **outside** both precedence groups. They are intake facts, not survey
+answers: a practice completing their own survey has no opinion about which
+insurer the patient named, so there is nothing to contest.
+
+`npm run check:webhook` — now 42 checks.
+
+## The second-consultation mapping, fixed
+
+The payload reader mapped `"Did this patient require a second consultation?"` to
+`second_consult_showed`. Those are different facts, and independent: a patient
+can need a second consult and not turn up to it, which the old mapping would have
+recorded as a **show**.
+
+It never fired — Make forwarded three fields and this was not among them, so the
+alias sat dormant from the day it was written. Widening `6109500` in 0028 would
+have armed it, which is how it surfaced.
+
+Fixed by adding the column rather than deleting the alias, because the answer is
+real and the call centre already collects it. The reason it looked like a
+duplicate is that the Hub had nowhere else to put it. `0029` adds
+`second_consult_required`, and who answers what is now unambiguous:
+
+| Column | Answered by |
+|---|---|
+| `second_consult_required` | the call centre, on the update form |
+| `second_consult_showed` | Call Center Mastery (02/03, splitting on a calendar name containing `Second_consultation`), or the practice in its portal |
+
+It joins the **outcome** group for precedence, not attendance — a calendar can
+see who turned up but not whether another appointment was judged necessary.
+Nothing contests it today; it is listed so that if the portal ever asks the
+practice the same question, the rule already covers it.
+
+`6109500` now sends it. `npm run check:webhook` — 48 checks, including the
+case the old mapping got wrong: needed one, did not attend, and both facts
+survive.
+
+## Do not activate 6109500 before these changes are deployed
+
+Scenario `6109500` has been inactive since it was built, for three reasons. One
+has expired and one is new.
+
+**Still true — nothing points at it.** No GoHighLevel workflow has been repointed
+to hook `2756502`. Activating it would receive zero traffic and simply look live
+in the Make list, which is the frozen-label confusion this engagement exists to
+remove. Repointing is the GoHighLevel-side work that cannot be automated.
+
+**No longer true — the endpoint is deployed.** It was originally blocked on
+`feat/call-centre-outcome-queue` being merged and shipped. It is on `main` and
+live: `GET` answers 405 and an unauthenticated `POST` answers 401, so the route
+exists and `SERVICE_API_KEY` is set. That blocker is gone.
+
+**New, and created by widening the blueprint.** The deployed reader still
+contains the old alias, mapping `"Did this patient require a second
+consultation?"` onto `second_consult_showed`. `6109500` now *sends* that
+question. Against the code currently in production that lands in the wrong
+column — arming the exact fault 0029 fixes. Five of the nine fields it now sends
+are also unknown to the deployed reader and would be silently ignored:
+
+| Field | Deployed reader |
+|---|---|
+| `second_consult_required` | **misread as attendance** |
+| `treatment_opted_for` | ignored |
+| `deposit_collected` | ignored |
+| `payment_method` | ignored |
+| `insurance_provider` | ignored |
+
+So the order is: **commit and deploy 0027–0029 and the code that goes with them,
+then repoint a clinic, then activate.** Activating first would not merely waste
+the widening — it would write a wrong answer into a real column.
+
+The same applies to the precedence rule. Until it ships, `/b2c` and the webhook
+are still last-writer-wins against a practice's portal answer. No practice has
+answered yet, so nothing is at risk today; that stops being true on the first
+one.

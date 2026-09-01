@@ -736,3 +736,77 @@ That the 42 sheets are the *right* place for those bookings to go. It establishe
 each sheet is the one that practice's own automation has been writing to. If a practice
 has been writing to the wrong file all along, this check agrees with the mistake. It
 removes the transcription risk in my proposals, not the possibility of an older error.
+
+---
+
+## The appointment-selection rule, tested against real rows — and a correction
+
+`/api/webhooks/consultation-outcome` resolves a type-04 form by contact id using
+"the most recent appointment that has already happened, falling back to the
+earliest upcoming one." That was shipped unproven; the payload suite can't reach
+it because the choice needs the database. Now checked.
+
+**The population is tiny.** 369 appointments, 364 distinct contacts, **5**
+contacts with more than one appointment, and none with more than two.
+
+**The fault the rule exists to prevent is not occurring.** Zero contacts have a
+past appointment alongside an upcoming one. I described the cloned scenarios'
+behaviour as "wrong for a rebooked patient — someone who attended in March and is
+booked again in May would have March's outcome written against May's
+consultation." The design flaw is real, but it has never had the chance to fire:
+nobody in this data is in that shape.
+
+**On every real case the two rules agree.** Ran both against the five pairs —
+mine, and the clones' "sort by appointment date descending, take the first."
+**5 of 5 identical choices.** All five pairs are entirely in the past, and for
+an all-past pair the two rules are the same rule. So the change is currently a
+no-op; its value is prospective only.
+
+What the five actually are: same contact, same calendar, distinct CRM appointment
+ids, 3 to 28 days apart, with status pairs that read as rebook-after-a-miss
+(no_show then confirmed; cancelled then showed). Genuine second bookings, not
+reschedules. For those, "most recent already-happened" is the right pick.
+
+Worth stating because it cuts both ways: the rule is defensible and now
+evidenced, and the urgency I attached to the flaw it fixes was overstated.
+
+---
+
+## Separate finding, logged not chased: the sync invented reschedule history
+
+Found while proving the rule above. Nothing to do with the consolidation — no
+consolidated scenario and no endpoint reads these fields — but it reached
+clients, so it is recorded here rather than left in a commit message.
+
+`crm-appointments.ts:547` decided whether a booking had moved by comparing two
+strings that spell the same instant differently. `event.startsAt` is a
+`toISOString()` result, `2026-07-17T14:30:00.000Z`; Postgres returns the same
+moment as `2026-07-17T14:30:00+00:00`. `!==` was therefore true on every pass for
+every appointment, so the reschedule branch ran on every sync and did two things:
+
+- `rescheduled_from = current.scheduled_at` — a no-op copy
+- `reschedule_count = current.reschedule_count + 1`
+
+Both consequences are visible in the data, which is how it was caught:
+
+- **All 364 rows** with `rescheduled_from` set had it **exactly equal** to
+  `scheduled_at`. Zero differed. The field held no information at all.
+- `reschedule_count` counted **sync passes**. For every creation date since
+  25 Aug there was exactly one distinct value across that day's rows, equal to
+  the number of nightly syncs since: 6, 5, 4, 3, 2, 1, 0 for the 25th to the
+  31st. The 21 Aug backfill spans 0–17 because it wrote mixed ages in one pass.
+
+**It was client-facing.** `BookingsTable.tsx:168` renders
+`Rescheduled: N time(s)` whenever the count is above zero, so the portal has been
+telling practices that appointments were moved up to seventeen times.
+
+Fixed by comparing instants. Data reset in `0026` rather than repaired, because
+there is nothing to repair to: the branch overwrote `rescheduled_from` with the
+current value on the next pass, so real reschedule history was destroyed as it
+was made. `0` and `null` now mean "not known", and the counter is trustworthy
+from 1 Sep 2026 forward only. `tsc --noEmit` clean, `npm run check:webhook`
+34/34.
+
+The general lesson is the one this engagement keeps relearning: a timestamp
+compared as text is a different value from a timestamp compared as a moment, and
+the version that is wrong fails silently and plausibly.

@@ -177,6 +177,76 @@ section('Neither id at all');
   check('no contact id', read.contactId, null);
 }
 
+section('The four the call centre already collects (0028)');
+{
+  const read = readConsultationPayload({
+    contact_id: 'c1',
+    'Which treatment did the patient opt for?': 'Clear Aligners',
+    'Deposit Collected': 'Yes',
+    'Payment Method': 'Insurance + Debit',
+    'Insurance Provider': 'Example Dental Plan',
+  });
+  check('treatment', read.changes.treatment_opted_for, 'Clear Aligners');
+  check('deposit', read.changes.deposit_collected, true);
+  check('payment method', read.changes.payment_method, 'Insurance + Debit');
+  check('insurer', read.changes.insurance_provider, 'Example Dental Plan');
+}
+
+section('A lone hyphen is how that form spells "not answered"');
+{
+  const read = readConsultationPayload({
+    contact_id: 'c1',
+    'Insurance Provider': '-',
+    'Payment Method': '-',
+    'Which treatment did the patient opt for?': '-',
+  });
+  check('insurer not stored as a dash', 'insurance_provider' in read.changes, false);
+  check('payment method not stored', 'payment_method' in read.changes, false);
+  check('treatment not stored', 'treatment_opted_for' in read.changes, false);
+}
+
+section('A deposit that was not asked about stays unanswered');
+{
+  const read = readConsultationPayload({ contact_id: 'c1', 'Deposit Collected': '' });
+  check('no deposit written', 'deposit_collected' in read.changes, false);
+}
+
+section('Needing a second consultation is not attending one (0029)');
+{
+  // The update form's question. It must not touch attendance.
+  const required = readConsultationPayload({
+    contact_id: 'c1',
+    'Did this patient require a second consultation?': 'Yes',
+  });
+  check('required is recorded', required.changes.second_consult_required, true);
+  check(
+    'attendance is left alone',
+    'second_consult_showed' in required.changes,
+    false,
+  );
+
+  // A patient who needed one and did not turn up: the old alias made this a show.
+  const neededAndMissed = readConsultationPayload({
+    appointment_id: 'a1',
+    'Did this patient require a second consultation?': 'Yes',
+    second_consult_showed: 'no',
+  });
+  check('required stays true', neededAndMissed.changes.second_consult_required, true);
+  check(
+    'and the no-show is still a no-show',
+    neededAndMissed.changes.second_consult_showed,
+    false,
+  );
+
+  // Call Center Mastery's own payload only ever speaks to attendance.
+  const ccm = readConsultationPayload({
+    appointment_id: 'a1',
+    second_consult_showed: 'yes',
+  });
+  check('CCM sets attendance', ccm.changes.second_consult_showed, true);
+  check('and asserts nothing about need', 'second_consult_required' in ccm.changes, false);
+}
+
 // ---------------------------------------------------------------------------
 console.log(
   `\n${checks - failures}/${checks} checks passed` +

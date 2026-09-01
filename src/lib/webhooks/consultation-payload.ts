@@ -169,9 +169,21 @@ export function readConsultationPayload(
       'attendance',
     ]),
   );
-  const secondShowed = readTri(
+  /*
+   * Attendance at the second consultation. Call Center Mastery sends this
+   * explicitly (scenarios 02 and 03 split on a calendar name containing
+   * Second_consultation), and the practice answers it in the portal.
+   *
+   * The GoHighLevel question "Did this patient require a second consultation?"
+   * used to be aliased here. It is a different fact — needing one and attending
+   * one are independent, and a patient who needed one and did not turn up would
+   * have been recorded as having shown. It now has its own column, added in
+   * 0029.
+   */
+  const secondShowed = readTri(pick(body, ['second_consult_showed']));
+  const secondRequired = readTri(
     pick(body, [
-      'second_consult_showed',
+      'second_consult_required',
       'Did this patient require a second consultation?',
     ]),
   );
@@ -207,6 +219,40 @@ export function readConsultationPayload(
     ]),
   );
 
+  /*
+   * The four the call centre already collects and the Hub used to discard —
+   * 0028 added the columns. These are intake facts rather than survey answers,
+   * so they sit outside the precedence groups in lib/outcomes/precedence and are
+   * never contested: a practice answering their own survey has no opinion about
+   * which insurer the patient named.
+   *
+   * A lone hyphen is how the GoHighLevel form spells "not answered" — real
+   * payloads carry "-" in Insurance Provider and Payment Method for cash
+   * patients. Storing that literally would put a dash in a report, so it is
+   * read as absent.
+   */
+  const unanswered = (value: string | null): string | null =>
+    value === null || value === '-' || value === '—' ? null : value;
+
+  const treatmentOpted = unanswered(
+    asString(
+      pick(body, [
+        'treatment_opted_for',
+        'Which treatment did the patient opt for?',
+        'treatment',
+      ]),
+    ),
+  );
+  const depositCollected = readTri(
+    pick(body, ['deposit_collected', 'Deposit Collected']),
+  );
+  const paymentMethod = unanswered(
+    asString(pick(body, ['payment_method', 'Payment Method'])),
+  );
+  const insuranceProvider = unanswered(
+    asString(pick(body, ['insurance_provider', 'Insurance Provider'])),
+  );
+
   const changes: TablesUpdate<'appointments'> = {};
 
   if (cancelled) {
@@ -223,11 +269,18 @@ export function readConsultationPayload(
     changes['showed_source'] = 'call_centre';
   }
   if (secondShowed !== undefined) changes['second_consult_showed'] = secondShowed;
+  if (secondRequired !== undefined)
+    changes['second_consult_required'] = secondRequired;
   if (ccOnFile !== undefined) changes['cc_on_file'] = ccOnFile;
   if (financing !== undefined) changes['financing_approved'] = financing;
   if (valueCents !== undefined) changes['value_cents'] = valueCents;
   if (outcome !== undefined) changes['outcome'] = outcome;
   if (notes !== null) changes['notes'] = notes;
+
+  if (treatmentOpted !== null) changes['treatment_opted_for'] = treatmentOpted;
+  if (depositCollected !== undefined) changes['deposit_collected'] = depositCollected;
+  if (paymentMethod !== null) changes['payment_method'] = paymentMethod;
+  if (insuranceProvider !== null) changes['insurance_provider'] = insuranceProvider;
 
   return { appointmentId, contactId, cancelled, changes };
 }
