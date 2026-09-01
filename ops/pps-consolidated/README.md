@@ -1682,3 +1682,76 @@ The reconciliation is live again, so tonight's numbers are current rather than
 frozen at this morning's. The three rows that aborted it are now single rows
 carrying both a CRM appointment id and their tracker origin — which is what the
 ledger was built to produce.
+
+---
+
+# Billed for consultations that were not delivered — 1 Sep 2026
+
+With the ledger rebuilding again, the billing question Kind Dental raised is
+answerable fleet-wide. It is not a Kind Dental problem.
+
+| Outcome recorded | Rows billed | Practices | Amount |
+|---|---|---|---|
+| showed | 315 | 28 | $60,829.32 |
+| **no_show** | **17** | **11** | **$3,230.34** |
+| **outcome never recorded** | **9** | **7** | **$1,659.33** |
+| **cancelled** | **1** | **1** | **$202.91** |
+
+**27 charges totalling $5,092.58** are against consultations that either did not
+happen or were never confirmed to have happened — about 7.7% of billed value.
+
+That 27 is not a coincidence. It is the same 27 the nightly exception report has
+been printing for months: *"27 appointment(s) are either billed without a
+recorded show or vanished from the CRM while still open."* The view was right;
+nobody had put a number on it.
+
+## Per practice
+
+| Practice | No-show | Cancelled | Never recorded | Amount |
+|---|---|---|---|---|
+| Anaheim Smile Center | 3 | – | 2 | **$1,014.55** |
+| Bespoke Orthodontics | 2 | – | 1 | $608.73 |
+| Hancock and Johnston Dentistry | 2 | – | – | $456.55 |
+| Wilmington Family Dental | – | – | 2 | $405.82 |
+| Bling Dental | 1 | 1 | – | $405.82 |
+| Snyder Dental Group | 2 | – | – | $405.82 |
+| TMJ Sleep Airway Orthodontics – Williston | 2 | – | – | $302.82 |
+| DNA Dental Studio | 1 | – | – | $202.91 |
+| Smile and Implant Center of Rockland | – | – | 1 | $202.91 |
+| Diamond Dental | – | – | 1 | $202.91 |
+| HEB Family Dentistry | 1 | – | – | $202.91 |
+| Magic Dental | 1 | – | – | $202.91 |
+| Kind Dental | 1 | – | 1 | $175.10 |
+| Lightning Orthodontics | – | – | 1 | $151.41 |
+| Team Dental N. Liberties | 1 | – | – | $151.41 |
+
+15 practices, 15 Mar – 27 Aug.
+
+The three categories are not equally wrong. A **no-show** or **cancelled** charge
+is billed for something the record says did not occur. An **outcome never
+recorded** charge may be perfectly good — nobody answered the survey, which is
+the adoption problem — but it is billed without evidence, which is the same
+position to be in if a client asks.
+
+## Kind Dental specifically, now that it has appointments
+
+36 ledger rows. 21 billed at $1,838.55, spanning 21 Apr – 20 Jul, and **not one
+of them has a CRM appointment behind it**.
+
+Removing the exclusion fixed the future, not the past. The sync's window reaches
+back to 7 July at the earliest, so consultations billed before then can never
+gain calendar corroboration — the tracker sheet remains the only evidence they
+happened. Of the 21, two are questionable on their face: one billed against a
+recorded no-show and one where no outcome was ever recorded.
+
+## Not recommended: fixing the `{{paid` defect
+
+The broken merge tag in all 58 type-01 scenarios is real, but it should be left
+alone.
+
+Its effect is unmeasurable from here — `appointments.utm_medium` is null on all
+369 rows, and a dropped booking leaves no row to count. And the replacement
+already does not have it: the consolidated scenario `6046761` writes every
+booking through one `addRow` with no `utmMedium` branch at all. Editing 58 live
+scenarios to repair a fault that the retirement deletes, with no way to show it
+has ever fired, is work spent on a system being switched off.
