@@ -631,3 +631,48 @@ cannot distinguish, so this one is **not settled** — it needs revision history
 Reading this as "City Dental is clean" would be going too far: the test rules out an
 overwrite carrying a timestamp, which is what those modules produce. It does not prove
 the file was never touched.
+
+---
+
+# GoHighLevel session: one confirmation, and a method that does not work
+
+## Kind Dental's location id is correct
+
+Navigated to `app.gohighlevel.com/location/KiGqpUllGNj1tJyPMpnX`. The account switcher
+reads **Kind Dental, Scotch Plains NJ**. So the id the Hub holds is right.
+
+That matters because it removes a candidate explanation. Kind Dental has 27 consultations
+billed and zero appointments, and "the Hub has the wrong location id" was one of the two
+possible causes. It is not that. The remaining explanation is the one already documented:
+its only consultation calendar is on the excluded list *and* named as an override, and the
+sync applies the exclusion.
+
+## Automating GoHighLevel's v2 interface does not work, and that is worth recording
+
+Every list view — sub-accounts, calendars — renders through nested web components that
+put nothing readable in the DOM. Deep shadow-root traversal returned 176 text nodes from
+the sub-accounts page and not one client name. Screenshots on the calendar settings page
+timed out at 30 seconds with the renderer unresponsive.
+
+Auth tokens do sit in `localStorage`, so the internal API is reachable in principle. I did
+not go that way: they are live credentials, and driving a vendor's private API by lifting
+its session token is not something to do casually on a production agency account.
+
+**The right route is the API the Hub already has.** `GHL_PRIVATE_TOKEN` exists as a Vercel
+environment variable and `crm-clients` already calls GoHighLevel with it. Any question of
+the form "which sub-accounts exist and what are their ids" should be answered by extending
+that sync, not by browsing. Recording this so nobody else spends an hour on the UI.
+
+## Village Dental (GD) and Best Care Dental — inference, not confirmation
+
+`clients` holds 76 rows, 75 with a location id. The one without is Village Dental of New
+England (General Dentistry), created by hand on 22 Aug — meaning `crm-clients` did not
+find a matching sub-account. Best Care Dental has no client row at all, so the sync never
+saw one either, which agrees with `0001_init.sql` recording it as a tracker name with no
+CRM candidate.
+
+**That is evidence, not proof.** Absence from `clients` means the sync did not match it; it
+does not distinguish "no such sub-account in GoHighLevel" from "exists but the sync missed
+it". The Kind Dental case shows `(General Dentistry)` does appear as a real GoHighLevel
+location name elsewhere, so a Village Dental GD sub-account plausibly exists and was
+merged or skipped by practice-name matching. Settling it needs the API.
