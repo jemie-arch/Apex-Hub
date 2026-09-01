@@ -1,0 +1,27 @@
+-- Restore the dual-write exemption that 0013 established and 0023 broke.
+--
+-- 0023 added writes_to_unowned_sheet to catch a module writing into a file that
+-- is nobody's primary target. The gap it closed is real. The clause was too
+-- broad: 0013 already carried an explicit carve-out, in its own words --
+--
+--   "Deliberately NOT a finding: a scenario writing to several files where each
+--    has its own lookup. That is a legitimate dual-write and one scenario does
+--    it on purpose."
+--
+-- Art of Smile is that scenario, and 0023 flagged it. Checked in the sheets
+-- themselves: its two files carry the same 23 of 24 appointment ids, the same
+-- practice name and the same date range, so it is one practice deliberately
+-- keeping a duplicate -- not a stray write. And the second file has its own
+-- filterRows, which is exactly the test 0013 named.
+--
+-- The clause now requires the unowned file to have NO lookup of its own in the
+-- same scenario. A file that is read as well as written is being maintained on
+-- purpose. A file only ever written to, that nothing in the fleet reads, is the
+-- actual fault.
+--
+-- Art of Smile remains a cutover consideration rather than a fault: the
+-- consolidated scenario writes one file per clinic, so moving it stops the
+-- duplicate being maintained. That is a decision, not a defect.
+--
+-- The applied statement is the full view with the extra NOT EXISTS on the
+-- writes_to_unowned_sheet branch; see 0023 for the unchanged clauses.
