@@ -521,3 +521,52 @@ is now ignored rather than treated as a failed delivery.
 Module 7, the updateRow branch, deliberately has no id guard and does not need one:
 reaching it means module 4 returned a row, which means an appointment id already
 matched.
+
+---
+
+## The key is live and the modules are wired — 1 Sep 2026
+
+`SERVICE_API_KEY` is set in Vercel and mirrored into a Make Keychain entry,
+**Apex Hub SERVICE_API_KEY**, id `215007`. Verified end to end:
+
+```
+POST /api/webhooks/consultation-outcome   Authorization: Bearer <key>   {}
+→ 422  "No appointment id and no contact id"
+```
+
+`422` is the pass. It authenticated, then refused an empty body — which is the
+endpoint declining to guess, exactly as designed.
+
+Six modules across five scenarios now reference that key, all still **inactive**:
+
+| Scenario | Modules | Valid |
+|---|---|---|
+| `6109503` 06 Appointment Cancelled | 1 | yes |
+| `6109500` 04 Appointment Update Form | 1 | yes |
+| `6108174` 02 CCM Show Tracker | 2 | yes |
+| `6108222` 03 CCM No Show Tracker | 2 | yes |
+| `6003601` GHL Token Bridge | 1 | **no — see below** |
+
+`6046761` (01 New Appointment Booked) needs no key: it writes to Google Sheets via
+the routing data store and never calls the Hub.
+
+### Two things known and accepted
+
+**The live key was exposed in a chat transcript** during setup and was knowingly kept
+rather than rotated. It is a working credential guarding `/api/tokens/ghl`, which
+hands out GoHighLevel access tokens. Rotating it later costs two edits — the Vercel
+variable and the value inside key `215007` — and needs no module rewiring, because the
+key entry keeps its id and its attachments. Recorded so the decision is visible rather
+than forgotten.
+
+**`6003601` is still `isinvalid`.** The missing key was one of at least two faults; it
+was asserted here that the key would fix it, and that was wrong. Everything checkable
+through the API is correct — key attached, data store `135204` "GHL OAuth Tokens"
+present with every field the module writes, all required HTTP fields populated, and
+the exact field shape of the four working modules replicated. Three API writes did not
+clear the flag. Either it only recomputes on a save in the editor, or something the
+API does not expose is wrong. Opening it in Make settles it: the editor marks the
+unhappy module and names the reason.
+
+It blocks nothing here. The Token Bridge caches a GoHighLevel token for other
+scenarios, calls a different endpoint, and has been broken since 20 August.
