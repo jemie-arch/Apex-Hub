@@ -12,7 +12,8 @@
     "sync:crm": "tsx scripts/sync-crm.ts",
     "sync:ads": "tsx scripts/sync-ads.ts",
     "sync:billing": "tsx scripts/sync-billing.ts",
-    "check:webhook": "tsx scripts/check-outcome-payload.ts"
+    "check:webhook": "tsx scripts/check-outcome-payload.ts",
+    "check:precedence": "tsx scripts/check-outcome-precedence.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

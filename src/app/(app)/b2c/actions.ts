@@ -26,6 +26,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { isStaffRole, isPrivileged } from '@/config/roles';
+import { applyPrecedence } from '@/lib/outcomes/precedence';
 import { currentCaller } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
@@ -107,9 +108,17 @@ export async function recordConsultation(input: {
 
   const db = serviceClient();
 
+  /*
+   * The provenance columns come back too, because what this write is allowed to
+   * touch depends on whether the practice has already answered.
+   */
   const existing = await db
     .from('appointments')
-    .select('id, patient_name')
+    .select(
+      // One unbroken literal: Supabase infers the row type from the select
+      // string, and a concatenation is not a literal type.
+      'id, patient_name, showed, second_consult_showed, showed_source, outcome, value_cents, financing_approved, cc_on_file, notes, lead_quality, outcome_source',
+    )
     .eq('id', input.appointmentId)
     .maybeSingle();
 
@@ -124,21 +133,33 @@ export async function recordConsultation(input: {
   const financing = tri(input.financing);
   const notes = input.notes.trim();
 
-  const written = await db
-    .from('appointments')
-    .update({
+  /*
+   * Spread-if-answered rather than assigned. An omitted key leaves the column as
+   * it was; writing null would erase what the calendar or the practice had
+   * already established.
+   *
+   * applyPrecedence then removes anything the practice has answered for itself.
+   * A blank they left is still fillable from here — the point is to help finish
+   * a half-answered consultation, not to lock the call centre out of the row.
+   */
+  const { changes, dropped } = applyPrecedence(
+    existing.data,
+    {
       outcome: input.outcome as AppointmentOutcome,
-      /*
-       * Spread-if-answered rather than assigned. An omitted key leaves the
-       * column as it was; writing null would erase what the calendar or the
-       * practice had already established.
-       */
-      ...(showed === null ? {} : { showed, showed_source: 'call_centre' }),
+      ...(showed === null ? {} : { showed }),
       ...(secondShowed === null ? {} : { second_consult_showed: secondShowed }),
       ...(ccOnFile === null ? {} : { cc_on_file: ccOnFile }),
       ...(financing === null ? {} : { financing_approved: financing }),
       ...(valueCents === null ? {} : { value_cents: valueCents }),
       ...(notes === '' ? {} : { notes }),
+    },
+    'call_centre',
+  );
+
+  const written = await db
+    .from('appointments')
+    .update({
+      ...changes,
       outcome_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -153,8 +174,20 @@ export async function recordConsultation(input: {
   revalidatePath('/b2c');
   revalidatePath('/reconciliation');
 
+  /*
+   * Say so when something was not written. Silently discarding half a submission
+   * is how somebody comes to believe a number is theirs when it is not — and the
+   * practice's answer being kept is the correct outcome, so there is nothing to
+   * apologise for, only something to report.
+   */
+  const who = existing.data.patient_name ?? 'this appointment';
   return {
     ok: true,
-    message: `Saved for ${existing.data.patient_name ?? 'this appointment'}.`,
+    message:
+      dropped.length === 0
+        ? `Saved for ${who}.`
+        : `Saved for ${who}. The practice had already answered ` +
+          `${dropped.length === 1 ? 'one field' : `${dropped.length} fields`} ` +
+          `(${dropped.join(', ')}), so theirs was kept.`,
   };
 }

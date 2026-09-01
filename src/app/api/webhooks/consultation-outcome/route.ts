@@ -67,6 +67,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { serviceApiKey } from '@/lib/env';
+import { applyPrecedence } from '@/lib/outcomes/precedence';
 import { serviceClient } from '@/lib/supabase/service';
 import { readConsultationPayload } from '@/lib/webhooks/consultation-payload';
 
@@ -144,8 +145,13 @@ export async function POST(request: NextRequest) {
 
   const db = serviceClient();
 
+  /*
+   * The provenance and answer columns are selected too. What this request is
+   * allowed to write depends on whether the practice has already answered — see
+   * lib/outcomes/precedence.
+   */
   const COLUMNS =
-    'id, patient_name, client_id, outcome, scheduled_at, status, crm_appointment_id';
+    'id, patient_name, client_id, outcome, scheduled_at, status, crm_appointment_id, showed, second_consult_showed, showed_source, value_cents, financing_approved, cc_on_file, notes, lead_quality, outcome_source';
 
   /**
    * Which of a contact's appointments an update form is about.
@@ -246,10 +252,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  /*
+   * This arrives from the GoHighLevel update form, which the call centre fills
+   * in — so it writes with call-centre authority, not the practice's. Anything
+   * the practice has already answered in their portal is kept, and this fills
+   * only what they left blank.
+   *
+   * Without this the last writer won, which would have made the portal's
+   * on-screen promise — "nothing you type here is overwritten by our systems" —
+   * false the first time both were used on the same consultation.
+   */
+  const { changes: permitted, dropped } = applyPrecedence(
+    found.data,
+    changes,
+    'call_centre',
+  );
+
   const now = new Date().toISOString();
   const written = await db
     .from('appointments')
-    .update({ ...changes, outcome_updated_at: now, updated_at: now })
+    .update({ ...permitted, outcome_updated_at: now, updated_at: now })
     .eq('id', found.data.id);
 
   if (written.error) {
@@ -261,6 +283,12 @@ export async function POST(request: NextRequest) {
     appointmentId: appointmentId ?? found.data.crm_appointment_id ?? null,
     resolvedBy: appointmentId ? 'appointment id' : 'contact id',
     patient: found.data.patient_name,
-    recorded: Object.keys(changes),
+    recorded: Object.keys(permitted),
+    /*
+     * Reported rather than hidden: a form that says "saved" while discarding
+     * half the submission is how somebody comes to trust a number that is not
+     * theirs. An empty array is the normal case.
+     */
+    keptFromPractice: dropped,
   });
 }
