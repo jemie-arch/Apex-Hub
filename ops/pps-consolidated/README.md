@@ -478,3 +478,36 @@ If it is unset, generate 32+ random characters, set it in Vercel, and use the sa
 value for the Make keychain key. Nothing else depends on it yet, so it can be created
 fresh rather than hunted for — which is easier than finding an existing `CRON_SECRET`,
 and safer, because that one should stay where it is.
+
+---
+
+## Guarding scenario 01 against a payload it cannot route
+
+Six webhook payloads were sitting queued on three consolidated hooks since 31 Aug —
+two each on `2755826`, `2756502` and `2756504`. All six are `{}`, one byte, test
+traffic from creation day. No appointment id, no contact id, no location id.
+
+For 04 and 06 that is harmless by construction: both HTTP modules sit behind a filter
+requiring an id to exist, so an empty body never reaches the Hub.
+
+**Scenario 01 had no such guard**, and it was the one place the reasoning got thin.
+The flow was webhook → datastore lookup keyed on `{{1.location.id}}` → sheet lookup on
+`{{2.spreadsheet_id}}` → router. With an empty payload the datastore key is empty, so
+the spreadsheet id is empty, so the Sheets modules have no file to address. The likely
+outcome is an error into the retry handler and then the queue. The argument that it
+*cannot* append a blank row to a real sheet is sound — every write is parameterised on
+a spreadsheet id that an unrouted payload never obtains — but it is an argument, and
+the cost of being wrong is a junk row in a client's stat sheet.
+
+So it is now a guard rather than an argument. Three filters:
+
+| Module | Requires |
+|---|---|
+| 2, datastore lookup | `{{1.location.id}}` exists |
+| 4, sheet lookup | `{{2.spreadsheet_id}}` exists, and the clinic is not switched off |
+| 6, addRow | `{{1.calendar.appointmentId}}` exists |
+
+An unroutable payload now stops at the trigger: no error, no retry, no queue entry,
+nothing written. A clinic with no routing row still parks loudly, which is the
+behaviour that was wanted — the difference is that a payload with no clinic *at all*
+is now simply ignored rather than treated as a failed delivery.
