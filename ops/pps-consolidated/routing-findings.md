@@ -583,3 +583,51 @@ and the stat sheets have a column K for it, but none of that has ever reached he
 That is worth knowing before the consolidated scenarios go live, because they will
 start populating it — so second-consult figures will appear to jump from nothing,
 and that will be the feed starting, not a change in behaviour.
+
+---
+
+# Browser session: two of the open questions answered
+
+## Art of Smile's second sheet is a deliberate duplicate — and my finding was wrong
+
+Opened both files. They carry the **same 23 of 24 appointment ids**, the same practice
+name in every row, and the same date range (22 Jun → 1 Oct 2026). Identical headers,
+33 rows against 32. It is one practice writing every booking to two files.
+
+`0013_init` already exempted this case, in its own words: *"Deliberately NOT a finding:
+a scenario writing to several files where each has its own lookup. That is a legitimate
+dual-write and one scenario does it on purpose."* Art of Smile **is** that scenario, and
+its second file has its own `filterRows`, which is the exact test named.
+
+So `writes_to_unowned_sheet` as I first wrote it was a false positive, and the lines
+ruling it out were in the file I had just read. `0024` narrows it: the clause now fires
+only when the unowned file is **never read back** by the same scenario. A file read as
+well as written is being maintained; a file only ever written to is the fault. Findings
+back to 10, Art of Smile correctly silent, the real gap still covered.
+
+**It is still a cutover consideration**, just not a defect. The consolidated scenario
+writes one file per clinic, so moving Art of Smile stops the duplicate being kept up.
+Somebody should decide whether anyone reads that second file before it goes stale.
+
+## No evidence the misdirected updateRow modules corrupted anything
+
+Rather than trawl revision history I used a fingerprint. The misdirected modules write
+`App Date` as `MM/DD/YYYY hh:mm` — **with a time**. So an overwritten row is visible if
+the receiving sheet's own rows carry date-only values.
+
+**City Dental Centers**, 176 rows: 52 carry a time, and they are **contiguous, rows 126
+to 177**, spanning June to September 2026. That is the scenario being upgraded to the
+newer generation mid-year, not scattered overwrites. It matters because Kind Dental's
+sheet holds ~32 rows, so an overwrite driven by its row numbers would land in City
+Dental **rows 2 to 33** — and there is not one timestamped row below 126.
+
+Every row in City Dental's sheet also names City Dental as its location, so no foreign
+booking has been appended either.
+
+**Team Dental N. Liberties** holds only 5 data rows, 2 of them timestamped and both at
+the end. The same chronological explanation fits, but with a sheet that small the test
+cannot distinguish, so this one is **not settled** — it needs revision history.
+
+Reading this as "City Dental is clean" would be going too far: the test rules out an
+overwrite carrying a timestamp, which is what those modules produce. It does not prove
+the file was never touched.
