@@ -676,3 +676,63 @@ does not distinguish "no such sub-account in GoHighLevel" from "exists but the s
 it". The Kind Dental case shows `(General Dentistry)` does appear as a real GoHighLevel
 location name elsewhere, so a Village Dental GD sub-account plausibly exists and was
 merged or skipped by practice-name matching. Settling it needs the API.
+
+---
+
+# 42 of 49 routing rows verified, by id
+
+The routing table had 49 proposals and nothing verified, so `pps_routing_export` was
+empty and the consolidated scenario could route nobody. Verifying meant a human
+opening 49 spreadsheets.
+
+There was a better test available. Every stat sheet carries a **Location ID** column
+that the booking scenario writes from `{{1.location.id}}` — the GoHighLevel location
+that actually fired the webhook. So the sheet states its own owner, in ids, in
+GoHighLevel's words. Reading that column and matching it to `clients.crm_location_id`
+is an id-to-id check with no name matching anywhere in it.
+
+Ran it over all 49.
+
+| Result | Count |
+|---|---|
+| Location id matched | **43** |
+| Location ID column empty (no bookings yet) | 6 |
+| **Mismatched** | **0** |
+
+Not one proposal was wrong. Forty-two are now marked verified — the forty-third,
+Stanton Dental Care, is held back deliberately below.
+
+**`pps_routing_export` went from 0 to 42.** The consolidated booking scenario can now
+route 42 clinics. Gaps fell from 57 to 15.
+
+## The six that could not be checked
+
+All Dental of Menifee · Genuine Family Dentistry · Integrity Dental · Smile Now Align ·
+Tamara Levit DDS PC · **TMJ Sleep Airway Orthodontics – Ponte Vedra**
+
+Each has a single header row and an empty Location ID column, so there is nothing to
+match. This is not a failed check, it is an absent one: no booking has ever been
+written to these sheets. They stay unverified until one is.
+
+Worth noting that **Ponte Vedra is among them** — the inferred row I singled out as
+needing the hardest look, because Gainesville is also in Florida and the match rested
+entirely on the sheet being named "FL PV". It remains the one row in the table resting
+on nothing but an abbreviation. `0001_init.sql` reached the same conclusion
+independently: *"Ponte Vedra has no tracker rows at all, which is consistent."*
+
+The other four inferred rows — Gainesville, New York, Williston and Art of Smile — are
+now confirmed by location id and are no weaker than any derived row.
+
+## Stanton Dental Care held back on purpose
+
+Its sheet matched its location id, so the pairing looks right. But that same sheet is
+the `shared_sheet` finding: OC Healthy Smiles' scenario writes to it as well. An
+automated check should not bless a file two practices claim. It needs the question
+`0013` already posed — open the file in Drive and settle who owns it.
+
+## What this does not establish
+
+That the 42 sheets are the *right* place for those bookings to go. It establishes that
+each sheet is the one that practice's own automation has been writing to. If a practice
+has been writing to the wrong file all along, this check agrees with the mistake. It
+removes the transcription risk in my proposals, not the possibility of an older error.
