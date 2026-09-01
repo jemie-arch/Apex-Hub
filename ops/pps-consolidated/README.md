@@ -1467,3 +1467,45 @@ July — one either excluded or never seen. Confirming that needs GoHighLevel's
 calendar list for the location, which needs API access, which needs the token
 bridge `6003601` that is still `isinvalid`. That chain is now the blocker on the
 last of the three.
+
+## Kind Dental's consultation calendar is no longer excluded — 1 Sep 2026
+
+Run on Jemie's instruction:
+
+```sql
+delete from excluded_calendars where crm_calendar_id = 'Il8ovGGMeIc7dbtkmB2N';
+```
+
+`Ortho & New Patient Exam | Dr. Vohra`, excluded on 22 Aug with the reason "Not
+the practice booking calendar", and confirmed two days later by a GoHighLevel UI
+audit to be exactly that. `calendar_list_conflicts` is now **empty**.
+
+To restore it, if the audit turns out to have been wrong:
+
+```sql
+insert into excluded_calendars (crm_calendar_id, client_id, calendar_name, reason, excluded_at)
+values ('Il8ovGGMeIc7dbtkmB2N', 'd9f78b83-e6e2-4e58-ba4b-0c8fdf76857f',
+        'Ortho & New Patient Exam | Dr. Vohra', 'Not the practice booking calendar',
+        '2026-08-22 17:42:28.187218+00');
+```
+
+### What this does and does not do
+
+**No money has moved.** This changes what the `crm-appointments` sync is allowed
+to read. It does not bill anything, release anything, or alter a charge. The 15
+held charges and 28 billed consults are still exactly where they were.
+
+**Kind Dental still shows 0 appointments** and will until the next nightly sync
+runs — the exclusion governs reading, and nothing has read since. That is the
+check: after the next run, `appointments` for
+`d9f78b83-e6e2-4e58-ba4b-0c8fdf76857f` should stop being zero for the first time.
+
+If it is still zero afterwards, the Vohra calendar was not the whole story and
+the remaining six exclusions need the same GoHighLevel scrutiny — particularly
+` {{location.name}} Virtual Calendar `, the other judgement call from 22 Aug,
+which nobody has audited. The five `Do Not Book` PatientSync mirrors are almost
+certainly correct and should stay.
+
+Only once real appointments land can the billing question be answered properly:
+28 consults were billed against zero appointments, and until there are
+appointments to compare them to, nobody can say which of the 28 were owed.
