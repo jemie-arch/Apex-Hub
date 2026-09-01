@@ -1560,3 +1560,80 @@ the deploy did not take.
 zero appointments. There are now seven. Whether those seven reconcile against
 the 28 is a separate exercise, and it needs the appointment ledger rather than
 this table.
+
+---
+
+# The ledger rebuild now fails, and it is a consequence of the Kind Dental fix
+
+Ran `appointment-ledger` manually at 18:07 to link the seven new appointments.
+It aborted:
+
+```
+fatal: duplicate key value violates unique constraint "appointment_ledger_tracker_key"
+Key (tracker_source_tab, tracker_source_row)=(Appointment Data, 46) already exists.
+```
+
+**No damage.** The ledger is still 1,344 rows and nothing was linked; the
+function is atomic and rolled back.
+
+## What the bug is
+
+`rebuild_appointment_ledger()` inserts CRM appointments as ledger rows first,
+then matches tracker rows to them on client + patient name + date, then stamps
+the tracker key onto the matched CRM row:
+
+```sql
+merged as (
+  update appointment_ledger l
+  set tracker_source_tab = p.tab,
+      tracker_source_row = p.source_row, ...
+  from paired p
+  where l.id = p.ledger_id and p.ledger_id is not null
+)
+```
+
+If that tracker row **already has its own tracker-only ledger row**, two rows now
+carry the same `(tracker_source_tab, tracker_source_row)` and the unique index
+rejects it. The merge never removes the row it is superseding.
+
+It has been dormant since the ledger was built, because it only fires the first
+time a practice goes from *"tracker rows, no CRM appointments"* to *"both"* — a
+transition no practice had made. Kind Dental made it this evening.
+
+## Blast radius: three rows, one practice, no money
+
+| tracker row | date | outcome | billing state | amount | billed | Stripe intent |
+|---|---|---|---|---|---|---|
+| 102 | 7 Aug | showed | billable | £0 | no | no |
+| 21 | 19 Aug | pending | pending | £0 | no | no |
+| 46 | 20 Aug | pending | pending | £0 | no | no |
+
+None carries money, a `billed_at`, or a payment intent.
+
+## Why it matters more than three rows
+
+The function is one statement. Three colliding rows abort the **entire** rebuild,
+so **the 06:04 run tomorrow will fail the same way** and the reconciliation stops
+updating fleet-wide — including the numbers it reported this morning:
+
+- 45 charge lines totalling **$11,836.75** that cannot be tied to an appointment
+- 455 delivered consultations worth an estimated **$102,592.66** unbilled past 30 days
+- 27 appointments billed without a recorded show, or vanished while still open
+
+Those figures go stale until the rebuild runs again.
+
+## Two ways out
+
+**Patch the function** — the right fix. In the `merged` CTE, delete the
+superseded tracker-only row as part of the merge, so one appointment keeps one
+ledger row: the CRM-keyed one, enriched from the tracker. This also covers the
+next practice to make the same transition, which Village Dental will do the
+moment its calendar is found. It is a change to billing reconciliation logic and
+has no test harness, which is why it is not done here.
+
+**Clear the three rows** — unblocks tonight. They carry no money and the rebuild
+recreates them correctly from `tracker_appointments`. But it recurs for the next
+practice, so it buys time rather than fixing anything.
+
+Recommend the patch, with the three-row clear only if the reconciliation numbers
+are needed before someone can review a function change.
