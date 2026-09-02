@@ -102,8 +102,37 @@ section('The friendly name wins, and organization is only a backstop');
 {
   const withoutFriendly = { ...ghlPayload };
   delete withoutFriendly['Clinic Friendly Name'];
+  delete withoutFriendly['Clinic Name'];
   const answers = adaptGhlOnboarding(withoutFriendly);
   check('falls back to organization', answers['clinic_name'], 'Riverbend Dental Group LLC');
+}
+
+section('The clinic-name field was renamed, so both spellings must work');
+{
+  // The live form now says "Clinic Name"; the two stored submissions say
+  // "Clinic Friendly Name". Falling through to organization would title the
+  // sub-account with the legal entity instead of the practice name.
+  const renamed = { ...ghlPayload };
+  delete renamed['Clinic Friendly Name'];
+  renamed['Clinic Name'] = 'Riverbend Dental';
+  check(
+    'the new label maps',
+    adaptGhlOnboarding(renamed)['clinic_name'],
+    'Riverbend Dental',
+  );
+
+  const both = { ...ghlPayload, 'Clinic Name': 'Should Not Win' };
+  check(
+    'the historical label still wins when both are present',
+    adaptGhlOnboarding(both)['clinic_name'],
+    'Riverbend Dental',
+  );
+
+  check(
+    'neither is left mapping to organization by accident',
+    adaptGhlOnboarding({ 'Clinic Name': 'Only New Label' })['clinic_name'],
+    'Only New Label',
+  );
 }
 
 section('Gender is read, never inferred');
