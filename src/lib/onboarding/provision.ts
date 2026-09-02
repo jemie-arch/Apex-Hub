@@ -172,6 +172,26 @@ export async function provisionFromSubmission(input: {
 
   if (locationId === null) {
     try {
+      /*
+       * The sub-account's own profile, not just its merge fields.
+       *
+       * This used to send four fields and leave the rest of GoHighLevel's
+       * business profile blank — no address, no city, no country — even though
+       * createSubAccount accepts all of them and the onboarding form makes most
+       * of them required. The first live route test made it obvious: an account
+       * created with a name and nothing else behind it.
+       *
+       * The address is worth more than tidiness. It is what GoHighLevel uses on
+       * the location record a practice sees, and the postal code is what several
+       * of its own features key off. Collecting a required answer and then
+       * dropping it is the same fault the Timezone custom value nearly had.
+       *
+       * firstName and lastName come from splitName rather than the raw answer,
+       * so "Dr Casey Lindqvist, female" does not land as a first name.
+       */
+      const doctorName = pick(input.answers, 'doctor_name');
+      const doctor = doctorName ? splitName(doctorName) : null;
+
       const created = await createSubAccount({
         name: clinicName,
         snapshotId: ONBOARDING_SNAPSHOT_ID,
@@ -179,6 +199,14 @@ export async function provisionFromSubmission(input: {
         website: pick(input.answers, 'website'),
         phone: pick(input.answers, 'phone'),
         email: pick(input.answers, 'doctor_email'),
+        address: pick(input.answers, 'address'),
+        city: pick(input.answers, 'city'),
+        state: pick(input.answers, 'state'),
+        postalCode: pick(input.answers, 'postal_code'),
+        country: pick(input.answers, 'country'),
+        ...(doctor === null
+          ? {}
+          : { firstName: doctor.firstName, lastName: doctor.lastName }),
       });
       locationId = created.locationId;
     } catch (error) {
