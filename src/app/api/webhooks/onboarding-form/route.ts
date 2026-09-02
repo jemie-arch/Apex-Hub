@@ -27,7 +27,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { serviceApiKey } from '@/lib/env';
+import { authorisedByServiceKey } from '@/lib/auth/service-key';
 import {
   groupAlreadyLive,
   withinAutoProvisionWindow,
@@ -59,22 +59,6 @@ const ENVELOPE = new Set([
   'location_id',
   'locationId',
 ]);
-
-function authorised(request: NextRequest): boolean {
-  const header = request.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return false;
-
-  const provided = header.slice('Bearer '.length);
-  const expected = serviceApiKey();
-
-  if (provided.length !== expected.length) return false;
-
-  let mismatch = 0;
-  for (let index = 0; index < provided.length; index += 1) {
-    mismatch |= provided.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  return mismatch === 0;
-}
 
 function text(value: unknown): string | null {
   if (typeof value === 'number') return String(value);
@@ -140,7 +124,7 @@ async function matchGroup(
 export async function POST(request: NextRequest) {
   let allowed: boolean;
   try {
-    allowed = authorised(request);
+    allowed = authorisedByServiceKey(request);
   } catch (error) {
     // SERVICE_API_KEY missing: say so rather than a bare 401, which would send
     // somebody hunting for a wrong key that is in fact absent.

@@ -66,7 +66,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { serviceApiKey } from '@/lib/env';
+import { authorisedByServiceKey } from '@/lib/auth/service-key';
 import { applyPrecedence } from '@/lib/outcomes/precedence';
 import { serviceClient } from '@/lib/supabase/service';
 import { readConsultationPayload } from '@/lib/webhooks/consultation-payload';
@@ -74,26 +74,10 @@ import { readConsultationPayload } from '@/lib/webhooks/consultation-payload';
 export const dynamic = 'force-dynamic';
 
 /** Constant-time bearer check, the same shape as /api/tokens/ghl. */
-function authorised(request: NextRequest): boolean {
-  const header = request.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return false;
-
-  const provided = header.slice('Bearer '.length);
-  const expected = serviceApiKey();
-
-  if (provided.length !== expected.length) return false;
-
-  let mismatch = 0;
-  for (let index = 0; index < provided.length; index += 1) {
-    mismatch |= provided.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  return mismatch === 0;
-}
-
 export async function POST(request: NextRequest) {
   let allowed: boolean;
   try {
-    allowed = authorised(request);
+    allowed = authorisedByServiceKey(request);
   } catch (error) {
     // SERVICE_API_KEY missing: say so rather than returning a bare 401, which
     // would look like a wrong key and send somebody hunting the wrong problem.

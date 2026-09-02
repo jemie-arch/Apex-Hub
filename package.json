@@ -15,7 +15,8 @@
     "check:webhook": "tsx scripts/check-outcome-payload.ts",
     "check:precedence": "tsx scripts/check-outcome-precedence.ts",
     "check:onboarding": "tsx scripts/check-onboarding-adapter.ts",
-    "list:custom-values": "tsx scripts/list-custom-values.ts"
+    "list:custom-values": "tsx scripts/list-custom-values.ts",
+    "check:auth": "tsx scripts/check-service-key.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
