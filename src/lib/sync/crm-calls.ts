@@ -267,8 +267,18 @@ export async function syncCrmCalls(ctx: SyncContext): Promise<void> {
   if (ownerless > 0) {
     ctx.log(
       `${ownerless} call(s) arrived with no GoHighLevel user on them, so no ` +
-        'mapping can attribute them. Attributing these needs a change in how ' +
-        'GoHighLevel assigns calls, not a change here.',
+        'mapping can attribute them. The cause was traced in the GoHighLevel ' +
+        'UI on 2 September: each practice number forwards inbound calls to an ' +
+        'external line (Phone numbers -> Edit Configuration -> Call ' +
+        'Forwarding, where "Team Member (1st Priority)" is empty and ' +
+        '"External Phone Number (2nd Priority)" is set). The call leaves ' +
+        'GoHighLevel before any user touches it, so there is no userId to ' +
+        'stamp and no endpoint can return one. The Agent report confirms it: ' +
+        'it counts dialer and manual calls per user and shows zero incoming. ' +
+        'The small share that do carry a user are outbound dialer calls. ' +
+        'Fixing this means routing inbound calls to Team Members instead of an ' +
+        'external number, per practice — an operational change, not a ' +
+        'reporting one.',
     );
   }
 
