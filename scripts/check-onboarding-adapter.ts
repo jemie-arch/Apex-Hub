@@ -199,12 +199,12 @@ section('A known-absent snapshot field does not make a good run look partial');
   // The first real onboarding wrote nine values and reported 'partial' because
   // Timezone alone had nowhere to land. Every successful run would have said
   // partial from then on, which is how a status stops meaning anything.
-  check('Timezone is recorded as known-absent', KNOWN_ABSENT_CUSTOM_VALUES.has('Timezone'), true);
-  check(
-    'and is still mapped, so it fills itself once the snapshot has the field',
-    ONBOARDING_VALUE_MAP['timezone'],
-    'Timezone',
-  );
+  // Timezone must NOT be here. It was, briefly, on one observation — and the
+  // next run wrote it fine. A snapshot applied asynchronously drops a different
+  // field each time, and excusing one of them means provision-pending stops
+  // retrying and the practice keeps an empty field forever.
+  check('Timezone is not treated as absent', KNOWN_ABSENT_CUSTOM_VALUES.has('Timezone'), false);
+  check('Timezone is still mapped and still written', ONBOARDING_VALUE_MAP['timezone'], 'Timezone');
   check(
     'the absent set is derived from the documented list, not a second copy',
     KNOWN_ABSENT_CUSTOM_VALUES.size,
@@ -212,12 +212,12 @@ section('A known-absent snapshot field does not make a good run look partial');
   );
 
   // The guard must stay narrow: an undocumented gap is still a real surprise.
-  const missing = ['Timezone', 'Some Field Nobody Documented'];
+  const missing = ['Legal Business Name', 'Some Field Nobody Documented'];
   const unexpected = missing.filter((name) => !KNOWN_ABSENT_CUSTOM_VALUES.has(name));
   check('an undocumented gap still counts', unexpected, ['Some Field Nobody Documented']);
   check(
     'a run missing only known-absent fields is clean',
-    ['Timezone'].filter((n) => !KNOWN_ABSENT_CUSTOM_VALUES.has(n)).length,
+    ['Legal Business Name'].filter((n) => !KNOWN_ABSENT_CUSTOM_VALUES.has(n)).length,
     0,
   );
 }

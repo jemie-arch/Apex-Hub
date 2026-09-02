@@ -123,19 +123,34 @@ export const UNAVAILABLE_CUSTOM_VALUES: ReadonlyArray<{
       '"[Landing Pages] Business Name" — say which is meant and it will be ' +
       'filled from the clinic name.',
   },
-  {
-    brief: 'Timezone',
-    note:
-      'Confirmed absent by the first real end-to-end onboarding, on 2 ' +
-      'September 2026: nine values were written and this was the only one with ' +
-      'nowhere to land. It is the sharpest gap of the three, because the form ' +
-      'asks for it and makes it REQUIRED — a practice is compelled to answer a ' +
-      'question whose answer is then discarded, and every appointment time is ' +
-      'set in the timezone we did not keep. Adding "Timezone" to the snapshot ' +
-      'is the fix; it is already mapped and starts being written the moment the ' +
-      'field exists.',
-  },
 ];
+
+/*
+ * Timezone was listed here for about an hour and should not have been.
+ *
+ * The first end-to-end onboarding wrote nine values and reported Timezone
+ * missing, which looked like a snapshot gap. The second, forty-five minutes
+ * later and from the same snapshot id, wrote Timezone perfectly well and
+ * reported Doctor Email missing instead.
+ *
+ * So the field is not absent. GoHighLevel applies a snapshot asynchronously
+ * after the location is created, and provisioning reads the custom value list
+ * while that is still happening — which value loses the race varies per run.
+ * setCustomValues already recognises the extreme case, where no values exist at
+ * all, as snapshotNotReady; a partly-applied snapshot looks exactly like a
+ * permanent gap and is what caught me out.
+ *
+ * Listing it here made that worse rather than better: a known-absent field no
+ * longer makes a run partial, so a race that dropped Timezone would have
+ * reported values_written, provision-pending would have skipped the row for
+ * good, and the practice would have kept an empty timezone forever. The list
+ * must only ever hold fields confirmed absent across several accounts, never
+ * one observation.
+ *
+ * The race itself is left alone here. provision-pending retries anything not
+ * marked values_written, so a partial run is filled in on the next pass — which
+ * is the existing design working, not a gap to patch.
+ */
 
 /**
  * Custom value names the snapshot is known not to have.
