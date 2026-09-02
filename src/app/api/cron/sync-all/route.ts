@@ -55,7 +55,28 @@ const ORDER = [
   // that a scope granted this morning repairs the backlog today rather than
   // waiting on somebody noticing a button.
   'provision-pending',
-  'onboarding-calls',
+  /*
+   * 'onboarding-calls' is deliberately NOT here, for the same reason as
+   * 'scenario-audit' and 'payout-hours' below.
+   *
+   * It reads the ADM Client Onboarding sub-account looking for a calendar named
+   * like an onboarding or launch call, and there is not one. On 2 September the
+   * sub-account held exactly one calendar: "Joshua Jung's Personal Calendar".
+   * So the sync cannot succeed, has never read a row, and reported partial every
+   * night — which is how a cycle teaches everyone to ignore its failures.
+   *
+   * Not fixed by widening the pattern, and that is the point. It identifies a
+   * call by calendar rather than by title on purpose, because a title is typed
+   * by whoever booked it and drifts. Matching a personal calendar would file
+   * every meeting that person books as an onboarding call, which is worse than
+   * knowing nothing.
+   *
+   * Whoever knows where these calls are actually booked can settle it in a
+   * minute: if they are in a different sub-account, change
+   * ONBOARDING_LOCATION_ID and put this back; if they are not in GoHighLevel at
+   * all, delete the sync. It stays registered either way, so it still runs from
+   * settings and the CLI for anybody testing that.
+   */
   'crm-deals',
   'windsor-ads',
   'stripe-charges',
