@@ -30,7 +30,22 @@ import type { Answers } from '@/lib/onboarding/provision';
  * hand-typed approximation.
  */
 export const GHL_ONBOARDING_FIELDS: Readonly<Record<string, string>> = {
+  /*
+   * Both spellings of the clinic's name, because the form was renamed.
+   *
+   * The two stored submissions carry "Clinic Friendly Name". A UI audit on 2
+   * September found the live form now labels that field "Clinic Name" — and the
+   * form was last edited on 20 August, the same day those two arrived. So the
+   * old key is what history holds and the new one is what arrives next.
+   *
+   * Getting this wrong is not a blank field. clinic_name falls through to
+   * `organization`, which is the legal entity rather than the patient-facing
+   * name — so a practice's whole sub-account, and every merge field derived
+   * from its name, would be titled "Riverbend Dental Group LLC" instead of
+   * "Riverbend Dental". Both spellings map, and the first one present wins.
+   */
   'Clinic Friendly Name': 'clinic_name',
+  'Clinic Name': 'clinic_name',
   'Timezone -': 'timezone',
   'Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?':
     'landmark',
