@@ -228,48 +228,72 @@ export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
  * their portal, which is the one source that updates itself — the tracker
  * backfill was always a bridge to that, not a replacement for it.
  */
+/**
+ * Both tracker tables, because both are read by something live.
+ *
+ * An audit of every table carrying a load timestamp found four loaded exactly
+ * once, on 22 August 2026. Two of them are these. tracker_leads was the one
+ * nobody had noticed: 1,103 rows feeding the Fulfilment page and lib/metrics,
+ * frozen, with nothing watching it — the same fault as tracker_appointments and
+ * a screen reading it as though it were current.
+ *
+ * `reads` names what goes stale with it, so the alert says what breaks rather
+ * than only which table is old.
+ */
+const TRACKER_FEEDS = [
+  {
+    table: 'tracker_appointments' as const,
+    label: 'consultation outcomes',
+    reads: 'the ledger and the practice-facing portal',
+  },
+  {
+    table: 'tracker_leads' as const,
+    label: 'leads',
+    reads: 'the Fulfilment page and the client metrics',
+  },
+];
+
 async function reportTrackerFreshness(
   ctx: SyncContext,
   db: ReturnType<typeof serviceClient>,
 ): Promise<void> {
-  const latest = await db
-    .from('tracker_appointments')
-    .select('imported_at')
-    .order('imported_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (latest.error) throw latest.error;
+  for (const feed of TRACKER_FEEDS) {
+    const latest = await db
+      .from(feed.table)
+      .select('imported_at')
+      .order('imported_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest.error) throw latest.error;
 
-  // No rows at all is a different condition, and not this function's business.
-  if (!latest.data?.imported_at) return;
+    // No rows at all is a different condition, and not this function's business.
+    if (!latest.data?.imported_at) continue;
 
-  const importedAt = new Date(latest.data.imported_at);
-  const ageDays = Math.floor(
-    (Date.now() - importedAt.getTime()) / 86_400_000,
-  );
+    const importedAt = new Date(latest.data.imported_at);
+    const ageDays = Math.floor((Date.now() - importedAt.getTime()) / 86_400_000);
 
-  ctx.note('tracker_last_imported', {
-    on: importedAt.toISOString().slice(0, 10),
-    age_days: ageDays,
-  });
+    ctx.note(`${feed.table}_last_imported`, {
+      on: importedAt.toISOString().slice(0, 10),
+      age_days: ageDays,
+    });
 
-  if (ageDays >= 30) {
-    ctx.recordError(
-      `The tracker feed was last imported ${ageDays} days ago. Every outcome ` +
-        'the ledger and the client portal read from it is at least that old, ' +
-        'and consultations since then have no outcome at all. Nothing in the ' +
-        'Hub writes this table — it has to be re-imported by hand, or the ' +
-        'practices have to start answering in their portal.',
-      { age_days: ageDays },
-    );
-    return;
-  }
+    if (ageDays >= 30) {
+      ctx.recordError(
+        `The ${feed.label} feed (${feed.table}) was last imported ${ageDays} ` +
+          `days ago, and ${feed.reads} read it as though it were current. ` +
+          'Nothing in the Hub writes this table — it has to be re-imported by ' +
+          'hand, or replaced by a source that updates itself.',
+        { table: feed.table, age_days: ageDays },
+      );
+      continue;
+    }
 
-  if (ageDays >= 7) {
-    ctx.log(
-      `The tracker feed is ${ageDays} days old. Consultations since then have ` +
-        'no recorded outcome, including on the practice-facing portal.',
-    );
+    if (ageDays >= 7) {
+      ctx.log(
+        `The ${feed.label} feed (${feed.table}) is ${ageDays} days old. ` +
+          `Anything since then is missing from ${feed.reads}.`,
+      );
+    }
   }
 }
 
