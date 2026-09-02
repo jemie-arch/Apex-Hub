@@ -122,12 +122,49 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
     try {
       rows = await fetchAdRows(batch, dateFrom, dateTo);
     } catch (error) {
-      // One batch failing must not lose the rest.
-      ctx.recordError(`Windsor request failed for ${batch.length} account(s)`, {
-        accounts: batch,
-        detail: error instanceof Error ? error.message : String(error),
-      });
-      continue;
+      /*
+       * A batch fails as a unit, so one bad account takes nine good ones with
+       * it. Retry them singly before giving up.
+       *
+       * On 2 September both batches failed with the same Facebook error, naming
+       * one account: "incomplete time-series data ... [Error pulling data for
+       * account 1020057142322568]". Twenty practices got no ad data that run
+       * because of one of them. Nothing was lost for good — the window is
+       * rewritten in full every run, so the next one recovers it — but a whole
+       * day of every practice's ad spend was missing from the portal in the
+       * meantime, and it did not need to be.
+       *
+       * The cost is bounded and only paid when something is already wrong: one
+       * request per account in a failed batch, never on the happy path.
+       */
+      const batchDetail = error instanceof Error ? error.message : String(error);
+      const salvaged: Awaited<ReturnType<typeof fetchAdRows>> = [];
+      const stillFailing: string[] = [];
+
+      for (const account of batch) {
+        try {
+          salvaged.push(...(await fetchAdRows([account], dateFrom, dateTo)));
+        } catch {
+          stillFailing.push(account);
+        }
+      }
+
+      if (stillFailing.length > 0) {
+        ctx.recordError(
+          `Windsor request failed for ${stillFailing.length} account(s), ` +
+            `after salvaging ${batch.length - stillFailing.length} of ${batch.length} ` +
+            'from a failed batch by asking one at a time',
+          { accounts: stillFailing, detail: batchDetail },
+        );
+      } else {
+        ctx.log(
+          `A batch of ${batch.length} failed as a unit and every account in it ` +
+            'succeeded on its own, so nothing was lost.',
+        );
+      }
+
+      if (salvaged.length === 0) continue;
+      rows = salvaged;
     }
 
     ctx.counts.read += rows.length;
