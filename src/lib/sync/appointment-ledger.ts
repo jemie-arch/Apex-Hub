@@ -32,6 +32,8 @@ interface RebuildResult {
 export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
 
+  await reportTrackerFreshness(ctx, db);
+
   /*
    * First, retire tracker-only rows that a CRM appointment has caught up with.
    *
@@ -197,6 +199,78 @@ export async function syncAppointmentLedger(ctx: SyncContext): Promise<void> {
   }
 
   await reportUnbilledBacklog(ctx, db);
+}
+
+/**
+ * How old the tracker feed is, said out loud every night.
+ *
+ * The header of this file warns that "a backfill that nothing repeats is a
+ * snapshot that rots". tracker_appointments is that snapshot. It was loaded
+ * once, on 22 August 2026 — one distinct import date across all 1,281 rows —
+ * and nothing in this repository writes to it. Every reference is a read.
+ *
+ * That was tolerable while the tracker only fed reconciliation, because a stale
+ * feed there produces a visible disagreement with the CRM. It stopped being
+ * tolerable when migration 0031 loaded the tracker's outcomes into
+ * appointments, because portal/[token] renders those as "Started treatment" to
+ * the practice. A frozen feed now means a client-facing number that silently
+ * stops growing while consultations keep happening — the reader cannot tell
+ * "nobody started treatment" from "nobody has re-imported the sheet".
+ *
+ * Deliberately not an error until it is old enough to be one. This file already
+ * argues that "a backlog reported as a fault every night is how an alert
+ * becomes wallpaper", and re-importing is manual today, so a nightly failure
+ * would train everyone to ignore the run. The age is always recorded, seven
+ * days logs, thirty days is a genuine fault: past a month the ledger is
+ * reconciling against a picture nobody recognises.
+ *
+ * The durable fix is not a fresher import. It is the practices answering in
+ * their portal, which is the one source that updates itself — the tracker
+ * backfill was always a bridge to that, not a replacement for it.
+ */
+async function reportTrackerFreshness(
+  ctx: SyncContext,
+  db: ReturnType<typeof serviceClient>,
+): Promise<void> {
+  const latest = await db
+    .from('tracker_appointments')
+    .select('imported_at')
+    .order('imported_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest.error) throw latest.error;
+
+  // No rows at all is a different condition, and not this function's business.
+  if (!latest.data?.imported_at) return;
+
+  const importedAt = new Date(latest.data.imported_at);
+  const ageDays = Math.floor(
+    (Date.now() - importedAt.getTime()) / 86_400_000,
+  );
+
+  ctx.note('tracker_last_imported', {
+    on: importedAt.toISOString().slice(0, 10),
+    age_days: ageDays,
+  });
+
+  if (ageDays >= 30) {
+    ctx.recordError(
+      `The tracker feed was last imported ${ageDays} days ago. Every outcome ` +
+        'the ledger and the client portal read from it is at least that old, ' +
+        'and consultations since then have no outcome at all. Nothing in the ' +
+        'Hub writes this table — it has to be re-imported by hand, or the ' +
+        'practices have to start answering in their portal.',
+      { age_days: ageDays },
+    );
+    return;
+  }
+
+  if (ageDays >= 7) {
+    ctx.log(
+      `The tracker feed is ${ageDays} days old. Consultations since then have ` +
+        'no recorded outcome, including on the practice-facing portal.',
+    );
+  }
 }
 
 /**
