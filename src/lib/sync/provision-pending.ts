@@ -14,6 +14,7 @@
  * Safe to run repeatedly. A submission whose account exists is configured rather
  * than duplicated, and a submission already finished is skipped entirely.
  */
+import { AUTO_PROVISION_FROM } from '@/lib/onboarding/auto-provision';
 import {
   adaptGhlOnboarding,
   GHL_ONBOARDING_FORM_KEY,
@@ -35,20 +36,7 @@ const ONBOARDING_FORM_KEYS = [
   GHL_ONBOARDING_FORM_KEY,
 ] as const;
 
-/**
- * Only auto-provision submissions from here onwards.
- *
- * Widening the form filter without this would queue a sub-account for every
- * unprovisioned submission ever received — around 141 of them, most for
- * practices that have had live GoHighLevel accounts for months. Creating a
- * second account for a running practice is expensive to undo and confusing to
- * everyone who touches it afterwards.
- *
- * So automation applies forward and history stays a human decision: every older
- * submission is still provisionable by hand from the Onboarding page, which is
- * where somebody can see which practice it is before pressing the button.
- */
-const AUTO_PROVISION_FROM = new Date(Date.UTC(2026, 8, 1)).toISOString();
+// Both rails live in lib/onboarding/auto-provision, shared with the webhook.
 
 /**
  * Submissions attempted per run.
