@@ -47,9 +47,17 @@
         "conditions": [
           [
             {
+              "a": "{{1.`Clinic Name`}}",
+              "o": "exist"
+            }
+          ],
+          [
+            {
               "a": "{{1.`Clinic Friendly Name`}}",
               "o": "exist"
-            },
+            }
+          ],
+          [
             {
               "a": "{{1.organization}}",
               "o": "exist"
@@ -61,7 +69,7 @@
         "ca": "",
         "qs": [],
         "url": "https://www.apexdentalmarketing.co/api/webhooks/onboarding-form",
-        "data": "{ \"form_key\": \"client-onboarding\", \"submission_id\": \"{{1.id}}\", \"location_id\": \"{{1.location.id}}\", \"answers\": { \"Clinic Friendly Name\": \"{{1.`Clinic Friendly Name`}}\", \"organization\": \"{{1.organization}}\", \"Timezone -\": \"{{1.`Timezone -`}}\", \"email\": \"{{1.email}}\", \"phone\": \"{{1.phone}}\", \"What is the name and gender of the doctor/doctors providing treatment?\": \"{{1.`What is the name and gender of the doctor/doctors providing treatment?`}}\", \"Name or Names of Front Desk Patient Concierge\": \"{{1.`Name or Names of Front Desk Patient Concierge`}}\", \"Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?\": \"{{1.`Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?`}}\", \"Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.\": \"{{1.`Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.`}}\", \"We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.\": \"{{1.`We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.`}}\" } }",
+        "data": "{ \"form_key\": \"client-onboarding\", \"submission_id\": \"{{1.id}}\", \"location_id\": \"{{1.location.id}}\", \"answers\": { \"Clinic Name\": \"{{1.`Clinic Name`}}\", \"Clinic Friendly Name\": \"{{1.`Clinic Friendly Name`}}\", \"Legal Business Name\": \"{{1.`Legal Business Name`}}\", \"organization\": \"{{1.organization}}\", \"Timezone -\": \"{{1.`Timezone -`}}\", \"email\": \"{{1.email}}\", \"phone\": \"{{1.phone}}\", \"full_name\": \"{{1.full_name}}\", \"What is the name and gender of the doctor/doctors providing treatment?\": \"{{1.`What is the name and gender of the doctor/doctors providing treatment?`}}\", \"Name or Names of Front Desk Patient Concierge\": \"{{1.`Name or Names of Front Desk Patient Concierge`}}\", \"Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?\": \"{{1.`Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?`}}\", \"Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.\": \"{{1.`Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.`}}\", \"Please select the data points you would like us to collect for you.\": \"{{1.`Please select the data points you would like us to collect for you.`}}\", \"We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.\": \"{{1.`We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.`}}\" } }",
         "gzip": true,
         "method": "post",
         "headers": [
