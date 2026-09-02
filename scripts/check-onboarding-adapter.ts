@@ -25,6 +25,7 @@ import {
   ONBOARDING_VALUE_MAP,
   UNAVAILABLE_CUSTOM_VALUES,
 } from '../src/config/provisioning';
+import { splitName } from '../src/lib/integrations/ghl-provision';
 
 let failures = 0;
 let checks = 0;
@@ -156,6 +157,41 @@ section('An explicit snake_case field always beats a derived one');
   });
   check('explicit clinic name wins', answers['clinic_name'], 'Explicit Name');
   check('explicit doctor email wins', answers['doctor_email'], 'explicit@example.invalid');
+}
+
+section('Splitting a doctor name for the GoHighLevel user endpoint');
+{
+  check('title is not a first name', splitName('Dr Morgan Reyes'), {
+    firstName: 'Morgan',
+    lastName: 'Reyes',
+  });
+  check('title with a full stop', splitName('Dr. Morgan Reyes'), {
+    firstName: 'Morgan',
+    lastName: 'Reyes',
+  });
+  // Everything after the first word is the surname, so compound names survive.
+  check('compound surname stays whole', splitName('Dr Ana van der Berg'), {
+    firstName: 'Ana',
+    lastName: 'van der Berg',
+  });
+  check('hyphenated surname stays whole', splitName('Ana Ruiz-Marquez'), {
+    firstName: 'Ana',
+    lastName: 'Ruiz-Marquez',
+  });
+  // A single name must not be duplicated into both fields — nobody should be
+  // greeted as "Osei Osei".
+  check('one word leaves the surname empty', splitName('Osei'), {
+    firstName: 'Osei',
+    lastName: '',
+  });
+  check('a bare title is kept rather than emptied', splitName('Dr'), {
+    firstName: 'Dr',
+    lastName: '',
+  });
+  check('extra whitespace is harmless', splitName('  Dr   Sam   Okafor  '), {
+    firstName: 'Sam',
+    lastName: 'Okafor',
+  });
 }
 
 section('A known-absent snapshot field does not make a good run look partial');

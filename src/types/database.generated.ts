@@ -10,102 +10,10 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      // Added by hand pending the next full regeneration, in the shape the
-      // generator produces.
-      pps_clinic_routing: {
-        Row: {
-          client_id: string
-          created_at: string
-          crm_location_id: string
-          notes: string | null
-          practice: string
-          source: string
-          spreadsheet_id: string | null
-          updated_at: string
-          verified_at: string | null
-          verified_by: string | null
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          crm_location_id: string
-          notes?: string | null
-          practice: string
-          source?: string
-          spreadsheet_id?: string | null
-          updated_at?: string
-          verified_at?: string | null
-          verified_by?: string | null
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          crm_location_id?: string
-          notes?: string | null
-          practice?: string
-          source?: string
-          spreadsheet_id?: string | null
-          updated_at?: string
-          verified_at?: string | null
-          verified_by?: string | null
-        }
-        Relationships: []
-      }
-      // Added by hand pending the next full regeneration, in the shape the
-      // generator produces. Safe to lose: a regeneration will emit the real
-      // definitions from the database and overwrite this.
-      scenario_sheet_targets: {
-        Row: {
-          folder: string | null
-          id: number
-          id_was_padded: boolean
-          is_active: boolean
-          label: string | null
-          last_edited_at: string | null
-          last_edited_by: string | null
-          module_id: number
-          observed_at: string
-          operation: string
-          scenario_id: number
-          scenario_name: string
-          spreadsheet_id: string | null
-        }
-        Insert: {
-          folder?: string | null
-          id?: never
-          id_was_padded?: boolean
-          is_active?: boolean
-          label?: string | null
-          last_edited_at?: string | null
-          last_edited_by?: string | null
-          module_id: number
-          observed_at?: string
-          operation: string
-          scenario_id: number
-          scenario_name: string
-          spreadsheet_id?: string | null
-        }
-        Update: {
-          folder?: string | null
-          id?: never
-          id_was_padded?: boolean
-          is_active?: boolean
-          label?: string | null
-          last_edited_at?: string | null
-          last_edited_by?: string | null
-          module_id?: number
-          observed_at?: string
-          operation?: string
-          scenario_id?: number
-          scenario_name?: string
-          spreadsheet_id?: string | null
-        }
-        Relationships: []
-      }
       ad_level_insights: {
         Row: {
           ad_id: string
@@ -171,8 +79,36 @@ export type Database = {
             foreignKeyName: "ad_level_insights_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_level_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_level_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_level_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_level_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -221,8 +157,36 @@ export type Database = {
             foreignKeyName: "ad_snapshots_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -284,8 +248,36 @@ export type Database = {
             foreignKeyName: "ads_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -459,8 +451,36 @@ export type Database = {
             foreignKeyName: "appointment_ledger_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "appointment_ledger_reschedule_of_fkey"
@@ -501,32 +521,32 @@ export type Database = {
           crm_appointment_id: string | null
           crm_calendar_id: string | null
           crm_contact_id: string | null
+          deposit_collected: boolean | null
           financing_approved: boolean | null
           funnel: Database["public"]["Enums"]["funnel"]
           id: string
+          insurance_provider: string | null
           lead_quality: Database["public"]["Enums"]["lead_quality"] | null
           notes: string | null
           outcome: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_source: string | null
           outcome_updated_at: string | null
           patient_email: string | null
           patient_name: string | null
           patient_phone: string | null
+          payment_method: string | null
           reschedule_count: number
           rescheduled_from: string | null
           scheduled_at: string
           scheduled_end_at: string | null
+          second_consult_required: boolean | null
           second_consult_showed: boolean | null
           showed: boolean | null
-          outcome_source: string | null
-          second_consult_required: boolean | null
-          treatment_opted_for: string | null
-          deposit_collected: boolean | null
-          payment_method: string | null
-          insurance_provider: string | null
           showed_source: string | null
           source: string
           status: Database["public"]["Enums"]["appointment_status"]
           synced_at: string | null
+          treatment_opted_for: string | null
           updated_at: string
           utm_campaign: string | null
           utm_content: string | null
@@ -550,32 +570,32 @@ export type Database = {
           crm_appointment_id?: string | null
           crm_calendar_id?: string | null
           crm_contact_id?: string | null
+          deposit_collected?: boolean | null
           financing_approved?: boolean | null
           funnel?: Database["public"]["Enums"]["funnel"]
           id?: string
+          insurance_provider?: string | null
           lead_quality?: Database["public"]["Enums"]["lead_quality"] | null
           notes?: string | null
           outcome?: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_source?: string | null
           outcome_updated_at?: string | null
           patient_email?: string | null
           patient_name?: string | null
           patient_phone?: string | null
+          payment_method?: string | null
           reschedule_count?: number
           rescheduled_from?: string | null
           scheduled_at: string
           scheduled_end_at?: string | null
+          second_consult_required?: boolean | null
           second_consult_showed?: boolean | null
           showed?: boolean | null
-          outcome_source?: string | null
-          second_consult_required?: boolean | null
-          treatment_opted_for?: string | null
-          deposit_collected?: boolean | null
-          payment_method?: string | null
-          insurance_provider?: string | null
           showed_source?: string | null
           source?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           synced_at?: string | null
+          treatment_opted_for?: string | null
           updated_at?: string
           utm_campaign?: string | null
           utm_content?: string | null
@@ -599,32 +619,32 @@ export type Database = {
           crm_appointment_id?: string | null
           crm_calendar_id?: string | null
           crm_contact_id?: string | null
+          deposit_collected?: boolean | null
           financing_approved?: boolean | null
           funnel?: Database["public"]["Enums"]["funnel"]
           id?: string
+          insurance_provider?: string | null
           lead_quality?: Database["public"]["Enums"]["lead_quality"] | null
           notes?: string | null
           outcome?: Database["public"]["Enums"]["appointment_outcome"]
+          outcome_source?: string | null
           outcome_updated_at?: string | null
           patient_email?: string | null
           patient_name?: string | null
           patient_phone?: string | null
+          payment_method?: string | null
           reschedule_count?: number
           rescheduled_from?: string | null
           scheduled_at?: string
           scheduled_end_at?: string | null
+          second_consult_required?: boolean | null
           second_consult_showed?: boolean | null
           showed?: boolean | null
-          outcome_source?: string | null
-          second_consult_required?: boolean | null
-          treatment_opted_for?: string | null
-          deposit_collected?: boolean | null
-          payment_method?: string | null
-          insurance_provider?: string | null
           showed_source?: string | null
           source?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           synced_at?: string | null
+          treatment_opted_for?: string | null
           updated_at?: string
           utm_campaign?: string | null
           utm_content?: string | null
@@ -645,8 +665,36 @@ export type Database = {
             foreignKeyName: "appointments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -998,8 +1046,36 @@ export type Database = {
             foreignKeyName: "billing_charges_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "billing_charges_stripe_customer_id_fkey"
@@ -1046,8 +1122,36 @@ export type Database = {
             foreignKeyName: "billing_customers_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "billing_customers_group_id_fkey"
@@ -1196,8 +1300,36 @@ export type Database = {
             foreignKeyName: "calls_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "calls_deal_id_fkey"
@@ -1269,8 +1401,36 @@ export type Database = {
             foreignKeyName: "campaigns_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1530,6 +1690,7 @@ export type Database = {
           group_id: string
           id: string
           is_active: boolean
+          is_internal: boolean
           name: string
           scheduling_type: string | null
           slug: string
@@ -1544,6 +1705,7 @@ export type Database = {
           group_id: string
           id?: string
           is_active?: boolean
+          is_internal?: boolean
           name: string
           scheduling_type?: string | null
           slug: string
@@ -1558,6 +1720,7 @@ export type Database = {
           group_id?: string
           id?: string
           is_active?: boolean
+          is_internal?: boolean
           name?: string
           scheduling_type?: string | null
           slug?: string
@@ -1718,8 +1881,36 @@ export type Database = {
             foreignKeyName: "excluded_calendars_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1855,8 +2046,36 @@ export type Database = {
             foreignKeyName: "form_submissions_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "form_submissions_deal_id_fkey"
@@ -1904,8 +2123,36 @@ export type Database = {
             foreignKeyName: "included_calendars_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2001,8 +2248,36 @@ export type Database = {
             foreignKeyName: "oauth_tokens_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2207,6 +2482,88 @@ export type Database = {
         }
         Relationships: []
       }
+      pps_clinic_routing: {
+        Row: {
+          client_id: string
+          created_at: string
+          crm_location_id: string
+          notes: string | null
+          practice: string
+          source: string
+          spreadsheet_id: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          crm_location_id: string
+          notes?: string | null
+          practice: string
+          source?: string
+          spreadsheet_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          crm_location_id?: string
+          notes?: string | null
+          practice?: string
+          source?: string
+          spreadsheet_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_notes: {
         Row: {
           author_user_id: string | null
@@ -2308,12 +2665,14 @@ export type Database = {
           created_at: string
           crm_location_id: string | null
           error: string | null
+          ghl_user_id: string | null
           id: string
           scope_problem: boolean
           snapshot_id: string
           started_by: string | null
           status: string
           submission_id: string | null
+          user_error: string | null
           values_failed: Json
           values_missing: string[]
           values_written: string[]
@@ -2325,12 +2684,14 @@ export type Database = {
           created_at?: string
           crm_location_id?: string | null
           error?: string | null
+          ghl_user_id?: string | null
           id?: string
           scope_problem?: boolean
           snapshot_id: string
           started_by?: string | null
           status: string
           submission_id?: string | null
+          user_error?: string | null
           values_failed?: Json
           values_missing?: string[]
           values_written?: string[]
@@ -2342,12 +2703,14 @@ export type Database = {
           created_at?: string
           crm_location_id?: string | null
           error?: string | null
+          ghl_user_id?: string | null
           id?: string
           scope_problem?: boolean
           snapshot_id?: string
           started_by?: string | null
           status?: string
           submission_id?: string | null
+          user_error?: string | null
           values_failed?: Json
           values_missing?: string[]
           values_written?: string[]
@@ -2464,6 +2827,54 @@ export type Database = {
           },
         ]
       }
+      scenario_sheet_targets: {
+        Row: {
+          folder: string | null
+          id: number
+          id_was_padded: boolean
+          is_active: boolean
+          label: string | null
+          last_edited_at: string | null
+          last_edited_by: string | null
+          module_id: number
+          observed_at: string
+          operation: string
+          scenario_id: number
+          scenario_name: string
+          spreadsheet_id: string | null
+        }
+        Insert: {
+          folder?: string | null
+          id?: never
+          id_was_padded?: boolean
+          is_active?: boolean
+          label?: string | null
+          last_edited_at?: string | null
+          last_edited_by?: string | null
+          module_id: number
+          observed_at?: string
+          operation: string
+          scenario_id: number
+          scenario_name: string
+          spreadsheet_id?: string | null
+        }
+        Update: {
+          folder?: string | null
+          id?: never
+          id_was_padded?: boolean
+          is_active?: boolean
+          label?: string | null
+          last_edited_at?: string | null
+          last_edited_by?: string | null
+          module_id?: number
+          observed_at?: string
+          operation?: string
+          scenario_id?: number
+          scenario_name?: string
+          spreadsheet_id?: string | null
+        }
+        Relationships: []
+      }
       sync_runs: {
         Row: {
           client_id: string | null
@@ -2521,8 +2932,36 @@ export type Database = {
             foreignKeyName: "sync_runs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2596,8 +3035,36 @@ export type Database = {
             foreignKeyName: "tech_calls_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tech_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tech_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tech_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "tech_calls_confirmed_by_fkey"
@@ -2728,8 +3195,36 @@ export type Database = {
             foreignKeyName: "tracker_appointments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2790,8 +3285,93 @@ export type Database = {
             foreignKeyName: "tracker_leads_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      tracker_practice_aliases: {
+        Row: {
+          client_id: string
+          created_at: string
+          note: string | null
+          tracker_name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          note?: string | null
+          tracker_name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          note?: string | null
+          tracker_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2865,14 +3445,128 @@ export type Database = {
       }
     }
     Views: {
-      // Added by hand pending the next full regeneration.
-      pps_routing_export: {
+      appointment_exceptions: {
         Row: {
-          crm_location_id: string | null
+          amount_cents: number | null
+          appointment_at: string | null
+          billing_state:
+            | Database["public"]["Enums"]["ledger_billing_state"]
+            | null
+          client_id: string | null
+          days_away: number | null
+          exception: string | null
+          id: string | null
+          outcome: Database["public"]["Enums"]["ledger_outcome"] | null
+          outcome_due_at: string | null
+          outcome_source:
+            | Database["public"]["Enums"]["ledger_outcome_source"]
+            | null
+          patient_name: string | null
           practice: string | null
-          spreadsheet_id: string | null
+          severity: number | null
+          source: Database["public"]["Enums"]["ledger_source"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      calendar_list_conflicts: {
+        Row: {
+          appointments_held: number | null
+          calendar_name: string | null
+          charges_held: number | null
+          client_id: string | null
+          consults_billed: number | null
+          crm_calendar_id: string | null
+          how_matched: string | null
+          override_reason: string | null
+          practice: string | null
         }
         Relationships: []
+      }
+      charge_exceptions: {
+        Row: {
+          candidate_name: string | null
+          client_id: string | null
+          exception: string | null
+          line_amount_cents: number | null
+          occurred_at: string | null
+          patient_name: string | null
+          practice: string | null
+          severity: number | null
+          stripe_payment_intent_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
       }
       pps_routing_candidates: {
         Row: {
@@ -2888,6 +3582,14 @@ export type Database = {
         }
         Relationships: []
       }
+      pps_routing_export: {
+        Row: {
+          crm_location_id: string | null
+          practice: string | null
+          spreadsheet_id: string | null
+        }
+        Relationships: []
+      }
       pps_routing_gaps: {
         Row: {
           all_candidates: number | null
@@ -2899,8 +3601,85 @@ export type Database = {
         }
         Relationships: []
       }
-      // Added by hand pending the next full regeneration. See the note above
-      // scenario_sheet_targets.
+      pps_routing_internal_excluded: {
+        Row: {
+          client_id: string | null
+          crm_location_id: string | null
+          practice: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          crm_location_id?: string | null
+          practice?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          crm_location_id?: string | null
+          practice?: string | null
+        }
+        Relationships: []
+      }
+      practice_rate_card: {
+        Row: {
+          client_id: string | null
+          confidence: string | null
+          implied_base_cents: number | null
+          lines_at_this_rate: number | null
+          lines_total: number | null
+          practice: string | null
+          unit_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      scenario_audit_coverage: {
+        Row: {
+          active_scenarios: number | null
+          caveat: string | null
+          distinct_sheets: number | null
+          findings: number | null
+          module_rows: number | null
+          newest_observation: string | null
+          oldest_observation: string | null
+          scenarios_audited: number | null
+        }
+        Relationships: []
+      }
       scenario_primary_sheet: {
         Row: {
           folder: string | null
@@ -2930,78 +3709,15 @@ export type Database = {
         }
         Relationships: []
       }
-      appointment_exceptions: {
+      tracker_unmatched_names: {
         Row: {
-          amount_cents: number | null
-          appointment_at: string | null
-          billing_state:
-            | Database["public"]["Enums"]["ledger_billing_state"]
-            | null
-          client_id: string | null
-          days_away: number | null
-          exception: string | null
-          id: string | null
-          outcome: Database["public"]["Enums"]["ledger_outcome"] | null
-          outcome_due_at: string | null
-          outcome_source:
-            | Database["public"]["Enums"]["ledger_outcome_source"]
-            | null
-          patient_name: string | null
-          practice: string | null
-          severity: number | null
-          source: Database["public"]["Enums"]["ledger_source"] | null
+          a_client_of_that_name_exists: boolean | null
+          earliest: string | null
+          latest: string | null
+          location_name: string | null
+          rows: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "appointment_ledger_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      charge_exceptions: {
-        Row: {
-          candidate_name: string | null
-          client_id: string | null
-          exception: string | null
-          line_amount_cents: number | null
-          occurred_at: string | null
-          patient_name: string | null
-          practice: string | null
-          severity: number | null
-          stripe_payment_intent_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_charges_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      practice_rate_card: {
-        Row: {
-          client_id: string | null
-          confidence: string | null
-          implied_base_cents: number | null
-          lines_at_this_rate: number | null
-          lines_total: number | null
-          practice: string | null
-          unit_cents: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_charges_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       unbilled_backlog: {
         Row: {
@@ -3023,8 +3739,36 @@ export type Database = {
             foreignKeyName: "appointment_ledger_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -3043,13 +3787,42 @@ export type Database = {
             foreignKeyName: "appointment_ledger_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
     }
     Functions: {
+      apply_tracker_aliases: { Args: never; Returns: number }
       attribute_billing_charges: { Args: never; Returns: Json }
       attribute_ledger_charges: { Args: never; Returns: number }
       auth_group_id: { Args: never; Returns: string }
@@ -3060,6 +3833,7 @@ export type Database = {
       }
       ensure_payout_periods: { Args: { p_through?: string }; Returns: number }
       generate_portal_token: { Args: never; Returns: string }
+      merge_superseded_tracker_ledger_rows: { Args: never; Returns: number }
       onboarding_status_for: {
         Args: { p_group: string }
         Returns: Database["public"]["Enums"]["onboarding_status"]
@@ -3068,7 +3842,7 @@ export type Database = {
         Args: { p_from: string; p_to: string; p_user_id: string }
         Returns: number
       }
-      merge_superseded_tracker_ledger_rows: { Args: never; Returns: number }
+      pps_normalise_practice: { Args: { name: string }; Returns: string }
       rebuild_appointment_ledger: { Args: never; Returns: Json }
       refresh_client_statuses: { Args: never; Returns: number }
       refresh_onboarding_status: {

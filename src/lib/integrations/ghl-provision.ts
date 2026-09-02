@@ -407,3 +407,82 @@ export async function setCustomValues(
 
   return result;
 }
+
+/**
+ * Splitting a doctor's name into the two fields GoHighLevel insists on.
+ *
+ * The onboarding form asks for one name, because that is how a person thinks of
+ * their own name and asking for it in halves invites "Dr" in the first-name box.
+ * The user endpoint wants firstName and lastName separately.
+ *
+ * Titles are stripped so they do not become a first name. Everything after the
+ * first remaining word is the surname, which keeps compound surnames — "van der
+ * Berg", "Ruiz Marquez" — intact rather than truncating them at the first space.
+ * A single word becomes the first name with the surname left blank rather than
+ * duplicated, so nobody is greeted as "Osei Osei".
+ */
+const NAME_TITLES = new Set(['dr', 'dr.', 'doctor', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'prof', 'prof.']);
+
+export function splitName(full: string): { firstName: string; lastName: string } {
+  const words = full.trim().split(/\s+/).filter(Boolean);
+  while (words.length > 1 && NAME_TITLES.has((words[0] ?? '').toLowerCase())) {
+    words.shift();
+  }
+  const firstName = words.shift() ?? '';
+  return { firstName, lastName: words.join(' ') };
+}
+
+export interface NewLocationUser {
+  locationId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+}
+
+/**
+ * Give the practice somebody who can actually sign in.
+ *
+ * Provisioning built a sub-account, applied the snapshot and filled the merge
+ * fields, and then stopped — leaving an account nobody could log into. A
+ * practice cannot use what it cannot open, so this was the last manual step in
+ * an otherwise unattended flow.
+ *
+ * Scoped to the one location deliberately. `type: 'account'` is a
+ * location-level user rather than an agency one, and the role is 'admin' so the
+ * practice can manage their own calendar and staff without us. Getting this
+ * wrong in the other direction — an agency-level user — would hand a practice
+ * sight of every other practice, so the narrow choice is the safe one.
+ */
+export async function createLocationUser(
+  input: NewLocationUser,
+): Promise<{ userId: string | null; raw: unknown }> {
+  const { token: accessToken, companyId } = await writeAuth();
+
+  if (!companyId) {
+    throw new Error(
+      'The agency token has no companyId recorded, and creating a user needs ' +
+        'one. Reconnect the GoHighLevel app in settings.',
+    );
+  }
+
+  const created = await call<{ id?: string; user?: { id?: string } }>(
+    accessToken,
+    'POST',
+    '/users/',
+    {
+      companyId,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email,
+      type: 'account',
+      role: 'admin',
+      locationIds: [input.locationId],
+      ...(input.phone === undefined || input.phone.trim() === ''
+        ? {}
+        : { phone: input.phone.trim() }),
+    },
+  );
+
+  return { userId: created.id ?? created.user?.id ?? null, raw: created };
+}
