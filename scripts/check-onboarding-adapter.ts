@@ -20,7 +20,12 @@ import {
   GHL_ONBOARDING_FIELDS,
   splitDoctor,
 } from '../src/lib/onboarding/ghl-form';
-import { ONBOARDING_VALUE_MAP } from '../src/config/provisioning';
+import {
+  KNOWN_ABSENT_CUSTOM_VALUES,
+  ONBOARDING_VALUE_MAP,
+  UNAVAILABLE_CUSTOM_VALUES,
+} from '../src/config/provisioning';
+import { splitName } from '../src/lib/integrations/ghl-provision';
 
 let failures = 0;
 let checks = 0;
@@ -152,6 +157,69 @@ section('An explicit snake_case field always beats a derived one');
   });
   check('explicit clinic name wins', answers['clinic_name'], 'Explicit Name');
   check('explicit doctor email wins', answers['doctor_email'], 'explicit@example.invalid');
+}
+
+section('Splitting a doctor name for the GoHighLevel user endpoint');
+{
+  check('title is not a first name', splitName('Dr Morgan Reyes'), {
+    firstName: 'Morgan',
+    lastName: 'Reyes',
+  });
+  check('title with a full stop', splitName('Dr. Morgan Reyes'), {
+    firstName: 'Morgan',
+    lastName: 'Reyes',
+  });
+  // Everything after the first word is the surname, so compound names survive.
+  check('compound surname stays whole', splitName('Dr Ana van der Berg'), {
+    firstName: 'Ana',
+    lastName: 'van der Berg',
+  });
+  check('hyphenated surname stays whole', splitName('Ana Ruiz-Marquez'), {
+    firstName: 'Ana',
+    lastName: 'Ruiz-Marquez',
+  });
+  // A single name must not be duplicated into both fields — nobody should be
+  // greeted as "Osei Osei".
+  check('one word leaves the surname empty', splitName('Osei'), {
+    firstName: 'Osei',
+    lastName: '',
+  });
+  check('a bare title is kept rather than emptied', splitName('Dr'), {
+    firstName: 'Dr',
+    lastName: '',
+  });
+  check('extra whitespace is harmless', splitName('  Dr   Sam   Okafor  '), {
+    firstName: 'Sam',
+    lastName: 'Okafor',
+  });
+}
+
+section('A known-absent snapshot field does not make a good run look partial');
+{
+  // The first real onboarding wrote nine values and reported 'partial' because
+  // Timezone alone had nowhere to land. Every successful run would have said
+  // partial from then on, which is how a status stops meaning anything.
+  check('Timezone is recorded as known-absent', KNOWN_ABSENT_CUSTOM_VALUES.has('Timezone'), true);
+  check(
+    'and is still mapped, so it fills itself once the snapshot has the field',
+    ONBOARDING_VALUE_MAP['timezone'],
+    'Timezone',
+  );
+  check(
+    'the absent set is derived from the documented list, not a second copy',
+    KNOWN_ABSENT_CUSTOM_VALUES.size,
+    UNAVAILABLE_CUSTOM_VALUES.length,
+  );
+
+  // The guard must stay narrow: an undocumented gap is still a real surprise.
+  const missing = ['Timezone', 'Some Field Nobody Documented'];
+  const unexpected = missing.filter((name) => !KNOWN_ABSENT_CUSTOM_VALUES.has(name));
+  check('an undocumented gap still counts', unexpected, ['Some Field Nobody Documented']);
+  check(
+    'a run missing only known-absent fields is clean',
+    ['Timezone'].filter((n) => !KNOWN_ABSENT_CUSTOM_VALUES.has(n)).length,
+    0,
+  );
 }
 
 // ---------------------------------------------------------------------------

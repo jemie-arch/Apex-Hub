@@ -14,7 +14,8 @@
     "sync:billing": "tsx scripts/sync-billing.ts",
     "check:webhook": "tsx scripts/check-outcome-payload.ts",
     "check:precedence": "tsx scripts/check-outcome-precedence.ts",
-    "check:onboarding": "tsx scripts/check-onboarding-adapter.ts"
+    "check:onboarding": "tsx scripts/check-onboarding-adapter.ts",
+    "list:custom-values": "tsx scripts/list-custom-values.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

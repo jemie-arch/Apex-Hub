@@ -12,6 +12,7 @@
  */
 import {
   CONSTANT_CUSTOM_VALUES,
+  KNOWN_ABSENT_CUSTOM_VALUES,
   ONBOARDING_SNAPSHOT_ID,
   ONBOARDING_VALUE_MAP,
   derivedCustomValues,
@@ -19,8 +20,10 @@ import {
 } from '@/config/provisioning';
 import {
   GhlWriteError,
+  createLocationUser,
   createSubAccount,
   setCustomValues,
+  splitName,
   writeAuth,
   type AuthKind,
 } from '@/lib/integrations/ghl-provision';
@@ -141,6 +144,8 @@ export async function provisionFromSubmission(input: {
       failed?: Array<{ name: string; reason: string }>;
       error?: string;
       scopeProblem?: boolean;
+      userId?: string | null;
+      userError?: string | null;
     },
   ) {
     await db.from('provisioning_runs').insert({
@@ -157,6 +162,8 @@ export async function provisionFromSubmission(input: {
       scope_problem: extra.scopeProblem ?? false,
       auth_kind: authKind,
       started_by: input.startedBy ?? null,
+      ghl_user_id: extra.userId ?? null,
+      user_error: extra.userError ?? null,
     });
   }
 
@@ -310,8 +317,75 @@ export async function provisionFromSubmission(input: {
   try {
     const outcome = await setCustomValues(clientId, locationId, values);
 
+    /*
+     * A gap we already know about is not a degraded run.
+     *
+     * `missing` means "the snapshot has no field of this name". Three of those
+     * are permanent and documented in UNAVAILABLE_CUSTOM_VALUES, so counting
+     * them as a fault made 'partial' the outcome of every successful onboarding
+     * — the first real one, on 2 September, wrote nine values correctly and
+     * still reported partial because of Timezone alone.
+     *
+     * That is how a status stops meaning anything. If every good run says
+     * partial, nobody reads partial, and the run that is genuinely half-finished
+     * looks exactly like the eighty before it. So a known-absent field is still
+     * reported, still listed in values_missing, and no longer changes the
+     * verdict; an undocumented one still does, because that is a real surprise.
+     */
+    const unexpectedMissing = outcome.missing.filter(
+      (name) => !KNOWN_ABSENT_CUSTOM_VALUES.has(name),
+    );
+
+    /*
+     * Give the practice a login.
+     *
+     * The last manual step. Everything above builds an account and fills it in;
+     * without this nobody at the practice can open it, which makes a
+     * successfully provisioned sub-account useless to the only people who need
+     * it.
+     *
+     * Deliberately not fatal, and deliberately not part of `status`. A
+     * sub-account with every merge field filled and no user is still worth
+     * keeping and still worth reporting as configured — the alternative is
+     * throwing away a good account because one call failed. The reason is
+     * recorded on the row, and provision-pending retries the submission.
+     *
+     * Skipped without complaint when there is no name or email to make one
+     * from: both are required on the Hub form, but the GoHighLevel form can
+     * arrive without them and an invented login is worse than none.
+     */
+    let userId: string | null = null;
+    let userError: string | null = null;
+
+    const loginName = pick(input.answers, 'doctor_name');
+    const loginEmail = pick(input.answers, 'doctor_email');
+
+    if (loginName === undefined || loginEmail === undefined) {
+      userError = 'No doctor name or email on the submission, so no login was made.';
+    } else {
+      const { firstName, lastName } = splitName(loginName);
+      try {
+        const user = await createLocationUser({
+          locationId,
+          firstName,
+          lastName,
+          email: loginEmail,
+          phone: pick(input.answers, 'doctor_phone'),
+        });
+        userId = user.userId;
+        if (userId === null) {
+          userError =
+            'GoHighLevel accepted the user but returned no id, so it cannot be ' +
+            'linked back to this run. Check the sub-account before retrying, or ' +
+            'a second login will be created.';
+        }
+      } catch (error) {
+        userError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
     const status: ProvisionOutcome['status'] =
-      outcome.failed.length > 0 || outcome.missing.length > 0
+      outcome.failed.length > 0 || unexpectedMissing.length > 0
         ? 'partial'
         : 'values_written';
 
@@ -320,6 +394,8 @@ export async function provisionFromSubmission(input: {
       written: outcome.written,
       missing: outcome.missing,
       failed: outcome.failed,
+      userId,
+      userError,
       // Recorded even on an otherwise clean run: if the clients row could not be
       // created, the sub-account exists and the practice is still missing from
       // the Hub, which nobody would notice from a green tick.
@@ -345,9 +421,13 @@ export async function provisionFromSubmission(input: {
           ? ' It has no custom values yet, which means GoHighLevel is still ' +
             'applying the snapshot rather than that anything is misconfigured. ' +
             'The next provision-pending run fills them; no action needed.'
-          : outcome.missing.length > 0
-            ? ` ${outcome.missing.length} had no matching field in the snapshot: ${outcome.missing.join(', ')}.`
-            : '') +
+          : unexpectedMissing.length > 0
+            ? ` ${unexpectedMissing.length} had no matching field in the snapshot: ${unexpectedMissing.join(', ')}.`
+            : outcome.missing.length > 0
+              ? ` ${outcome.missing.length} known-absent field(s) were skipped: ` +
+                `${outcome.missing.join(', ')} — documented in ` +
+                'UNAVAILABLE_CUSTOM_VALUES, not a fault with this run.'
+              : '') +
         (outcome.failed.length > 0
           ? ` ${outcome.failed.length} were refused.`
           : ''),
