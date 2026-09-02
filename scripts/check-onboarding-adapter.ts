@@ -107,6 +107,30 @@ section('The friendly name wins, and organization is only a backstop');
   check('falls back to organization', answers['clinic_name'], 'Riverbend Dental Group LLC');
 }
 
+section('The data-points question was rewritten, so both wordings must work');
+{
+  // The live form asks "Please select the data points you would like us to
+  // collect for you." The stored submissions ask the older, longer
+  // "information points" version. Only mapping the old one meant requirements
+  // silently stopped being written.
+  const rewritten = { ...ghlPayload };
+  delete rewritten[
+    'We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.'
+  ];
+  rewritten['Please select the data points you would like us to collect for you.'] =
+    'Basic Insurance Info, Patient Address';
+  check(
+    'the live wording maps',
+    adaptGhlOnboarding(rewritten)['requirements'],
+    'Basic Insurance Info, Patient Address',
+  );
+  check(
+    'the historical wording still maps',
+    adaptGhlOnboarding(ghlPayload)['requirements'],
+    'Insurance provider, Preferred time',
+  );
+}
+
 section('The clinic-name field was renamed, so both spellings must work');
 {
   // The live form now says "Clinic Name"; the two stored submissions say

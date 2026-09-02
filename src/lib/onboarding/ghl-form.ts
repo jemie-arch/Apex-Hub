@@ -52,7 +52,22 @@ export const GHL_ONBOARDING_FIELDS: Readonly<Record<string, string>> = {
   'Name or Names of Front Desk Patient Concierge': 'front_desk_name',
   "Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.":
     'languages',
+  /*
+   * Both wordings of the data-points question, for the same reason as the
+   * clinic name: the form was rewritten and the old key only survives in
+   * history.
+   *
+   * The stored submissions carry the long "information points" sentence. A
+   * character-for-character read of the live form on 2 September found it now
+   * asks "Please select the data points you would like us to collect for you."
+   * — a different sentence, not a tweak. Mapping only the old one meant
+   * `requirements` would never have been written again, silently, because a
+   * question nobody answers and a question nobody asks look identical
+   * downstream.
+   */
   'We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.':
+    'requirements',
+  'Please select the data points you would like us to collect for you.':
     'requirements',
   email: 'doctor_email',
   phone: 'doctor_phone',
