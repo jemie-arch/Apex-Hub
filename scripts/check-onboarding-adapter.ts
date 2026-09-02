@@ -20,7 +20,11 @@ import {
   GHL_ONBOARDING_FIELDS,
   splitDoctor,
 } from '../src/lib/onboarding/ghl-form';
-import { ONBOARDING_VALUE_MAP } from '../src/config/provisioning';
+import {
+  KNOWN_ABSENT_CUSTOM_VALUES,
+  ONBOARDING_VALUE_MAP,
+  UNAVAILABLE_CUSTOM_VALUES,
+} from '../src/config/provisioning';
 
 let failures = 0;
 let checks = 0;
@@ -152,6 +156,34 @@ section('An explicit snake_case field always beats a derived one');
   });
   check('explicit clinic name wins', answers['clinic_name'], 'Explicit Name');
   check('explicit doctor email wins', answers['doctor_email'], 'explicit@example.invalid');
+}
+
+section('A known-absent snapshot field does not make a good run look partial');
+{
+  // The first real onboarding wrote nine values and reported 'partial' because
+  // Timezone alone had nowhere to land. Every successful run would have said
+  // partial from then on, which is how a status stops meaning anything.
+  check('Timezone is recorded as known-absent', KNOWN_ABSENT_CUSTOM_VALUES.has('Timezone'), true);
+  check(
+    'and is still mapped, so it fills itself once the snapshot has the field',
+    ONBOARDING_VALUE_MAP['timezone'],
+    'Timezone',
+  );
+  check(
+    'the absent set is derived from the documented list, not a second copy',
+    KNOWN_ABSENT_CUSTOM_VALUES.size,
+    UNAVAILABLE_CUSTOM_VALUES.length,
+  );
+
+  // The guard must stay narrow: an undocumented gap is still a real surprise.
+  const missing = ['Timezone', 'Some Field Nobody Documented'];
+  const unexpected = missing.filter((name) => !KNOWN_ABSENT_CUSTOM_VALUES.has(name));
+  check('an undocumented gap still counts', unexpected, ['Some Field Nobody Documented']);
+  check(
+    'a run missing only known-absent fields is clean',
+    ['Timezone'].filter((n) => !KNOWN_ABSENT_CUSTOM_VALUES.has(n)).length,
+    0,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@
  */
 import {
   CONSTANT_CUSTOM_VALUES,
+  KNOWN_ABSENT_CUSTOM_VALUES,
   ONBOARDING_SNAPSHOT_ID,
   ONBOARDING_VALUE_MAP,
   derivedCustomValues,
@@ -310,8 +311,27 @@ export async function provisionFromSubmission(input: {
   try {
     const outcome = await setCustomValues(clientId, locationId, values);
 
+    /*
+     * A gap we already know about is not a degraded run.
+     *
+     * `missing` means "the snapshot has no field of this name". Three of those
+     * are permanent and documented in UNAVAILABLE_CUSTOM_VALUES, so counting
+     * them as a fault made 'partial' the outcome of every successful onboarding
+     * — the first real one, on 2 September, wrote nine values correctly and
+     * still reported partial because of Timezone alone.
+     *
+     * That is how a status stops meaning anything. If every good run says
+     * partial, nobody reads partial, and the run that is genuinely half-finished
+     * looks exactly like the eighty before it. So a known-absent field is still
+     * reported, still listed in values_missing, and no longer changes the
+     * verdict; an undocumented one still does, because that is a real surprise.
+     */
+    const unexpectedMissing = outcome.missing.filter(
+      (name) => !KNOWN_ABSENT_CUSTOM_VALUES.has(name),
+    );
+
     const status: ProvisionOutcome['status'] =
-      outcome.failed.length > 0 || outcome.missing.length > 0
+      outcome.failed.length > 0 || unexpectedMissing.length > 0
         ? 'partial'
         : 'values_written';
 
@@ -345,9 +365,13 @@ export async function provisionFromSubmission(input: {
           ? ' It has no custom values yet, which means GoHighLevel is still ' +
             'applying the snapshot rather than that anything is misconfigured. ' +
             'The next provision-pending run fills them; no action needed.'
-          : outcome.missing.length > 0
-            ? ` ${outcome.missing.length} had no matching field in the snapshot: ${outcome.missing.join(', ')}.`
-            : '') +
+          : unexpectedMissing.length > 0
+            ? ` ${unexpectedMissing.length} had no matching field in the snapshot: ${unexpectedMissing.join(', ')}.`
+            : outcome.missing.length > 0
+              ? ` ${outcome.missing.length} known-absent field(s) were skipped: ` +
+                `${outcome.missing.join(', ')} — documented in ` +
+                'UNAVAILABLE_CUSTOM_VALUES, not a fault with this run.'
+              : '') +
         (outcome.failed.length > 0
           ? ` ${outcome.failed.length} were refused.`
           : ''),

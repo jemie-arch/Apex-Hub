@@ -123,7 +123,29 @@ export const UNAVAILABLE_CUSTOM_VALUES: ReadonlyArray<{
       '"[Landing Pages] Business Name" — say which is meant and it will be ' +
       'filled from the clinic name.',
   },
+  {
+    brief: 'Timezone',
+    note:
+      'Confirmed absent by the first real end-to-end onboarding, on 2 ' +
+      'September 2026: nine values were written and this was the only one with ' +
+      'nowhere to land. It is the sharpest gap of the three, because the form ' +
+      'asks for it and makes it REQUIRED — a practice is compelled to answer a ' +
+      'question whose answer is then discarded, and every appointment time is ' +
+      'set in the timezone we did not keep. Adding "Timezone" to the snapshot ' +
+      'is the fix; it is already mapped and starts being written the moment the ' +
+      'field exists.',
+  },
 ];
+
+/**
+ * Custom value names the snapshot is known not to have.
+ *
+ * Derived from the list above rather than repeated, so documenting a gap and
+ * accounting for it cannot drift apart.
+ */
+export const KNOWN_ABSENT_CUSTOM_VALUES: ReadonlySet<string> = new Set(
+  UNAVAILABLE_CUSTOM_VALUES.map((value) => value.brief),
+);
 
 /**
  * Values that can only be known after the sub-account exists.
