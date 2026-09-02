@@ -18,32 +18,16 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { serviceApiKey } from '@/lib/env';
+import { authorisedByServiceKey } from '@/lib/auth/service-key';
 import { getToken } from '@/lib/integrations/ghl';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
 
-function authorised(request: NextRequest): boolean {
-  const header = request.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return false;
-
-  const provided = header.slice('Bearer '.length);
-  const expected = serviceApiKey();
-
-  if (provided.length !== expected.length) return false;
-
-  let mismatch = 0;
-  for (let index = 0; index < provided.length; index += 1) {
-    mismatch |= provided.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  return mismatch === 0;
-}
-
 export async function GET(request: NextRequest) {
   let allowed: boolean;
   try {
-    allowed = authorised(request);
+    allowed = authorisedByServiceKey(request);
   } catch (error) {
     // SERVICE_API_KEY missing: say so rather than returning a bare 401 that
     // would look like a wrong key.
