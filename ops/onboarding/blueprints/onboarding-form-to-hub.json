@@ -1,0 +1,103 @@
+{
+  "name": "07 - Onboarding Form -> HUB [CONSOLIDATED]",
+  "flow": [
+    {
+      "id": 1,
+      "mapper": {},
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "metadata": {
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": { "editable": "true" },
+              "label": "Onboarding Form -> HUB [CONSOLIDATED]"
+            }
+          }
+        },
+        "designer": { "x": 0, "y": 0 },
+        "parameters": [
+          { "name": "hook", "type": "hook:gateway-webhook", "label": "Webhook", "required": true },
+          { "name": "maxResults", "type": "number", "label": "Maximum number of results" }
+        ]
+      },
+      "parameters": { "maxResults": 1 }
+    },
+    {
+      "id": 2,
+      "filter": {
+        "name": "Names a clinic",
+        "conditions": [
+          [
+            { "a": "{{1.`Clinic Friendly Name`}}", "o": "exist" },
+            { "a": "{{1.organization}}", "o": "exist" }
+          ]
+        ]
+      },
+      "mapper": {
+        "ca": "",
+        "qs": [],
+        "url": "https://www.apexdentalmarketing.co/api/webhooks/onboarding-form",
+        "data": "{ \"form_key\": \"client-onboarding\", \"submission_id\": \"{{1.id}}\", \"location_id\": \"{{1.location.id}}\", \"answers\": { \"Clinic Friendly Name\": \"{{1.`Clinic Friendly Name`}}\", \"organization\": \"{{1.organization}}\", \"Timezone -\": \"{{1.`Timezone -`}}\", \"email\": \"{{1.email}}\", \"phone\": \"{{1.phone}}\", \"What is the name and gender of the doctor/doctors providing treatment?\": \"{{1.`What is the name and gender of the doctor/doctors providing treatment?`}}\", \"Name or Names of Front Desk Patient Concierge\": \"{{1.`Name or Names of Front Desk Patient Concierge`}}\", \"Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?\": \"{{1.`Are there any landmarks near your clinic we can use as a reference point when we direct people to their appointments?`}}\", \"Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.\": \"{{1.`Does your practice offer consultations in any other languages? We'll send these patients directly through to your office.`}}\", \"We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.\": \"{{1.`We can collect these information points to expedite the consultation process. Please select the information points you would like us to collect.`}}\" } }",
+        "gzip": true,
+        "method": "post",
+        "headers": [{ "name": "Content-Type", "value": "application/json" }],
+        "timeout": "",
+        "useMtls": false,
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "serializeUrl": false,
+        "shareCookies": false,
+        "parseResponse": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "followAllRedirects": false,
+        "rejectUnauthorized": true
+      },
+      "module": "http:ActionSendDataAPIKeyAuth",
+      "onerror": [
+        {
+          "id": 3,
+          "mapper": { "count": "5", "retry": true, "interval": "15" },
+          "module": "builtin:Break",
+          "version": 1,
+          "metadata": { "designer": { "x": 600, "y": 150 } }
+        }
+      ],
+      "version": 3,
+      "metadata": {
+        "restore": {
+          "expect": {
+            "qs": { "mode": "chose" },
+            "method": { "mode": "chose", "label": "POST" },
+            "headers": { "mode": "chose", "items": [null] },
+            "bodyType": { "label": "Raw" },
+            "contentType": { "label": "JSON (application/json)" }
+          },
+          "parameters": { "auth": { "label": "Apex Hub SERVICE_API_KEY" } }
+        },
+        "designer": { "x": 300, "y": 0 }
+      },
+      "parameters": { "auth": 215007, "handleErrors": true, "useNewZLibDeCompress": true }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "designer": { "orphans": [] },
+    "scenario": {
+      "dlq": true,
+      "slots": null,
+      "dataloss": true,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "roundtrips": 1,
+      "sequential": false,
+      "confidential": false,
+      "freshVariables": false,
+      "autoCommitTriggerLast": true
+    }
+  },
+  "scheduling": { "type": "immediately" },
+  "interface": { "input": [], "output": [] }
+}
