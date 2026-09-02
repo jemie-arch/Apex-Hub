@@ -22,9 +22,30 @@ import { authoritative, humanOwned } from '@/lib/sync/merge';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
-/** How far back and forward to look. Bounded so this cannot grow unbounded. */
-const LOOKBACK_DAYS = 45;
-const LOOKAHEAD_DAYS = 90;
+/**
+ * The window the CRM is asked for: every booking, not a rolling slice.
+ *
+ * /calendars/events requires startTime and endTime, so "no window" cannot be
+ * expressed. These bounds are set to cover the whole record instead.
+ *
+ * It used to be a rolling 45 days back and 90 forward, and that quietly decided
+ * what the Hub could ever know. The feed reached 2026-07-07 while the tracker
+ * holds appointments from 2025-12-09: 881 of its 1,281 rows sat earlier than
+ * the window, so they could never match a CRM appointment, and the outcomes
+ * attached to them could never be read. The same bound at the other end hid
+ * bookings made a long way ahead — there is one booked 381 days out, which a
+ * 90-day horizon would never have seen.
+ *
+ * Widening costs response size, not requests: listAppointments makes one call
+ * per calendar whatever the window, so this returns more events per call rather
+ * than making more calls.
+ *
+ * HISTORY_BEGINS_AT is a fixed origin rather than another rolling offset,
+ * because a rolling lookback is what drops history in the first place. It sits
+ * comfortably before the earliest record either feed holds.
+ */
+const HISTORY_BEGINS_AT = Date.UTC(2025, 0, 1);
+const LOOKAHEAD_DAYS = 730;
 
 /**
  * Only the practice's consultation calendar, named "<Location> Booking
@@ -113,8 +134,12 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     data: (clientRows.data ?? []).filter((row) => !churned.has(row.group_id)),
   };
 
-  const from = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000);
+  const from = new Date(HISTORY_BEGINS_AT);
   const to = new Date(Date.now() + LOOKAHEAD_DAYS * 86_400_000);
+  ctx.note('window', {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  });
   let contactLookups = 0;
   /** One shape note per run is enough; see ctx.note beside the lookup. */
   let shapeNoted = false;
