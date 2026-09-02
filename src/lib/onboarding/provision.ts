@@ -186,12 +186,16 @@ export async function provisionFromSubmission(input: {
        * of its own features key off. Collecting a required answer and then
        * dropping it is the same fault the Timezone custom value nearly had.
        *
-       * firstName and lastName come from splitName rather than the raw answer,
-       * so "Dr Casey Lindqvist, female" does not land as a first name.
+       * The doctor's name is NOT sent here. The first attempt included
+       * firstName and lastName, and POST /locations/ answered
+       *   422 "property firstName should not exist"
+       * taking the whole creation with it. Those fields belong to the user
+       * endpoint, not the location one, and createLocationUser already sets
+       * them further down.
+       *
+       * `country` is normalised to an ISO code by isoCountry before it is sent,
+       * because GoHighLevel validates it as an enum and 422s on "United States".
        */
-      const doctorName = pick(input.answers, 'doctor_name');
-      const doctor = doctorName ? splitName(doctorName) : null;
-
       const created = await createSubAccount({
         name: clinicName,
         snapshotId: ONBOARDING_SNAPSHOT_ID,
@@ -204,9 +208,6 @@ export async function provisionFromSubmission(input: {
         state: pick(input.answers, 'state'),
         postalCode: pick(input.answers, 'postal_code'),
         country: pick(input.answers, 'country'),
-        ...(doctor === null
-          ? {}
-          : { firstName: doctor.firstName, lastName: doctor.lastName }),
       });
       locationId = created.locationId;
     } catch (error) {

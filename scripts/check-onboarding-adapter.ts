@@ -25,7 +25,7 @@ import {
   ONBOARDING_VALUE_MAP,
   UNAVAILABLE_CUSTOM_VALUES,
 } from '../src/config/provisioning';
-import { splitName } from '../src/lib/integrations/ghl-provision';
+import { isoCountry, splitName } from '../src/lib/integrations/ghl-provision';
 
 let failures = 0;
 let checks = 0;
@@ -273,6 +273,21 @@ section('A known-absent snapshot field does not make a good run look partial');
     ['Legal Business Name'].filter((n) => !KNOWN_ABSENT_CUSTOM_VALUES.has(n)).length,
     0,
   );
+}
+
+section('Country must be an ISO code or GoHighLevel 422s the whole request');
+{
+  // The first attempt sent 'United States' and POST /locations/ answered
+  // 'country must be a valid enum value', failing sub-account creation outright.
+  check('a full name maps', isoCountry('United States'), 'US');
+  check('case and spacing are tolerated', isoCountry('  united states  '), 'US');
+  check('an existing code passes through', isoCountry('us'), 'US');
+  check('Canada maps', isoCountry('Canada'), 'CA');
+  // Unrecognised is dropped, never sent. An account without a country is
+  // recoverable; one that fails to create is not.
+  check('an unknown country is dropped', isoCountry('Wakanda'), undefined);
+  check('empty is dropped', isoCountry('   '), undefined);
+  check('undefined stays undefined', isoCountry(undefined), undefined);
 }
 
 // ---------------------------------------------------------------------------

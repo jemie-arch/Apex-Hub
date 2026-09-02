@@ -125,13 +125,57 @@ export interface NewSubAccount {
   address?: string;
   city?: string;
   state?: string;
-  postalCode?: string;
+  /**
+   * ISO 3166-1 alpha-2, e.g. "US". GoHighLevel validates this as an enum and
+   * rejects the whole request with 422 for a full country name, so it is
+   * normalised before sending — see `isoCountry`.
+   */
   country?: string;
+  postalCode?: string;
   website?: string;
   phone?: string;
   email?: string;
-  firstName?: string;
-  lastName?: string;
+  /*
+   * firstName and lastName are deliberately absent.
+   *
+   * They were declared here and never sent, so nothing had tested them. The
+   * first request that included them came back
+   *   422 "property firstName should not exist" / "property lastName should not
+   *   exist"
+   * and took the whole sub-account creation with it. POST /locations/ does not
+   * accept them. Removed from the type so the next person does not rediscover
+   * this in production.
+   */
+}
+
+/**
+ * GoHighLevel wants a two-letter country code and 422s on anything else.
+ *
+ * A bare pass-through is not safe: the onboarding form's country dropdown is
+ * read by a human and "United States" fails the enum. Two letters are assumed
+ * to be a code already. Everything else is looked up in the small map below,
+ * and an unrecognised value is DROPPED rather than sent — an account created
+ * without a country is recoverable, an account that fails to create is not.
+ *
+ * The map is deliberately short. It covers where this agency's practices
+ * actually are; adding a guess for somewhere it does not operate would be
+ * inventing data to look complete.
+ */
+const COUNTRY_CODES: Readonly<Record<string, string>> = {
+  'united states': 'US',
+  'united states of america': 'US',
+  usa: 'US',
+  us: 'US',
+  canada: 'CA',
+  ca: 'CA',
+};
+
+export function isoCountry(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (trimmed === '') return undefined;
+  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  return COUNTRY_CODES[trimmed.toLowerCase()];
 }
 
 /**
@@ -168,12 +212,10 @@ export async function createSubAccount(
     ['city', input.city],
     ['state', input.state],
     ['postalCode', input.postalCode],
-    ['country', input.country],
+    ['country', isoCountry(input.country)],
     ['website', input.website],
     ['phone', input.phone],
     ['email', input.email],
-    ['firstName', input.firstName],
-    ['lastName', input.lastName],
   ];
   for (const [key, value] of optional) {
     if (value !== undefined && value.trim() !== '') payload[key] = value.trim();
