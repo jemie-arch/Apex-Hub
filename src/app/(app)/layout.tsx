@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { isPrivileged } from '@/config/roles';
 
+import { NotificationBell, type InboxItem } from '@/components/shell/NotificationBell';
 import { PortalSwitcher } from '@/components/shell/PortalSwitcher';
 import { Sidebar } from '@/components/shell/Sidebar';
 import type { Theme } from '@/components/shell/ThemeToggle';
@@ -23,11 +24,29 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // session that expires between the middleware check and the render.
   if (!caller) redirect('/login');
 
-  const profile = await serviceClient()
-    .from('user_profiles')
-    .select('permissions, theme, role')
-    .eq('id', caller.id)
-    .maybeSingle();
+  const db = serviceClient();
+
+  const [profile, inbox] = await Promise.all([
+    db
+      .from('user_profiles')
+      .select('permissions, theme, role')
+      .eq('id', caller.id)
+      .maybeSingle(),
+    /*
+     * The bell's contents, read once per navigation rather than polled.
+     *
+     * Twenty is a panel's worth. The unread badge counts only what is in this
+     * slice, which is honest for any realistic backlog and wrong only for
+     * somebody who has ignored the bell twenty times — at which point the exact
+     * number has stopped being information anyway.
+     */
+    db
+      .from('notifications')
+      .select('id, title, body, href, read_at, created_at')
+      .eq('user_id', caller.id)
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ]);
 
   const permissions = profile.data?.permissions ?? [];
   const theme: Theme = profile.data?.theme === 'light' ? 'light' : 'dark';
@@ -55,6 +74,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
    */
   const isSuperAdmin = profile.data?.role === 'super_admin';
 
+  const notifications: InboxItem[] = (inbox.data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    href: row.href,
+    createdAt: row.created_at,
+    read: row.read_at !== null,
+  }));
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
       <Sidebar
@@ -81,7 +109,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           Padding steps up with the viewport instead of sitting at a fixed 2rem,
           which on a phone spent an eighth of the screen on margins.
         */}
-        <div className="flex justify-end px-4 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+        <div className="flex items-center justify-end gap-3 px-4 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+          <NotificationBell items={notifications} />
           <PortalSwitcher />
         </div>
         <div className="px-4 pb-8 pt-4 sm:px-6 lg:px-8">{children}</div>

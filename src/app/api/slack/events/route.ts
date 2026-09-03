@@ -2,8 +2,14 @@
  * The @apex ticket bot.
  *
  * Tag @apex in any Slack channel it has been invited to and the message becomes
- * a tech support ticket on the Hub, assigned to Ally, with a threaded reply
- * saying so.
+ * a tech support ticket on the Hub, with a threaded reply saying so.
+ *
+ * It lands on Ally by default. Tag somebody else in the same message and it
+ * lands on them instead — but only a real Slack mention counts, never a name
+ * typed as words. lib/slack/assignee carries the reasoning, which is the same
+ * reasoning that keeps this route from guessing which practice a ticket is
+ * about: a name in prose carries no intent, and "ayanda is out today" must not
+ * assign anything to Ayanda.
  *
  * WHY THIS ROUTE IS NOT GUARDED LIKE THE OTHERS
  *
@@ -44,6 +50,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { hubUrl } from '@/lib/app-url';
 import { serverEnv, slackSigningSecret } from '@/lib/env';
+import { notifyUsers } from '@/lib/notify/inbox';
 import {
   addReaction,
   lookupChannelName,
@@ -51,6 +58,7 @@ import {
   messagePermalink,
   postThreadReply,
 } from '@/lib/slack/api';
+import { chooseAssignee } from '@/lib/slack/assignee';
 import { parseMention } from '@/lib/slack/mention';
 import { verifySlackSignature } from '@/lib/slack/signature';
 import { serviceClient } from '@/lib/supabase/service';
@@ -205,36 +213,88 @@ export async function POST(request: NextRequest) {
         null)
       : null;
 
-  const draft = parseMention(event.text ?? '', { botUserId });
+  /*
+   * Parsed twice, deliberately.
+   *
+   * The first pass is only to learn which Slack ids the message tags, because
+   * that decides who to look up. The second pass is the one that produces the
+   * ticket text, and by then the names are known — so the body reads "@Ally"
+   * rather than "@U0BRYTXLWM8", which is markup nobody outside Slack can read.
+   *
+   * parseMention is pure and operates on one short string, so running it twice
+   * costs nothing worth measuring and saves threading half-resolved state
+   * through the lookups.
+   */
+  const firstPass = parseMention(event.text ?? '', { botUserId });
 
-  if (draft.title === null) {
+  if (firstPass.title === null) {
     await postThreadReply(
       channelId,
       threadTs,
       "I can file that as a tech support ticket — tell me what's wrong in the " +
-        'same message and I will. Add #urgent, #high or #low to set the priority.',
+        'same message and I will. Tag somebody to assign it to them, and add ' +
+        '#urgent, #high or #low to set the priority.',
     );
     return NextResponse.json({ ok: false, reason: 'no description given' });
   }
 
   const raiser = event.user ? await lookupUser(event.user) : null;
 
-  const [assignee, raisedBy, channelName, permalink] = await Promise.all([
-    resolveAssignee(),
-    resolveRaiser(raiser?.email ?? null),
-    lookupChannelName(channelId),
-    messagePermalink(channelId, messageTs),
-  ]);
+  /*
+   * Capped at three. Each is a users.info round trip inside a three-second
+   * budget, and a message tagging four people is not making a finer-grained
+   * assignment than one tagging three — it is tagging a crowd. The cap applies
+   * to lookups, not to the ticket: everything typed is still in the body.
+   */
+  const taggedSlackIds = firstPass.mentionedUserIds.slice(0, 3);
+
+  const [tagged, defaultAssignee, raisedBy, channelName, permalink] =
+    await Promise.all([
+      Promise.all(
+        taggedSlackIds.map(async (slackId) => {
+          const user = await lookupUser(slackId);
+          return {
+            slackId,
+            name: user?.name ?? null,
+            hubUserId: await resolveRaiser(user?.email ?? null),
+          };
+        }),
+      ),
+      resolveAssignee(),
+      resolveRaiser(raiser?.email ?? null),
+      lookupChannelName(channelId),
+      messagePermalink(channelId, messageTs),
+    ]);
+
+  const names = Object.fromEntries(
+    tagged
+      .filter((person) => person.name !== null)
+      .map((person) => [person.slackId, person.name as string]),
+  );
+
+  const draft = parseMention(event.text ?? '', { botUserId, names });
+
+  /*
+   * Tagged wins over the default. See lib/slack/assignee for why only a real
+   * Slack mention counts and a name typed as words does not.
+   */
+  const assignment = chooseAssignee(tagged, {
+    id: defaultAssignee.id,
+    name: defaultAssignee.name ?? defaultAssignee.email,
+  });
 
   const db = serviceClient();
 
   const inserted = await db
     .from('tech_tickets')
     .insert({
-      title: draft.title,
+      // The second pass cannot turn a title null when the first pass found
+      // one — same text, same bot id, only the display names differ — but the
+      // type does not know that, and firstPass.title is already narrowed.
+      title: draft.title ?? firstPass.title,
       body: draft.body,
       priority: draft.priority,
-      assigned_to: assignee.id,
+      assigned_to: assignment.assigneeId,
       raised_by: raisedBy,
       raised_by_name: raiser?.name ?? event.user ?? null,
       source: 'slack',
@@ -288,22 +348,65 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: inserted.error.message });
   }
 
-  const link = hubUrl('/tech-support');
-  const owner = assignee.name ?? assignee.email;
+  /*
+   * Tell the assignee in the Hub as well as in the thread.
+   *
+   * The Slack reply goes to the channel the request came from, which is where
+   * the person who asked is looking. It is not where Ally is looking — she may
+   * not be in that channel at all, and the whole point of filing the ticket was
+   * to get it out of a channel. So the bell gets its own row.
+   */
+  const title = draft.title ?? firstPass.title;
 
-  const lines = [
-    `:white_check_mark: Filed as *${draft.title}*`,
-    assignee.id
-      ? `Tech Support on the Hub, assigned to ${owner}.`
-      : `Tech Support on the Hub — but *nobody is assigned*: no Hub user has ` +
-        `the address ${assignee.email}. Somebody will need to pick it up by hand.`,
-  ];
+  /*
+   * Everybody tagged is told, not only the one who owns it. Being tagged and
+   * hearing nothing is indistinguishable from not having been tagged, and
+   * "@Jemie @Ally one of you" means both should know it exists.
+   */
+  await notifyUsers({
+    userIds: [assignment.assigneeId, ...assignment.alsoNotify],
+    kind: 'info',
+    title: `New tech ticket: "${title}"`,
+    body: raiser?.name ? `Raised by ${raiser.name} in Slack` : 'Raised in Slack',
+    href: `/tech-support/${inserted.data.id}`,
+  });
+
+  const link = hubUrl(`/tech-support/${inserted.data.id}`);
+
+  const lines = [`:white_check_mark: Filed as *${title}*`];
+
+  if (assignment.reason === 'tagged') {
+    lines.push(`Tech Support on the Hub, assigned to *${assignment.name}*.`);
+  } else if (assignment.reason === 'default') {
+    lines.push(`Tech Support on the Hub, assigned to ${assignment.name}.`);
+  } else {
+    lines.push(
+      `Tech Support on the Hub — but *nobody is assigned*: no Hub user has ` +
+        `the address ${defaultAssignee.email}. Somebody will need to pick it ` +
+        `up by hand.`,
+    );
+  }
+
+  /*
+   * Said out loud rather than swallowed. Somebody who tags a colleague and is
+   * not told the tag did nothing will assume the ticket is theirs, and find out
+   * days later that it sat with the default assignee instead.
+   */
+  if (assignment.unknown.length > 0) {
+    lines.push(
+      `:warning: ${assignment.unknown.join(', ')} ${
+        assignment.unknown.length === 1 ? 'has' : 'have'
+      } no Hub login, so ${
+        assignment.unknown.length === 1 ? 'they' : 'they'
+      } could not be assigned or notified.`,
+    );
+  }
 
   if (draft.priority !== 'normal') {
     lines.push(`Priority: *${draft.priority}*.`);
   }
 
-  if (link) lines.push(`<${link}|Open Tech Support>`);
+  if (link) lines.push(`<${link}|Open the ticket>`);
 
   await Promise.all([
     postThreadReply(channelId, threadTs, lines.join('\n')),
@@ -313,7 +416,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     ticketId: inserted.data.id,
-    assignedTo: assignee.id,
+    assignedTo: assignment.assigneeId,
+    assignedBecause: assignment.reason,
     priority: draft.priority,
   });
 }

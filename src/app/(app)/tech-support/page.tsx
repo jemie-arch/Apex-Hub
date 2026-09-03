@@ -184,7 +184,12 @@ export default async function TechSupportPage() {
                 <tr key={row.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3 align-top">
                     <span className="flex items-center gap-2">
-                      <span className="font-medium text-fg">{row.title}</span>
+                      <Link
+                        href={`/tech-support/${row.id}`}
+                        className="font-medium text-fg hover:text-accent"
+                      >
+                        {row.title}
+                      </Link>
                       {row.priority === 'normal' ? null : (
                         <StatusPill
                           value={row.priority}
@@ -255,7 +260,12 @@ export default async function TechSupportPage() {
                 {doneTickets.map((row) => (
                   <tr key={row.id} className="border-b border-line last:border-0">
                     <td className="px-4 py-3 align-top text-fg">
-                      {row.title}
+                      <Link
+                        href={`/tech-support/${row.id}`}
+                        className="hover:text-accent"
+                      >
+                        {row.title}
+                      </Link>
                       <span className="block text-xs text-fg-subtle">
                         <ClientCell groupId={row.client_group_id} />
                         {row.assigned_to

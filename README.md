@@ -132,6 +132,34 @@ Started around 9am, three practices affected.
 The first line becomes the title, the whole message the body, and `#urgent`
 sets the priority. `#high`, `#low` and `#normal` work the same way.
 
+### Who it lands on
+
+Ally by default. Tag somebody else in the same message and it lands on them:
+
+```
+@apex @Jemie the A2P registration is stuck        -> Jemie
+@apex @Jemie @Ally one of you can take this       -> Jemie, Ally notified
+@apex the calendar sync is down                   -> Ally
+```
+
+**Only a real Slack mention counts.** `@apex assign this to jemie`, typed as
+words, goes to Ally — the name is prose, and prose carries no intent:
+
+| What somebody writes | What a name matcher would do |
+| --- | --- |
+| "assign this to ayanda" | she owns it — correct |
+| "ayanda said this is broken" | she owns it — wrong, she reported it |
+| "ayanda is out today" | she owns it — wrong, she is *away* |
+
+Two of those three put work on somebody who never agreed to it, and nobody
+notices until the ticket ages. A Slack mention is an id chosen from a picker,
+not a name — an explicit act, and the only signal worth acting on. The cost is
+that typing a name instead of tagging gets you Ally and a reassignment on the
+page: visible and cheap, where a silent misassignment is neither.
+
+Tag somebody Slack knows but the Hub does not and the reply says so by name,
+rather than quietly falling back.
+
 Tickets live in `tech_tickets`, which is deliberately **not** `tech_calls`. A
 tech call is a booking — it has a time, a confirm step, and can end in a
 no-show. A ticket is a piece of work and ends resolved. One table covering both
@@ -208,6 +236,57 @@ request.
 no workspace, database or network. Worth running before touching either: the
 signature is the only guard on a public URL, and the parser decides what a
 ticket says.
+
+## Comments, mentions and the bell
+
+Clicking a ticket opens `/tech-support/<id>`: the request, its Slack thread, and
+a conversation. Typing `@` in the comment box tags a teammate, and they are told
+in the bell at the top right of every page.
+
+Who gets told, and why those people:
+
+| Event | Notified |
+| --- | --- |
+| A ticket arrives from Slack | the assignee |
+| Somebody is assigned a ticket | the new assignee |
+| A comment is posted | everyone tagged, plus the assignee |
+
+The assignee is on the comment row even when nobody typed their name, because a
+comment on a ticket somebody owns is addressed to them either way. Nobody is
+ever notified of their own action — people write "@me to follow up", and a bell
+that pings you for your own typing stops meaning "somebody needs you".
+
+### The mention is an id, not a name
+
+`tech_ticket_comments` stores both the body text and `mentioned_user_ids`, and
+they are not redundant. The array is authoritative; the `@Name` in the text is
+display. Re-deriving ids from the text at read time would be a guess, and two
+people sharing a first name would make it a guess that pings the wrong person.
+
+One consequence worth knowing: editing a comment later does not change who was
+notified, because they already were. A notification is an event that happened,
+not a view over current text.
+
+Deleting a name from the box *before* posting does drop that mention — the ids
+are filtered against what the body still says at submit time.
+
+### What the bell does not do
+
+It does not poll. The list is whatever the layout read when the page rendered,
+so something arriving while you sit on one screen appears on your next
+navigation. That is deliberate for a first version: polling every thirty seconds
+is a query per person per thirty seconds forever, and this is a team who
+navigate constantly. Worth revisiting with Supabase realtime if anybody actually
+misses something.
+
+Opening the panel does not mark anything read. You either follow the link, which
+clears that one, or press *Mark all read*. A bell that clears itself on a glance
+loses the things you meant to come back to.
+
+The `notifications` table has existed since `0001` with nothing writing to it.
+This is its first writer, so the shape is conservative — one row per person per
+event, no grouping. A "3 new comments" summary that collapses the one mention
+that mattered is a worse failure than three rows.
 
 ## Billing
 

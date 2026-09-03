@@ -16,6 +16,7 @@
  *
  * No database, no network, no secret — the signing secret below is invented.
  */
+import { chooseAssignee } from '../src/lib/slack/assignee';
 import { parseMention, userIdsIn } from '../src/lib/slack/mention';
 import {
   MAX_SKEW_SECONDS,
@@ -347,6 +348,115 @@ section('Silence does not become a ticket');
     parseMention(`<@${BOT}> #urgent`, { botUserId: BOT }).title,
     null,
   );
+}
+
+
+// ---------------------------------------------------------------------------
+section('Tagging somebody assigns it to them; tagging nobody assigns to Ally');
+{
+  const ALLY = { id: 'ally-hub-id', name: 'Ally' };
+
+  check(
+    'nobody tagged falls back to the default',
+    chooseAssignee([], ALLY),
+    { assigneeId: 'ally-hub-id', name: 'Ally', reason: 'default', alsoNotify: [], unknown: [] },
+  );
+
+  check(
+    'one tagged teammate takes it',
+    chooseAssignee([{ slackId: 'U1', hubUserId: 'jemie-hub-id', name: 'Jemie' }], ALLY),
+    { assigneeId: 'jemie-hub-id', name: 'Jemie', reason: 'tagged', alsoNotify: [], unknown: [] },
+  );
+
+  // A ticket has one owner. The first named is the one being asked; the rest
+  // are told rather than dropped.
+  check(
+    'two tagged: the first owns it, the second is notified',
+    chooseAssignee(
+      [
+        { slackId: 'U1', hubUserId: 'jemie-hub-id', name: 'Jemie' },
+        { slackId: 'U2', hubUserId: 'ally-hub-id', name: 'Ally' },
+      ],
+      ALLY,
+    ),
+    {
+      assigneeId: 'jemie-hub-id',
+      name: 'Jemie',
+      reason: 'tagged',
+      alsoNotify: ['ally-hub-id'],
+      unknown: [],
+    },
+  );
+
+  // Tagging somebody Slack knows and the Hub does not is not an error, but it
+  // cannot be an assignment -- and the reply says so rather than swallowing it.
+  check(
+    'tagged but no Hub login: falls back, and names them',
+    chooseAssignee([{ slackId: 'U9', hubUserId: null, name: 'Contractor' }], ALLY),
+    {
+      assigneeId: 'ally-hub-id',
+      name: 'Ally',
+      reason: 'default',
+      alsoNotify: [],
+      unknown: ['Contractor'],
+    },
+  );
+
+  check(
+    'a known tag still wins when an unknown one is also present',
+    chooseAssignee(
+      [
+        { slackId: 'U9', hubUserId: null, name: 'Contractor' },
+        { slackId: 'U1', hubUserId: 'jemie-hub-id', name: 'Jemie' },
+      ],
+      ALLY,
+    ),
+    {
+      assigneeId: 'jemie-hub-id',
+      name: 'Jemie',
+      reason: 'tagged',
+      alsoNotify: [],
+      unknown: ['Contractor'],
+    },
+  );
+
+  // The default itself can be missing -- a TECH_SUPPORT_ASSIGNEE_EMAIL matching
+  // nobody. The ticket is still filed; it just has no owner.
+  check(
+    'no tag and no default leaves it unassigned',
+    chooseAssignee([], { id: null, name: null }),
+    { assigneeId: null, name: null, reason: 'nobody', alsoNotify: [], unknown: [] },
+  );
+
+  check(
+    'the same person tagged twice is not notified twice',
+    chooseAssignee(
+      [
+        { slackId: 'U1', hubUserId: 'jemie-hub-id', name: 'Jemie' },
+        { slackId: 'U1', hubUserId: 'jemie-hub-id', name: 'Jemie' },
+      ],
+      ALLY,
+    ).alsoNotify,
+    [],
+  );
+}
+
+section('A name typed as words is NOT a tag');
+{
+  // The whole reason assignment reads ids and not prose. Every one of these is
+  // a real sentence somebody would write, and a name matcher would put work on
+  // a person in two of the three.
+  for (const text of [
+    'assign this to jemie',
+    'ayanda said this is broken',
+    'ayanda is out today so nobody can fix it',
+  ]) {
+    check(
+      `"${text}" tags nobody`,
+      parseMention(`<@${BOT}> ${text}`, { botUserId: BOT }).mentionedUserIds,
+      [],
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
