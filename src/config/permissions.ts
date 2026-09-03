@@ -132,6 +132,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/onboarding/clients', 'client_onboarding'],
     ['/onboarding/provisioning', 'provisioning'],
     ['/b2c', 'consultations'],
+    // The call centre's booking reference. Same audience as /call-center, so it
+    // shares the 'calls' key rather than inventing a permission for one page.
+    ['/scheduling', 'calls'],
     ['/call-center', 'calls'],
     ['/meetings', 'meetings'],
     ['/projects', 'projects'],
