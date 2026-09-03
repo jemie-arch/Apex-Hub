@@ -20,6 +20,7 @@ import {
   BadgeDollarSign,
   BarChart3,
   CalendarCheck,
+  CalendarClock,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
@@ -139,6 +140,11 @@ const SECTIONS: NavSection[] = [
         ],
       },
       { href: '/b2c', label: 'Consultations', icon: BadgeDollarSign },
+      /*
+       * Sits beside Consultations because it answers the question that comes
+       * first on a call: how does this practice take a booking at all.
+       */
+      { href: '/scheduling', label: 'Scheduling', icon: CalendarClock },
     ],
   },
   {
