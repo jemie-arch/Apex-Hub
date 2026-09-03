@@ -96,14 +96,6 @@ const serverSchema = z.object({
    * tracker id because the two are different files with different owners.
    */
   COMMISSION_INPUTS_SHEET_ID: z.string().min(1).optional(),
-  /**
-   * The A1 range holding one commission unit's value, tab name included.
-   *
-   * Defaulted rather than required, so a working guess costs one env var to
-   * correct instead of a deploy — and the sync reports the raw text it read, so
-   * a wrong range is visible on the first run rather than believed.
-   */
-  COMMISSION_UNIT_RANGE: z.string().min(1).default('Input Values!B12'),
 
   HUBSTAFF_TOKEN: z.string().min(1).optional(),
   HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),

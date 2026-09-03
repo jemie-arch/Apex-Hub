@@ -19,10 +19,15 @@
 import { dailyBonusCents } from '../src/config/isa-commission';
 import {
   type BookingRow,
+  type CommissionScheme,
   classify,
   collapseDuplicates,
+  commissionCentsFor,
+  dailyBonusCentsFrom,
   dailyTallies,
   monthlySummaries,
+  parseScheme,
+  ratePerBookingCents,
   unattributedCount,
 } from '../src/lib/isa-commission';
 
@@ -492,6 +497,70 @@ check(
   })(),
   [[5, 1000]],
 );
+
+section('The scheme as the sheet actually defines it');
+
+/*
+ * The real figures, read from INPUT VALUES on the Call Center Agent Dashboard:
+ * $8 per booking below 96, $10 below 128, $12 above; daily bonus $10/$20/$30 at
+ * 5/6/8; two bookings lost per invalid booking.
+ */
+const SHEET: CommissionScheme = {
+  unitAmount: 800,
+  quota1Amount: 1000,
+  quota2Amount: 1200,
+  quota1Threshold: 96,
+  quota2Threshold: 128,
+  tier1Bonus: 1000,
+  tier2Bonus: 2000,
+  tier3Bonus: 3000,
+  tier1Threshold: 5,
+  tier2Threshold: 6,
+  tier3Threshold: 8,
+  bookingsLostPerInvalid: 2,
+};
+
+// Karol Sanchez, 75 bookings, is $600.00 on the live dashboard. Ayanda, 69, is
+// $552.00. Both reproduced here, which is the only evidence available that this
+// matches what the sheet pays.
+check('75 bookings pay $600, as the dashboard shows', commissionCentsFor(75, SHEET), 60000);
+check('69 bookings pay $552, as the dashboard shows', commissionCentsFor(69, SHEET), 55200);
+
+check('95 bookings are still on the $8 rate', ratePerBookingCents(95, SHEET), 800);
+check('96 bookings step up to $10', ratePerBookingCents(96, SHEET), 1000);
+check('127 bookings are still $10', ratePerBookingCents(127, SHEET), 1000);
+check('128 bookings step up to $12', ratePerBookingCents(128, SHEET), 1200);
+check('96 bookings pay $960, not $768', commissionCentsFor(96, SHEET), 96000);
+
+// Negative units earn nothing rather than owing money.
+check('negative units pay zero, not a debt', commissionCentsFor(-3, SHEET), 0);
+check('zero units pay zero', commissionCentsFor(0, SHEET), 0);
+
+check(
+  'the sheet-driven daily bonus matches the hardcoded one at every tier',
+  [4, 5, 6, 7, 8, 9, 20].map((count) => dailyBonusCentsFrom(count, SHEET)),
+  [4, 5, 6, 7, 8, 9, 20].map((count) => dailyBonusCents(count)),
+);
+
+/*
+ * Seven is the case the two live formulas disagree on. STATS DASHBOARD!P2 uses
+ * >= and pays $20; TODAY'S DATA!M3 uses = on tiers 1 and 2, so seven matches no
+ * branch and pays nothing. Joshua confirmed seven pays $20, so the dashboard is
+ * authoritative and this follows it.
+ */
+check('seven bookings pay $20, following the dashboard', dailyBonusCentsFrom(7, SHEET), 2000);
+
+section('A stored scheme is taken whole or not at all');
+
+check('the real scheme parses', parseScheme({ ...SHEET })?.unitAmount ?? null, 800);
+check('a missing field discards the lot', parseScheme({ unitAmount: 800 }), null);
+check(
+  'a field that is not a number discards the lot',
+  parseScheme({ ...SHEET, tier2Threshold: '6' }),
+  null,
+);
+check('null is not a scheme', parseScheme(null), null);
+check('a number is not a scheme', parseScheme(800), null);
 
 section('An empty month is not an error');
 

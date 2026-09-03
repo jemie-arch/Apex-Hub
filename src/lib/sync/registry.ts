@@ -8,6 +8,7 @@ import { syncCrmAppointments } from '@/lib/sync/crm-appointments';
 import { syncCrmCalls } from '@/lib/sync/crm-calls';
 import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
+import { syncCommissionInputs } from '@/lib/sync/commission-inputs';
 import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
@@ -53,6 +54,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'The Client Fulfilment Tracker sheet into tracker_appointments — needs a ' +
       'Google service account and FULFILMENT_TRACKER_SHEET_ID',
     run: syncFulfilmentTracker,
+  },
+  'commission-inputs': {
+    name: 'commission-inputs',
+    description:
+      'The ISA commission rates from the Call Center Agent Dashboard — a ' +
+      'different sheet from the tracker, needs COMMISSION_INPUTS_SHEET_ID',
+    run: syncCommissionInputs,
   },
   'onboarding-calls': {
     name: 'onboarding-calls',

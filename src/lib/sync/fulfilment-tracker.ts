@@ -29,7 +29,7 @@ import {
   normaliseHeader,
 } from '@/config/fulfilment-tracker';
 import { serverEnv } from '@/lib/env';
-import { listSheetTitles, readSheet } from '@/lib/integrations/google-sheets';
+import { readSheet } from '@/lib/integrations/google-sheets';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -219,103 +219,5 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
     `${records.length} tracker row(s) imported from the sheet. ` +
       `${records.filter((row) => row['booked_by'] !== null).length} name who booked them.`,
   );
-
-  await readCommissionUnitValue(ctx, db);
 }
 
-
-/**
- * Pick up what one commission unit is worth, from wherever it actually lives.
- *
- * This began by guessing. The rate was described as "B12 in sheet input
- * values", which read as a tab of the tracker — and the tracker's only
- * input-shaped tab, INPUT CLIENT INFO, holds a list of clinics whose B12 is the
- * client name "Dental Illusions". Parsed as currency that is zero, and a rate
- * of zero pays nobody while looking like a working calculation.
- *
- * So the location is now stated rather than inferred: its own spreadsheet id
- * and its own A1 range, because it is a different file from the tracker with a
- * different owner. Two env vars are a small price for not paying people from a
- * cell nobody confirmed.
- *
- * Never fails the run. The consultation records are what this sync is for, and
- * a missing rate must not cost us the import.
- */
-async function readCommissionUnitValue(
-  ctx: SyncContext,
-  db: ReturnType<typeof serviceClient>,
-): Promise<void> {
-  const env = serverEnv();
-  const sheetId = env.COMMISSION_INPUTS_SHEET_ID;
-  const range = env.COMMISSION_UNIT_RANGE;
-
-  if (!sheetId) {
-    ctx.note(
-      'unit_value_unconfigured',
-      'COMMISSION_INPUTS_SHEET_ID is not set, so the commission rate was not ' +
-        'read. It is a different spreadsheet from the tracker.',
-    );
-    return;
-  }
-
-  let cells: string[][];
-  try {
-    cells = await readSheet(sheetId, range);
-  } catch (error) {
-    /*
-     * A wrong tab name returns a bare 400 that names neither the tab nor the
-     * mistake, so the real titles go into the note. One run then corrects the
-     * range instead of a series of guesses doing it.
-     */
-    let titles: string[] = [];
-    try {
-      titles = await listSheetTitles(sheetId);
-    } catch {
-      // Already failing; the tab list is a courtesy, not a second chance.
-    }
-    ctx.note('unit_value_unread', {
-      range,
-      error: error instanceof Error ? error.message.slice(0, 200) : 'unknown',
-      tabs: titles,
-    });
-    return;
-  }
-
-  const raw = cells[0]?.[0]?.trim() ?? '';
-
-  /*
-   * Read as currency a person typed: "$2.00", "2", "2.50", maybe with a comma.
-   * Anything else is reported rather than coerced. Silently parsing to zero pays
-   * nobody, and misreading "$2.00" as 200 pays a hundredfold — and a client name
-   * parses to neither, which is exactly how the first guess was caught.
-   */
-  const numeric = Number(raw.replace(/[^0-9.-]/g, ''));
-  if (raw === '' || !Number.isFinite(numeric) || numeric <= 0) {
-    ctx.note('unit_value_unusable', { range, read: raw === '' ? '(empty)' : raw });
-    return;
-  }
-
-  const cents = Math.round(numeric * 100);
-
-  const written = await db.from('app_settings').upsert(
-    {
-      key: 'isa_commission_unit_cents',
-      value: cents,
-      description:
-        `One ISA commission unit, read from ${range}. Change it in the sheet, ` +
-        'not here — the next run overwrites this.',
-    },
-    { onConflict: 'key' },
-  );
-
-  if (written.error) {
-    ctx.note('unit_value_not_stored', written.error.message);
-    return;
-  }
-
-  // The range and the raw text, not just the parsed figure. "$2.00 from
-  // Input Values!B12" can be confirmed at a glance; a bare 200 cannot, and this
-  // number multiplies somebody's pay.
-  ctx.note('unit_value_source', `${range} = ${raw}`);
-  ctx.note('unit_value_cents', cents);
-}
