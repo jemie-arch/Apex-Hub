@@ -49,6 +49,24 @@ export function dailyBonusCents(qualifyingBookings: number): number {
 }
 
 /**
+ * Whether a patient who reschedules counts as a second booking.
+ *
+ * False, and that is a judgement rather than a fact, so it is one line to flip.
+ *
+ * 45 patients hold 90 rows in the tracker — 7% of the file. 36 of those pairs
+ * carry different appointment dates, which is what a reschedule looks like, and
+ * a genuine second consultation months later looks identical. The data cannot
+ * tell them apart.
+ *
+ * Counting once is the safer error. Paying an ISA twice because a patient moved
+ * their appointment is money out for work not done, and it also inflates the
+ * denominator of the 5% test, which makes a bad month look acceptable. Counting
+ * once can only under-credit somebody who genuinely booked the same patient
+ * twice, which is rarer and visible — the merged rows are reported, not hidden.
+ */
+export const COUNT_REBOOKINGS_SEPARATELY = false;
+
+/**
  * Commission units lost for each unqualified booking.
  *
  * Confirmed by worked example on 3 September: an ISA who makes 6 bookings in a

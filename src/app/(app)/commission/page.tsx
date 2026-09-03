@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
 import {
   type BookingRow,
+  collapseDuplicates,
   dailyTallies,
   monthlySummaries,
   unattributedCount,
@@ -63,20 +64,51 @@ export default async function CommissionPage({
   const [year, monthNumber] = chosen.split('-').map(Number);
   const to = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
 
+  /*
+   * The unit rate as the sheet last reported it, or null.
+   *
+   * Null is a first-class case rather than a fallback to some default. A guessed
+   * rate would render a plausible payable figure, and somebody would pay it.
+   */
+  const rate = await serviceClient()
+    .from('app_settings')
+    .select('value, updated_at')
+    .eq('key', 'isa_commission_unit_cents')
+    .maybeSingle();
+
+  const unitCents =
+    typeof rate.data?.value === 'number' && rate.data.value > 0
+      ? rate.data.value
+      : null;
+
   const booked = await serviceClient()
     .from('tracker_appointments')
-    .select('booked_by, created_on, appointment_status, status_if_showed')
+    // One literal string, not a concatenation: the generated types are inferred
+    // from it, and a joined expression widens the row to GenericStringError.
+    .select(
+      'booked_by, created_on, appointment_status, status_if_showed, patient_name, location_name, booked_for',
+    )
     .gte('created_on', from)
     .lt('created_on', to);
 
   if (booked.error) throw booked.error;
 
-  const rows: BookingRow[] = (booked.data ?? []).map((row) => ({
+  const raw: BookingRow[] = (booked.data ?? []).map((row) => ({
     bookedBy: row.booked_by,
     createdOn: row.created_on,
     appointmentStatus: row.appointment_status,
     statusIfShowed: row.status_if_showed,
+    patientName: row.patient_name,
+    locationName: row.location_name,
+    bookedFor: row.booked_for,
   }));
+
+  /*
+   * Collapsed before anything is counted, because a reschedule that counts
+   * twice pays twice and also inflates the denominator of the 5% test, which
+   * would make a bad month look acceptable.
+   */
+  const { rows, merged } = collapseDuplicates(raw);
 
   const summaries = monthlySummaries(rows);
   const days = dailyTallies(rows);
@@ -109,9 +141,15 @@ export default async function CommissionPage({
           <p className="mt-1">
             Units are counted — bookings less{' '}
             {PENDING_PENALTY_RULES.unitsLostPerUnqualified} for each unqualified
-            one — but never converted to money, because one unit is worth cell{' '}
-            {COMMISSION_UNIT_VALUE_CELL} of the tracker&rsquo;s input values and
-            that sheet cannot be read yet. The forfeiture above{' '}
+            one.{' '}
+            {unitCents === null
+              ? `They are not converted to money, because one unit is worth cell
+                 ${COMMISSION_UNIT_VALUE_CELL} of the tracker's input values and
+                 that has not been read yet.`
+              : `One unit is ${formatMoney(unitCents)}, read from cell
+                 ${COMMISSION_UNIT_VALUE_CELL} of the tracker — change it there,
+                 not here.`}{' '}
+            The forfeiture above{' '}
             {formatPercent(MONTHLY_UNQUALIFIED_LIMIT)} of a month&rsquo;s
             bookings is not applied either: what counts as an unqualified call is
             defined by the ISA call process document, and nothing scores calls
@@ -162,6 +200,9 @@ export default async function CommissionPage({
               day(s)
               {unattributed > 0
                 ? ` · ${formatCount(unattributed)} booking(s) name nobody and are excluded`
+                : ''}
+              {merged > 0
+                ? ` · ${formatCount(merged)} duplicate or rescheduled row(s) merged`
                 : ''}
             </p>
           </div>
@@ -228,6 +269,11 @@ export default async function CommissionPage({
                         }
                       >
                         {row.commissionUnits}
+                        {unitCents === null ? null : (
+                          <span className="ml-1 font-normal text-fg-subtle">
+                            ({formatMoney(row.commissionUnits * unitCents)})
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
                         {formatCount(row.daysPaying)} of {formatCount(row.daysBooked)}
