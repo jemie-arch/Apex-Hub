@@ -1162,6 +1162,75 @@ export type Database = {
           },
         ]
       }
+      booking_sheet_rows: {
+        Row: {
+          agent: string | null
+          booked_on: string | null
+          disposition: string | null
+          id: string
+          imported_at: string
+          location_name: string | null
+          patient_email: string | null
+          patient_name: string | null
+          source_row: number
+        }
+        Insert: {
+          agent?: string | null
+          booked_on?: string | null
+          disposition?: string | null
+          id?: string
+          imported_at?: string
+          location_name?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          source_row: number
+        }
+        Update: {
+          agent?: string | null
+          booked_on?: string | null
+          disposition?: string | null
+          id?: string
+          imported_at?: string
+          location_name?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          source_row?: number
+        }
+        Relationships: []
+      }
+      invalid_booking_reports: {
+        Row: {
+          agent: string | null
+          id: string
+          imported_at: string
+          invalid_on: string | null
+          notes: string | null
+          reason: string | null
+          reported_at: string | null
+          source_row: number
+        }
+        Insert: {
+          agent?: string | null
+          id?: string
+          imported_at?: string
+          invalid_on?: string | null
+          notes?: string | null
+          reason?: string | null
+          reported_at?: string | null
+          source_row: number
+        }
+        Update: {
+          agent?: string | null
+          id?: string
+          imported_at?: string
+          invalid_on?: string | null
+          notes?: string | null
+          reason?: string | null
+          reported_at?: string | null
+          source_row?: number
+        }
+        Relationships: []
+      }
       call_recordings: {
         Row: {
           ai_action_items: Json
