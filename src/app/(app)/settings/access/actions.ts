@@ -226,6 +226,33 @@ export async function setRole(input: {
 }
 
 /**
+ * An existing login for this address, if there is one.
+ *
+ * listUsers is paginated and there is no lookup-by-email in this client
+ * version, so this walks pages until it finds the address or runs out. Bounded
+ * at twenty pages of two hundred: four thousand logins is far beyond this
+ * agency, and an unbounded loop against a paginated API is how a server action
+ * starts timing out silently.
+ */
+async function findAuthUserByEmail(
+  db: ReturnType<typeof serviceClient>,
+  email: string,
+): Promise<{ user?: { id: string } | null; error?: string }> {
+  for (let page = 1; page <= 20; page += 1) {
+    const listed = await db.auth.admin.listUsers({ page, perPage: 200 });
+    if (listed.error) return { error: listed.error.message };
+
+    const hit = listed.data.users.find(
+      (candidate) => candidate.email?.toLowerCase() === email,
+    );
+    if (hit) return { user: { id: hit.id } };
+
+    if (listed.data.users.length < 200) break;
+  }
+  return { user: null };
+}
+
+/**
  * Adds a teammate and returns a link for them to set their own password.
  *
  * No email is sent. The link comes back to you to pass on however you like,
@@ -277,18 +304,61 @@ export async function addTeammate(input: {
 
   const keys = [...new Set((input.keys ?? []).filter(isPermissionKey))];
 
-  const created = await db.auth.admin.createUser({
-    email,
-    email_confirm: true,
-    app_metadata: { role: input.role },
-    user_metadata: { full_name: fullName },
-  });
+  /*
+   * A login may already exist without a profile, and this used to be unfixable
+   * from here.
+   *
+   * Adding somebody through the Supabase dashboard creates the auth user and
+   * nothing else — no profile, no role claim. Middleware reads the role from
+   * app_metadata and defaults to 'client', so that person authenticates
+   * successfully and is redirected out of the app. Meanwhile this action saw no
+   * profile, went straight to createUser, and failed on the duplicate email —
+   * so the only route out was hand-written SQL. That is exactly what happened
+   * on 2 September and it cost an evening.
+   *
+   * So an orphaned login is adopted rather than rejected: the role claim and
+   * name are set on it, and the flow continues as if it had just been made.
+   */
+  const orphan = await findAuthUserByEmail(db, email);
+  if (orphan.error) return { ok: false, message: orphan.error };
 
-  if (created.error || !created.data.user) {
-    return {
-      ok: false,
-      message: created.error?.message ?? 'Could not create the login.',
-    };
+  let userId: string;
+  let adopted = false;
+
+  if (orphan.user) {
+    adopted = true;
+    userId = orphan.user.id;
+
+    const claimed = await db.auth.admin.updateUserById(userId, {
+      app_metadata: { role: input.role },
+      user_metadata: { full_name: fullName },
+    });
+
+    if (claimed.error) {
+      return {
+        ok: false,
+        message:
+          `${email} already has a login, but its role could not be set: ` +
+          `${claimed.error.message}. Until that succeeds they will be treated ` +
+          'as a client and redirected out of the app.',
+      };
+    }
+  } else {
+    const created = await db.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      app_metadata: { role: input.role },
+      user_metadata: { full_name: fullName },
+    });
+
+    if (created.error || !created.data.user) {
+      return {
+        ok: false,
+        message: created.error?.message ?? 'Could not create the login.',
+      };
+    }
+
+    userId = created.data.user.id;
   }
 
   // A trigger may already have made the profile row from the auth user, so this
@@ -297,7 +367,7 @@ export async function addTeammate(input: {
     .from('user_profiles')
     .upsert(
       {
-        id: created.data.user.id,
+        id: userId,
         email,
         full_name: fullName,
         role: input.role,
@@ -333,8 +403,14 @@ export async function addTeammate(input: {
   return {
     ok: true,
     message:
-      `Added ${fullName} as ${ROLE_LABELS[input.role]} with ${keys.length} page(s). ` +
-      'Send them the link below — it is single use and no email went out.',
+      (adopted
+        ? `${fullName} already had a login, so it was adopted rather than ` +
+          `recreated — set to ${ROLE_LABELS[input.role]} with ${keys.length} page(s). ` +
+          'Whatever password they already had still works, so they may not need ' +
+          'the link at all. '
+        : `Added ${fullName} as ${ROLE_LABELS[input.role]} with ${keys.length} page(s). `) +
+      'Send them the link below if they need one — it is single use, no email ' +
+      'went out, and clicking it twice will report it expired.',
     link: generated.link,
   };
 }
