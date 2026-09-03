@@ -1,4 +1,22 @@
 /**
+ * ============================ NOT THE PAY PATH ============================
+ * classify, collapseDuplicates, dailyTallies, monthlySummaries and
+ * unattributedCount work from the Client Fulfilment Tracker, and NOTHING is
+ * paid from them. The live calculation reads BOOKING SHEET — see lib/agent-pay,
+ * which is what the commission page uses.
+ *
+ * They are kept rather than deleted for one specific reason. BOOKING SHEET's
+ * Disposition column is a constant, so attendance is absent from the pay
+ * source; if the daily bonus is ever to exclude no-shows, the outcome has to be
+ * joined from tracker_appointments, and this is that half already written and
+ * checked. Delete it if that decision goes the other way, rather than leaving
+ * two plausible answers in the codebase.
+ *
+ * The scheme helpers below it — CommissionScheme, parseScheme,
+ * ratePerBookingCents, commissionCentsFor, dailyBonusCentsFrom — ARE on the pay
+ * path and are used by lib/agent-pay.
+ * ==========================================================================
+ *
  * Working out ISA commission from tracker bookings.
  *
  * Pure functions over plain rows: no database, no clock, no environment. The

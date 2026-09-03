@@ -1,23 +1,15 @@
 import { Coins, TriangleAlert } from 'lucide-react';
 
-import {
-  BONUS_TIERS,
-  COMMISSION_UNIT_SOURCE,
-  MONTHLY_UNQUALIFIED_LIMIT,
-  PENDING_PENALTY_RULES,
-} from '@/config/isa-commission';
+import { MONTHLY_UNQUALIFIED_LIMIT } from '@/config/isa-commission';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { StatusPill } from '@/components/ui/StatusPill';
 import {
-  type BookingRow,
-  collapseDuplicates,
-  commissionCentsFor,
-  dailyTallies,
-  monthlySummaries,
-  parseScheme,
-  unattributedCount,
-} from '@/lib/isa-commission';
+  type AgentBooking,
+  type InvalidReport,
+  agentDays,
+  agentMonths,
+} from '@/lib/agent-pay';
+import { parseScheme } from '@/lib/isa-commission';
 import { formatCount, formatMoney, formatPercent } from '@/lib/format';
 import { requirePermission } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
@@ -27,23 +19,20 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'ISA Commission' };
 
 /**
- * What each ISA earned for booking consultations.
+ * What each ISA earned, from the sheet that actually decides it.
  *
- * Reads the tracker rather than the CRM, because the tracker is the only place
- * that records who booked an appointment. GoHighLevel can attribute about 2.3%
- * of calls — inbound calls forward to an external line before any GHL user
- * touches them — so tracker_appointments.booked_by is the whole basis of this
- * page.
+ * Reads BOOKING SHEET and INVALID BOOKINGS, because that is what the live
+ * calculation reads: DAILY BONUS TALLY counts BOOKING SHEET by agent and day,
+ * subtracts twice the matching invalid reports, and STATS DASHBOARD — the sheet
+ * carrying Comms, Bonus and Salary — reads that tally. Nothing in the chain
+ * touches the Client Fulfilment Tracker, which is what the first version of this
+ * page was built on.
  *
- * Which means this page is empty until the sheet sync runs, and says so
- * plainly. An earnings page that renders a clean set of zeroes would read as
- * "nobody earned anything this month".
- *
- * The penalty half of the scheme is shown but never applied. See
- * config/isa-commission for why: what a "commission unit" is worth and which
- * disqualifications count are both undecided, and the tracker's DQ column runs
- * at 35-50% of all bookings, so a 5% threshold applied to it would forfeit
- * everybody every month.
+ * THIS PAGE IS FOR RECONCILING, NOT YET FOR PAYING. Its figures should match
+ * STATS DASHBOARD agent for agent, and the banner asks for that check rather
+ * than for trust. A screen headed "commission" showing plausible money gets paid
+ * from whatever its caveats say, so the caveats have to name something a reader
+ * can go and verify.
  */
 export default async function CommissionPage({
   searchParams,
@@ -57,63 +46,65 @@ export default async function CommissionPage({
     ? (month as string)
     : new Date().toISOString().slice(0, 7);
 
-  /*
-   * Filtered on created_on — the day the booking was made — because that is the
-   * day the bonus is earned against. Filtering on booked_for would answer a
-   * different question and quietly pay people for a different month's work.
-   */
   const from = `${chosen}-01`;
   const [year, monthNumber] = chosen.split('-').map(Number);
   const to = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
 
-  /*
-   * The scheme as the sheet last reported it, or null.
-   *
-   * Null is a first-class case rather than a fallback to plausible defaults. A
-   * guessed rate renders a payable-looking figure, and somebody pays it.
-   */
-  const stored = await serviceClient()
-    .from('app_settings')
-    .select('value, updated_at')
-    .eq('key', 'isa_commission_scheme')
-    .maybeSingle();
+  const db = serviceClient();
+
+  const [stored, booked, invalid, nameless] = await Promise.all([
+    db
+      .from('app_settings')
+      .select('value, updated_at')
+      .eq('key', 'isa_commission_scheme')
+      .maybeSingle(),
+    db
+      .from('booking_sheet_rows')
+      .select('agent, booked_on, disposition')
+      .gte('booked_on', from)
+      .lt('booked_on', to),
+    db
+      .from('invalid_booking_reports')
+      .select('agent, invalid_on')
+      .gte('invalid_on', from)
+      .lt('invalid_on', to),
+    /*
+     * Bookings naming nobody, counted separately because by definition they
+     * appear in no agent's row. Roughly half of September's rows are like this
+     * and the sheet gives no sign of it, so this page has to.
+     */
+    db
+      .from('booking_sheet_rows')
+      .select('*', { count: 'exact', head: true })
+      .is('agent', null)
+      .gte('booked_on', from)
+      .lt('booked_on', to),
+  ]);
+
+  if (booked.error) throw booked.error;
+  if (invalid.error) throw invalid.error;
 
   const scheme = parseScheme(stored.data?.value ?? null);
   const schemeReadAt = stored.data?.updated_at ?? null;
+  const namelessBookings = nameless.count ?? 0;
 
-  const booked = await serviceClient()
-    .from('tracker_appointments')
-    // One literal string, not a concatenation: the generated types are inferred
-    // from it, and a joined expression widens the row to GenericStringError.
-    .select(
-      'booked_by, created_on, appointment_status, status_if_showed, patient_name, location_name, booked_for',
-    )
-    .gte('created_on', from)
-    .lt('created_on', to);
-
-  if (booked.error) throw booked.error;
-
-  const raw: BookingRow[] = (booked.data ?? []).map((row) => ({
-    bookedBy: row.booked_by,
-    createdOn: row.created_on,
-    appointmentStatus: row.appointment_status,
-    statusIfShowed: row.status_if_showed,
-    patientName: row.patient_name,
-    locationName: row.location_name,
-    bookedFor: row.booked_for,
+  const bookings: AgentBooking[] = (booked.data ?? []).map((row) => ({
+    agent: row.agent,
+    bookedOn: row.booked_on,
+    disposition: row.disposition,
   }));
 
-  /*
-   * Collapsed before anything is counted, because a reschedule that counts
-   * twice pays twice and also inflates the denominator of the 5% test, which
-   * would make a bad month look acceptable.
-   */
-  const { rows, merged } = collapseDuplicates(raw);
+  const reports: InvalidReport[] = (invalid.data ?? []).map((row) => ({
+    agent: row.agent,
+    invalidOn: row.invalid_on,
+  }));
 
-  const summaries = monthlySummaries(rows);
-  const days = dailyTallies(rows);
-  const unattributed = unattributedCount(rows);
-  const payroll = summaries.reduce((total, row) => total + row.bonusCents, 0);
+  // No scheme means no money, and no table either — a row of counts with blank
+  // currency columns invites somebody to fill them in by hand.
+  const months = scheme ? agentMonths(bookings, reports, scheme) : [];
+  const days = scheme ? agentDays(bookings, reports, scheme) : [];
+
+  const payroll = months.reduce((total, row) => total + row.totalCents, 0);
 
   const monthLabel = new Date(`${chosen}-01T00:00:00Z`).toLocaleDateString(
     undefined,
@@ -124,86 +115,91 @@ export default async function CommissionPage({
     <>
       <PageHeader
         title="ISA Commission"
-        description={`Booking bonus for ${monthLabel}, by the day each booking was made`}
+        description={`${monthLabel}, by the day each booking was made`}
       />
 
       {/*
-        Stated up front rather than in a footnote. Somebody reading a payroll
-        figure needs to know it is missing its deductions before they act on it.
+        Two warnings, deliberately not interchangeable. One says "this cannot be
+        computed"; the other says "this can be computed but nobody has checked
+        it". Collapsing them into a single caveat is how a caveat stops being
+        read.
       */}
-      <div className="mb-6 flex items-start gap-3 rounded-lg border border-line bg-warning-subtle px-4 py-3">
-        <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warning" />
-        <div className="text-xs text-warning">
-          <p className="font-medium">
-            These are gross figures. The unqualified-booking penalty is not
-            applied.
-          </p>
-          <p className="mt-1">
-            Units are counted — bookings less{' '}
-            {PENDING_PENALTY_RULES.unitsLostPerUnqualified} for each unqualified
-            one.{' '}
-            {scheme === null
-              ? `They are not converted to money, because the rates have not been
-                 read from ${COMMISSION_UNIT_SOURCE} yet — run commission-inputs.`
-              : `Paid at ${formatMoney(scheme.unitAmount)} per booking below
-                 ${scheme.quota1Threshold}, ${formatMoney(scheme.quota1Amount)} below
-                 ${scheme.quota2Threshold}, then ${formatMoney(scheme.quota2Amount)} —
-                 read from ${COMMISSION_UNIT_SOURCE}, so change it there, not here.`}{' '}
-            The forfeiture above{' '}
-            {formatPercent(MONTHLY_UNQUALIFIED_LIMIT)} of a month&rsquo;s
-            bookings is not applied either: what counts as an unqualified call is
-            defined by the ISA call process document, and nothing scores calls
-            against it today. Do not pay from this page.
-          </p>
+      {scheme === null ? (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-line bg-negative-subtle px-4 py-3">
+          <TriangleAlert size={16} className="mt-0.5 shrink-0 text-negative" />
+          <div className="text-xs text-negative">
+            <p className="font-medium">
+              No rates have been read, so no money is shown.
+            </p>
+            <p className="mt-1">
+              Run <code>commission-inputs</code> from Settings — it reads INPUT
+              VALUES on the Call Center Agent Dashboard. Nothing here falls back
+              to a default rate, because a guessed figure on this page would look
+              payable.
+            </p>
+          </div>
         </div>
-      </div>
-
-      {rows.length === 0 ? (
-        <EmptyState
-          title={`No bookings recorded in ${monthLabel}`}
-          description={
-            'Nothing was booked in this month, or the tracker has not been ' +
-            'imported for it. The tracker was last read on 22 August.'
-          }
-          icon={<Coins size={22} />}
-        />
-      ) : summaries.length === 0 ? (
-        /*
-         * Rows exist but none carry a name. This is the state the page is in
-         * today — booked_by is null on every one of the 1,281 imported rows —
-         * and it is the single most important thing the page can say.
-         */
-        <EmptyState
-          title="No booking is attributed to an ISA yet"
-          description={
-            `All ${formatCount(rows.length)} booking(s) in ${monthLabel} have an ` +
-            'empty "booked by" column, so there is nobody to pay. This fills in ' +
-            'when the fulfilment-tracker sync runs against the live sheet — set ' +
-            'the Google service account credentials, share the tracker with it, ' +
-            'and run it once from Settings.'
-          }
-          icon={<Coins size={22} />}
-        />
       ) : (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-line bg-warning-subtle px-4 py-3">
+          <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warning" />
+          <div className="text-xs text-warning">
+            <p className="font-medium">
+              Check these against STATS DASHBOARD before paying anybody from them.
+            </p>
+            <p className="mt-1">
+              This reimplements the sheet&rsquo;s own formula, so the two should
+              agree agent for agent. Bookings less {scheme.bookingsLostPerInvalid}{' '}
+              per invalid one, tiered daily, plus {formatMoney(scheme.unitAmount)}{' '}
+              per booking below {scheme.quota1Threshold},{' '}
+              {formatMoney(scheme.quota1Amount)} below {scheme.quota2Threshold},
+              then {formatMoney(scheme.quota2Amount)}. The{' '}
+              {formatPercent(MONTHLY_UNQUALIFIED_LIMIT)} monthly forfeiture is{' '}
+              <strong>not</strong> applied: it appears nowhere in the sheet or its
+              script, so it is new policy rather than something to reproduce.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {namelessBookings > 0 ? (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-negative bg-negative-subtle px-4 py-3">
+          <TriangleAlert size={16} className="mt-0.5 shrink-0 text-negative" />
+          <div className="text-xs text-negative">
+            <p className="font-medium">
+              {formatCount(namelessBookings)} booking(s) this month name no agent.
+            </p>
+            <p className="mt-1">
+              They are attributed to nobody and go unpaid — here and in the sheet,
+              where a blank agent matches no COUNTIFS. That is a data-entry gap in
+              BOOKING SHEET column B, not something the Hub can repair.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {bookings.length === 0 && namelessBookings === 0 ? (
+        <EmptyState
+          title={`No bookings imported for ${monthLabel}`}
+          description={
+            'Run booking-sheet from Settings. It needs the Google service ' +
+            'account, COMMISSION_INPUTS_SHEET_ID, and the dashboard shared with ' +
+            'the service account as a Viewer.'
+          }
+          icon={<Coins size={22} />}
+        />
+      ) : months.length === 0 ? null : (
         <>
           <div className="panel mb-6 rounded-lg border border-line bg-surface px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-fg-subtle">
-              Gross booking bonus, {monthLabel}
+              Bonus plus commission, {monthLabel}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-fg">
               {formatMoney(payroll)}
             </p>
             <p className="mt-1 text-xs text-fg-subtle">
-              across {formatCount(summaries.length)} ISA
-              {summaries.length === 1 ? '' : 's'} and{' '}
+              {formatCount(months.length)} agent{months.length === 1 ? '' : 's'} ·{' '}
               {formatCount(days.filter((day) => day.bonusCents > 0).length)} paying
-              day(s)
-              {unattributed > 0
-                ? ` · ${formatCount(unattributed)} booking(s) name nobody and are excluded`
-                : ''}
-              {merged > 0
-                ? ` · ${formatCount(merged)} duplicate or rescheduled row(s) merged`
-                : ''}
+              day(s) · {formatCount(reports.length)} invalid booking(s) reported
             </p>
           </div>
 
@@ -212,74 +208,60 @@ export default async function CommissionPage({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
-                    <th className="px-4 py-3 font-medium">ISA</th>
+                    <th className="px-4 py-3 font-medium">Agent</th>
                     <th className="px-4 py-3 text-right font-medium">Bookings</th>
-                    <th className="px-4 py-3 text-right font-medium">Qualifying</th>
-                    <th className="px-4 py-3 text-right font-medium">Pending</th>
-                    <th className="px-4 py-3 text-right font-medium">No show</th>
-                    <th className="px-4 py-3 text-right font-medium">Unqualified</th>
-                    <th className="px-4 py-3 text-right font-medium">Units</th>
+                    <th className="px-4 py-3 text-right font-medium">Invalid</th>
+                    <th className="px-4 py-3 text-right font-medium">Countable</th>
                     <th className="px-4 py-3 text-right font-medium">Paying days</th>
-                    <th className="px-4 py-3 text-right font-medium">Gross bonus</th>
+                    <th className="px-4 py-3 text-right font-medium">Bonus</th>
+                    <th className="px-4 py-3 text-right font-medium">Commission</th>
+                    <th className="px-4 py-3 text-right font-medium">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {summaries.map((row) => (
+                  {months.map((row) => (
                     <tr
-                      key={`${row.isa} ${row.month}`}
+                      key={`${row.agent} ${row.month}`}
                       className="border-b border-line last:border-0 hover:bg-surface-hover"
                     >
-                      <td className="px-4 py-3 font-medium text-fg">{row.isa}</td>
+                      <td className="px-4 py-3 font-medium text-fg">{row.agent}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
-                        {formatCount(row.total)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-fg">
-                        {formatCount(row.qualifying)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-fg-subtle">
-                        {formatCount(row.pending)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
-                        {formatCount(row.noShow)}
+                        {formatCount(row.bookings)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        <span className="text-fg-muted">
-                          {formatCount(row.unqualified)}
-                        </span>
-                        {row.exceedsUnqualifiedLimit ? (
-                          <span className="ml-2 align-middle">
-                            <StatusPill
-                              value={formatPercent(row.unqualifiedRate, 1)}
-                              tone="warning"
-                            />
+                        {row.invalid === 0 ? (
+                          <span className="text-fg-subtle">—</span>
+                        ) : (
+                          <span className="text-warning">
+                            {formatCount(row.invalid)}
                           </span>
-                        ) : null}
+                        )}
                       </td>
                       {/*
-                        A count, never money. One unit is worth cell B12 of the
-                        tracker's input values, which cannot be read until the
-                        service account exists — and a figure multiplied by a
-                        guessed rate would look like a payable amount.
+                        Negative shown as negative. Above a 50% invalid rate the
+                        deduction outweighs the bookings, and clamping to zero
+                        would hide the case the penalty exists for.
                       */}
                       <td
                         className={
-                          row.commissionUnits < 0
+                          row.countable < 0
                             ? 'px-4 py-3 text-right font-medium tabular-nums text-negative'
                             : 'px-4 py-3 text-right tabular-nums text-fg'
                         }
                       >
-                        {row.commissionUnits}
-                        {scheme === null ? null : (
-                          <span className="ml-1 font-normal text-fg-subtle">
-                            ({formatMoney(commissionCentsFor(row.commissionUnits, scheme))})
-                          </span>
-                        )}
+                        {row.countable}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
-                        {formatCount(row.daysPaying)} of {formatCount(row.daysBooked)}
+                        {formatCount(row.daysPaying)}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium tabular-nums text-fg">
+                      <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
                         {formatMoney(row.bonusCents)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
+                        {formatMoney(row.commissionCents)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-fg">
+                        {formatMoney(row.totalCents)}
                       </td>
                     </tr>
                   ))}
@@ -288,13 +270,11 @@ export default async function CommissionPage({
             </div>
           </div>
 
-          <h2 className="mb-2 mt-8 text-sm font-semibold text-fg">
-            Day by day
-          </h2>
+          <h2 className="mb-2 mt-8 text-sm font-semibold text-fg">Day by day</h2>
           <p className="mb-3 max-w-2xl text-xs text-fg-subtle">
-            The tier resets every day, so this is the grain the bonus is actually
-            earned at — eleven qualifying bookings are {formatMoney(3000)} in one
-            day and nothing at all spread over three.
+            The bonus tier resets daily, so this is the grain it is earned at. An
+            invalid booking is deducted before the tier is read, which is why a
+            day can hold plenty of bookings and still pay nothing.
           </p>
 
           <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
@@ -302,28 +282,44 @@ export default async function CommissionPage({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-subtle">
-                    <th className="px-4 py-3 font-medium">ISA</th>
+                    <th className="px-4 py-3 font-medium">Agent</th>
                     <th className="px-4 py-3 font-medium">Booked on</th>
-                    <th className="px-4 py-3 text-right font-medium">Qualifying</th>
-                    <th className="px-4 py-3 text-right font-medium">Of total</th>
+                    <th className="px-4 py-3 text-right font-medium">Bookings</th>
+                    <th className="px-4 py-3 text-right font-medium">Invalid</th>
+                    <th className="px-4 py-3 text-right font-medium">Countable</th>
                     <th className="px-4 py-3 text-right font-medium">Bonus</th>
                   </tr>
                 </thead>
                 <tbody>
                   {days.map((day) => (
                     <tr
-                      key={`${day.isa} ${day.day}`}
+                      key={`${day.agent} ${day.day}`}
                       className="border-b border-line last:border-0 hover:bg-surface-hover"
                     >
-                      <td className="px-4 py-3 text-fg">{day.isa}</td>
+                      <td className="px-4 py-3 text-fg">{day.agent}</td>
                       <td className="px-4 py-3 tabular-nums text-fg-muted">
                         {day.day}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-fg">
-                        {formatCount(day.qualifying)}
+                        {formatCount(day.bookings)}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-fg-subtle">
-                        {formatCount(day.total)}
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {day.invalid === 0 ? (
+                          <span className="text-fg-subtle">—</span>
+                        ) : (
+                          <span className="text-warning">
+                            {formatCount(day.invalid)}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={
+                          day.countable < 0
+                            ? 'px-4 py-3 text-right tabular-nums text-negative'
+                            : 'px-4 py-3 text-right tabular-nums text-fg-muted'
+                        }
+                      >
+                        {day.countable}
                       </td>
                       <td
                         className={
@@ -344,33 +340,30 @@ export default async function CommissionPage({
       )}
 
       <section className="mt-8 max-w-2xl">
-        <h2 className="mb-2 text-sm font-semibold text-fg">The rules</h2>
+        <h2 className="mb-2 text-sm font-semibold text-fg">Where these come from</h2>
         <ul className="space-y-1 text-xs text-fg-muted">
-          {[...BONUS_TIERS].reverse().map((tier) => (
-            <li key={tier.minimum}>
-              {tier.minimum} qualifying bookings in a day —{' '}
-              {formatMoney(tier.amountCents)}
-            </li>
-          ))}
           <li>
-            Fewer than {BONUS_TIERS[BONUS_TIERS.length - 1]?.minimum} pays nothing.
-            There is no tier above {BONUS_TIERS[0]?.minimum} yet, so more pays the
-            same.
+            Bookings and invalid reports: BOOKING SHEET and INVALID BOOKINGS on
+            the Call Center Agent Dashboard, via <code>booking-sheet</code>.
           </li>
           <li>
-            A booking counts against the day the ISA booked it, not the day of
-            the appointment.
+            Rates: INPUT VALUES on the same spreadsheet, via{' '}
+            <code>commission-inputs</code>. Change them there, not here.
           </li>
-          <li>No-shows and unqualified bookings do not pay.</li>
+          <li>
+            A booking counts against the day it was made, not the appointment
+            date.
+          </li>
+          <li>
+            No-shows are not excluded, and cannot be: BOOKING SHEET&rsquo;s
+            Disposition column reads &ldquo;Booked&rdquo; on all 362 rows, so
+            attendance is not in the pay source at all.
+          </li>
         </ul>
         <p className="mt-3 text-xs text-fg-subtle">
-          Confirmed by {PENDING_PENALTY_RULES.confirmedBy} on{' '}
-          {PENDING_PENALTY_RULES.confirmedOn}. Earl designed this scheme and has
-          left, so there is nobody to check it against — these answers are the
-          record.
           {schemeReadAt === null
-            ? ' Rates have never been read from the sheet.'
-            : ` Rates last read from the sheet on ${schemeReadAt.slice(0, 10)}.`}
+            ? 'Rates have never been read from the sheet.'
+            : `Rates last read ${schemeReadAt.slice(0, 10)}.`}
         </p>
       </section>
     </>
