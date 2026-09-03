@@ -49,6 +49,38 @@ export function dailyBonusCents(qualifyingBookings: number): number {
 }
 
 /**
+ * Commission units lost for each unqualified booking.
+ *
+ * Confirmed by worked example on 3 September: an ISA who makes 6 bookings in a
+ * day, one of which is later disqualified, is left with 4 commission units.
+ *
+ * Note what that arithmetic says. The deduction comes off the FULL booking
+ * count, not off the qualifying ones — 6 - 2 = 4, rather than 5 qualifying
+ * minus 2 giving 3. So a disqualified booking is counted and then charged for.
+ *
+ * Which means a bad booking is worse than no booking at all: five clean
+ * bookings are five units, and those same five plus one disqualified are four.
+ * That looks deliberate rather than accidental — it is what makes the penalty
+ * bite — but it is worth stating out loud, because it is the kind of property
+ * somebody notices for the first time in a payslip.
+ */
+export const UNITS_LOST_PER_UNQUALIFIED = 2;
+
+/**
+ * What one commission unit is worth: cell B12 of the tracker's input values.
+ *
+ * DELIBERATELY NOT A NUMBER HERE. It lives in the sheet because that is where
+ * it was put, and reading it there means the rate can be changed by whoever
+ * owns the scheme without a deploy and without me. Hardcoding it would fork the
+ * figure, and the copy in the code would win silently.
+ *
+ * Unreadable until the Google service account exists — the sheet returns 401 to
+ * anything unauthenticated, unlike the process document — which is a second
+ * reason that credential is the blocker on this whole project.
+ */
+export const COMMISSION_UNIT_VALUE_CELL = 'B12';
+
+/**
  * The penalty half of the scheme, WHICH IS NOT IMPLEMENTED AND MUST NOT BE.
  *
  * Recorded here so the numbers are not lost, and deliberately not wired into

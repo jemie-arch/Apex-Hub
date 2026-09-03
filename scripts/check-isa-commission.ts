@@ -284,6 +284,67 @@ check(
   [[1000, true]],
 );
 
+section('Commission units — the worked example, exactly as given');
+
+/*
+ * "An ISA books 6 in a day, one is later DQ'd" — corrected on 3 September to
+ * four commission units still eligible after the -2 deduction.
+ *
+ * Note this pins the arithmetic against the plausible wrong reading. Taking the
+ * five QUALIFYING bookings and deducting two would give three. It is the full
+ * booking count that is charged: 6 - 2 = 4.
+ */
+check(
+  'six bookings, one disqualified, leaves four commission units',
+  dailyTallies([
+    ...Array.from({ length: 5 }, () => booked('Maria', '2026-09-01')),
+    booked('Maria', '2026-09-01', 'Showed', 'DQ'),
+  ]).map((day) => [day.total, day.qualifying, day.unqualified, day.commissionUnits]),
+  [[6, 5, 1, 4]],
+);
+
+// A bad booking is worse than no booking: five clean is five units, and those
+// same five plus one disqualified is four.
+check(
+  'five clean bookings are five units',
+  dailyTallies(Array.from({ length: 5 }, () => booked('Maria', '2026-09-01'))).map(
+    (day) => day.commissionUnits,
+  ),
+  [5],
+);
+
+check(
+  'a no-show costs no units — only disqualification does',
+  dailyTallies([
+    ...Array.from({ length: 5 }, () => booked('Maria', '2026-09-01')),
+    booked('Maria', '2026-09-01', 'No Show', null),
+  ]).map((day) => [day.total, day.commissionUnits]),
+  [[6, 6]],
+);
+
+// Above a 50% disqualification rate the deduction outweighs the bookings. Left
+// negative rather than clamped: that is the case the penalty exists to surface,
+// and a floor at zero would hide it.
+check(
+  'three bookings of which two disqualified is minus one unit, not zero',
+  dailyTallies([
+    booked('Maria', '2026-09-01'),
+    booked('Maria', '2026-09-01', 'Showed', 'DQ'),
+    booked('Maria', '2026-09-01', 'Showed', 'DQ'),
+  ]).map((day) => day.commissionUnits),
+  [-1],
+);
+
+check(
+  'the month sums units across its days',
+  monthlySummaries([
+    ...Array.from({ length: 5 }, () => booked('Maria', '2026-09-01')),
+    booked('Maria', '2026-09-01', 'Showed', 'DQ'),
+    ...Array.from({ length: 4 }, () => booked('Maria', '2026-09-02')),
+  ]).map((month) => [month.total, month.unqualified, month.commissionUnits]),
+  [[10, 1, 8]],
+);
+
 section('An empty month is not an error');
 
 check('no rows means no summaries', monthlySummaries([]), []);

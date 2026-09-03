@@ -2,6 +2,7 @@ import { Coins, TriangleAlert } from 'lucide-react';
 
 import {
   BONUS_TIERS,
+  COMMISSION_UNIT_VALUE_CELL,
   MONTHLY_UNQUALIFIED_LIMIT,
   PENDING_PENALTY_RULES,
 } from '@/config/isa-commission';
@@ -106,12 +107,15 @@ export default async function CommissionPage({
             applied.
           </p>
           <p className="mt-1">
-            {PENDING_PENALTY_RULES.unitsLostPerUnqualified} commission units are
-            lost per unqualified booking, and above{' '}
+            Units are counted — bookings less{' '}
+            {PENDING_PENALTY_RULES.unitsLostPerUnqualified} for each unqualified
+            one — but never converted to money, because one unit is worth cell{' '}
+            {COMMISSION_UNIT_VALUE_CELL} of the tracker&rsquo;s input values and
+            that sheet cannot be read yet. The forfeiture above{' '}
             {formatPercent(MONTHLY_UNQUALIFIED_LIMIT)} of a month&rsquo;s
-            bookings the month is forfeit. Neither is calculated here, because{' '}
-            {PENDING_PENALTY_RULES.blockedOn.join('; ')} — all still open. Do not
-            pay from this page until they are settled.
+            bookings is not applied either: what counts as an unqualified call is
+            defined by the ISA call process document, and nothing scores calls
+            against it today. Do not pay from this page.
           </p>
         </div>
       </div>
@@ -173,6 +177,7 @@ export default async function CommissionPage({
                     <th className="px-4 py-3 text-right font-medium">Pending</th>
                     <th className="px-4 py-3 text-right font-medium">No show</th>
                     <th className="px-4 py-3 text-right font-medium">Unqualified</th>
+                    <th className="px-4 py-3 text-right font-medium">Units</th>
                     <th className="px-4 py-3 text-right font-medium">Paying days</th>
                     <th className="px-4 py-3 text-right font-medium">Gross bonus</th>
                   </tr>
@@ -208,6 +213,21 @@ export default async function CommissionPage({
                             />
                           </span>
                         ) : null}
+                      </td>
+                      {/*
+                        A count, never money. One unit is worth cell B12 of the
+                        tracker's input values, which cannot be read until the
+                        service account exists — and a figure multiplied by a
+                        guessed rate would look like a payable amount.
+                      */}
+                      <td
+                        className={
+                          row.commissionUnits < 0
+                            ? 'px-4 py-3 text-right font-medium tabular-nums text-negative'
+                            : 'px-4 py-3 text-right tabular-nums text-fg'
+                        }
+                      >
+                        {row.commissionUnits}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-fg-muted">
                         {formatCount(row.daysPaying)} of {formatCount(row.daysBooked)}
