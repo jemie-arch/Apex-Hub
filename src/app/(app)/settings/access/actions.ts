@@ -18,6 +18,7 @@ import {
   canAssign,
   isPrivileged,
   isUserRole,
+  type UserRole,
 } from '@/config/roles';
 import { requireAdmin } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
@@ -253,7 +254,72 @@ async function findAuthUserByEmail(
 }
 
 /**
+ * The login for an address: adopted if one already exists, created if not.
+ *
+ * A login may exist with no profile, and that used to be unfixable from here.
+ * Adding somebody through the Supabase dashboard creates the auth user and
+ * nothing else — no profile, no role claim. Middleware reads the role from
+ * app_metadata and defaults to 'client', so that person authenticates
+ * successfully and is redirected out of the app. Meanwhile this screen saw no
+ * profile, went straight to createUser, and failed on the duplicate email — so
+ * the only route out was hand-written SQL. That is exactly what happened on
+ * 2 September and it cost an evening.
+ *
+ * The role written here is a starting value. user_profiles_mirror_to_auth
+ * rewrites app_metadata from the profile row on insert or update, so the profile
+ * is the authority and this only avoids a window where the token says nothing.
+ */
+async function adoptOrCreateLogin(
+  db: ReturnType<typeof serviceClient>,
+  input: { email: string; fullName: string; role: UserRole },
+): Promise<
+  { ok: true; userId: string; adopted: boolean } | { ok: false; message: string }
+> {
+  const orphan = await findAuthUserByEmail(db, input.email);
+  if (orphan.error) return { ok: false, message: orphan.error };
+
+  if (orphan.user) {
+    const claimed = await db.auth.admin.updateUserById(orphan.user.id, {
+      app_metadata: { role: input.role },
+      user_metadata: { full_name: input.fullName },
+    });
+
+    if (claimed.error) {
+      return {
+        ok: false,
+        message:
+          `${input.email} already has a login, but its role could not be set: ` +
+          `${claimed.error.message}. Until that succeeds they will be treated ` +
+          'as a client and redirected out of the app.',
+      };
+    }
+
+    return { ok: true, userId: orphan.user.id, adopted: true };
+  }
+
+  const created = await db.auth.admin.createUser({
+    email: input.email,
+    email_confirm: true,
+    app_metadata: { role: input.role },
+    user_metadata: { full_name: input.fullName },
+  });
+
+  if (created.error || !created.data.user) {
+    return {
+      ok: false,
+      message: created.error?.message ?? 'Could not create the login.',
+    };
+  }
+
+  return { ok: true, userId: created.data.user.id, adopted: false };
+}
+
+/**
  * Adds a teammate and returns a link for them to set their own password.
+ *
+ * Staff only. A client login is a different thing with a different failure mode
+ * — it needs a practice attached or it lands nowhere — so it has its own action
+ * below rather than a 'client' option on this one.
  *
  * No email is sent. The link comes back to you to pass on however you like,
  * which also means no password is ever chosen for somebody else or typed into a
@@ -304,62 +370,14 @@ export async function addTeammate(input: {
 
   const keys = [...new Set((input.keys ?? []).filter(isPermissionKey))];
 
-  /*
-   * A login may already exist without a profile, and this used to be unfixable
-   * from here.
-   *
-   * Adding somebody through the Supabase dashboard creates the auth user and
-   * nothing else — no profile, no role claim. Middleware reads the role from
-   * app_metadata and defaults to 'client', so that person authenticates
-   * successfully and is redirected out of the app. Meanwhile this action saw no
-   * profile, went straight to createUser, and failed on the duplicate email —
-   * so the only route out was hand-written SQL. That is exactly what happened
-   * on 2 September and it cost an evening.
-   *
-   * So an orphaned login is adopted rather than rejected: the role claim and
-   * name are set on it, and the flow continues as if it had just been made.
-   */
-  const orphan = await findAuthUserByEmail(db, email);
-  if (orphan.error) return { ok: false, message: orphan.error };
+  const login = await adoptOrCreateLogin(db, {
+    email,
+    fullName,
+    role: input.role,
+  });
+  if (!login.ok) return { ok: false, message: login.message };
 
-  let userId: string;
-  let adopted = false;
-
-  if (orphan.user) {
-    adopted = true;
-    userId = orphan.user.id;
-
-    const claimed = await db.auth.admin.updateUserById(userId, {
-      app_metadata: { role: input.role },
-      user_metadata: { full_name: fullName },
-    });
-
-    if (claimed.error) {
-      return {
-        ok: false,
-        message:
-          `${email} already has a login, but its role could not be set: ` +
-          `${claimed.error.message}. Until that succeeds they will be treated ` +
-          'as a client and redirected out of the app.',
-      };
-    }
-  } else {
-    const created = await db.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      app_metadata: { role: input.role },
-      user_metadata: { full_name: fullName },
-    });
-
-    if (created.error || !created.data.user) {
-      return {
-        ok: false,
-        message: created.error?.message ?? 'Could not create the login.',
-      };
-    }
-
-    userId = created.data.user.id;
-  }
+  const { userId, adopted } = login;
 
   // A trigger may already have made the profile row from the auth user, so this
   // updates whatever is there rather than assuming it can insert.
@@ -372,6 +390,10 @@ export async function addTeammate(input: {
         full_name: fullName,
         role: input.role,
         permissions: keys,
+        // Stated rather than left alone. Staff are scoped to no single practice,
+        // and a null here is what auth_group_id() needs to see so row-level
+        // security lets them read across clients.
+        client_group_id: null,
       },
       { onConflict: 'id' },
     );
@@ -411,6 +433,159 @@ export async function addTeammate(input: {
         : `Added ${fullName} as ${ROLE_LABELS[input.role]} with ${keys.length} page(s). `) +
       'Send them the link below if they need one — it is single use, no email ' +
       'went out, and clicking it twice will report it expired.',
+    link: generated.link,
+  };
+}
+
+/**
+ * Adds a client login: a practice signing in to see its own portal.
+ *
+ * Kept apart from addTeammate deliberately. The two look similar and fail
+ * completely differently: a teammate without pages sees an empty sidebar, while
+ * a client without a practice attached is redirected to a portal that does not
+ * exist. Offering 'client' as one more role button on the teammate form meant
+ * the practice was never asked for, which is how a login ended up with an empty
+ * group_id claim and a dead end where its portal should have been.
+ *
+ * The practice is the whole point of this action, so it is required and checked
+ * to exist before any login is touched.
+ */
+export async function addClientLogin(input: {
+  email: string;
+  fullName: string;
+  clientGroupId: string;
+}): Promise<AccessResult> {
+  await requireAdmin();
+
+  const email = input.email.trim().toLowerCase();
+  const fullName = input.fullName.trim();
+  const groupId = input.clientGroupId.trim();
+
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return { ok: false, message: 'That does not look like an email address.' };
+  }
+  if (fullName === '') {
+    return {
+      ok: false,
+      message: 'Give them a name — it is what the portal greets them by.',
+    };
+  }
+  if (groupId === '') {
+    return {
+      ok: false,
+      message:
+        'Choose which practice this login belongs to. Without one there is no ' +
+        'portal for them to open.',
+    };
+  }
+
+  const db = serviceClient();
+
+  /*
+   * Confirm the practice first, before creating anything.
+   *
+   * Creating the login and then discovering the practice is wrong leaves an
+   * orphan behind — exactly the state this screen spent an evening learning to
+   * clean up.
+   */
+  const group = await db
+    .from('client_groups')
+    .select('id, name, portal_enabled')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (group.error) return { ok: false, message: group.error.message };
+  if (!group.data) {
+    return { ok: false, message: 'That practice no longer exists. Reload the page.' };
+  }
+
+  const existing = await db
+    .from('user_profiles')
+    .select('id, role')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existing.error) return { ok: false, message: existing.error.message };
+  if (existing.data) {
+    return {
+      ok: false,
+      message:
+        existing.data.role === 'client'
+          ? `${email} already has a client login. Remove it before pointing the ` +
+            'same address at a different practice.'
+          : `${email} is already a staff account. One address cannot be both — ` +
+            'use a different address for the practice.',
+    };
+  }
+
+  const login = await adoptOrCreateLogin(db, { email, fullName, role: 'client' });
+  if (!login.ok) return { ok: false, message: login.message };
+
+  /*
+   * The profile row is what actually scopes them.
+   *
+   * user_profiles_mirror_to_auth copies role and client_group_id into the JWT's
+   * app_metadata on write, and auth_group_id() reads that claim, so this single
+   * upsert is what gives them their portal and what stops row-level security
+   * showing them anybody else's. No permission keys: a client never sees a page
+   * in this app, so keys would be meaningless and misleading on the table.
+   */
+  const profile = await db.from('user_profiles').upsert(
+    {
+      id: login.userId,
+      email,
+      full_name: fullName,
+      role: 'client',
+      permissions: [],
+      client_group_id: group.data.id,
+    },
+    { onConflict: 'id' },
+  );
+
+  if (profile.error) {
+    return {
+      ok: false,
+      message:
+        `Created the login but could not scope it to ${group.data.name}: ` +
+        `${profile.error.message}. They will be treated as a client with no ` +
+        'practice until this is fixed, so do not send them a link yet.',
+    };
+  }
+
+  revalidatePath('/settings/access');
+  revalidatePath('/client-portal');
+
+  const generated = await setPasswordLink(email);
+
+  // Said plainly rather than left to be discovered: the login is correct, the
+  // portal is simply switched off, and the link would land on a refusal.
+  const portalWarning = group.data.portal_enabled
+    ? ''
+    : ` The portal for ${group.data.name} is currently switched off, so they ` +
+      'will be turned away until it is enabled on Client Portal.';
+
+  if (!generated.ok) {
+    return {
+      ok: true,
+      message:
+        `Added ${fullName} as a client login for ${group.data.name}, but the ` +
+        `set-password link failed: ${generated.message}` +
+        portalWarning,
+    };
+  }
+
+  return {
+    ok: true,
+    message:
+      (login.adopted
+        ? `${fullName} already had a login, so it was adopted rather than ` +
+          `recreated, and is now scoped to ${group.data.name}. Whatever ` +
+          'password they already had still works.'
+        : `Added ${fullName} as a client login for ${group.data.name}.`) +
+      ' Signing in takes them straight to that practice’s portal and ' +
+      'nowhere else in the Hub. The link below is single use, and clicking it ' +
+      'twice will report it expired.' +
+      portalWarning,
     link: generated.link,
   };
 }
