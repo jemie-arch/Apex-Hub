@@ -22,6 +22,7 @@ import {
   agentMonths,
 } from '../src/lib/agent-pay';
 import type { CommissionScheme } from '../src/lib/isa-commission';
+import { parseSheetDate } from '../src/lib/sheet-dates';
 
 let failures = 0;
 let checks = 0;
@@ -75,6 +76,76 @@ function many(count: number, agent: string, day: string): AgentBooking[] {
 }
 
 // ---------------------------------------------------------------------------
+
+section('Which month a date falls in');
+
+/*
+ * BOOKING SHEET is M/D/YYYY. Established from Google's own column summary: min
+ * 7/10/2026, max 9/3/2026. Under D/M/YYYY the min would have been the September
+ * value, and it was not — so 7/10/2026 is 10 July.
+ *
+ * This is checked because it decides which pay period a booking lands in, and
+ * getting it wrong is silent: every date still parses, every total still adds
+ * up, and the money is attributed to the wrong month.
+ */
+check(
+  'BOOKING SHEET: 7/10/2026 is 10 July',
+  parseSheetDate('7/10/2026', 'month-first').date,
+  '2026-07-10',
+);
+check(
+  'BOOKING SHEET: 9/3/2026 is 3 September, so the column sorts ascending',
+  parseSheetDate('9/3/2026', 'month-first').date,
+  '2026-09-03',
+);
+
+// APPOINTMENT DATA uses the opposite convention: 01-07-2026 sits on a row whose
+// own Month column reads July. Joining the two tabs on a single rule would
+// misalign them without failing.
+check(
+  'APPOINTMENT DATA: 01-07-2026 is 1 July under day-first',
+  parseSheetDate('01-07-2026', 'day-first').date,
+  '2026-07-01',
+);
+check(
+  'the same string read month-first would be 7 January — the trap',
+  parseSheetDate('01-07-2026', 'month-first').date,
+  '2026-01-07',
+);
+
+// A value above 12 cannot be a month, so it settles the order itself and
+// overrides the declared convention rather than deferring to it.
+check(
+  'a day above 12 overrides the convention',
+  [
+    parseSheetDate('7/25/2026', 'day-first').date,
+    parseSheetDate('25/7/2026', 'month-first').date,
+  ],
+  ['2026-07-25', '2026-07-25'],
+);
+check(
+  'and is not flagged as ambiguous, because it is not',
+  parseSheetDate('7/25/2026', 'month-first').ambiguous,
+  false,
+);
+check(
+  'an ambiguous value is flagged even though it parses',
+  parseSheetDate('7/10/2026', 'month-first').ambiguous,
+  true,
+);
+
+check(
+  'ISO passes through untouched',
+  parseSheetDate('2026-07-10', 'day-first').date,
+  '2026-07-10',
+);
+check(
+  'both halves above 12 is not a date',
+  parseSheetDate('25/25/2026', 'month-first').date,
+  null,
+);
+check('an empty cell is null, not today', parseSheetDate('', 'month-first').date, null);
+check('so is a label', parseSheetDate('Dental Illusions', 'month-first').date, null);
 
 section('The daily tally, as the sheet computes it');
 

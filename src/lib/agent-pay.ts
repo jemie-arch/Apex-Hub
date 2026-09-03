@@ -56,6 +56,13 @@ export interface PayOptions {
    * Both readings are defensible and they pay differently, so this exists to
    * compute both and show the gap rather than to pick a side. Nobody's wage
    * should turn on which one I found more plausible.
+   *
+   * NOTHING CAN DRIVE IT FROM BOOKING SHEET TODAY. Its Disposition column is a
+   * constant — 362 of 362 rows read "Booked" — so attendance is not in the pay
+   * source at all. Filtering therefore needs an outcome joined from elsewhere:
+   * tracker_appointments.appointment_status, or GoHighLevel directly. Until
+   * then the live behaviour is the only computable one, and that is a fact
+   * about the data rather than a decision anybody made.
    */
   qualifyingOnly?: boolean;
   qualifies?: (row: AgentBooking) => boolean;
