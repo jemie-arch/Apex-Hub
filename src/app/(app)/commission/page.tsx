@@ -2,7 +2,7 @@ import { Coins, TriangleAlert } from 'lucide-react';
 
 import {
   BONUS_TIERS,
-  COMMISSION_UNIT_VALUE_CELL,
+  COMMISSION_UNIT_SOURCE,
   MONTHLY_UNQUALIFIED_LIMIT,
   PENDING_PENALTY_RULES,
 } from '@/config/isa-commission';
@@ -143,12 +143,10 @@ export default async function CommissionPage({
             {PENDING_PENALTY_RULES.unitsLostPerUnqualified} for each unqualified
             one.{' '}
             {unitCents === null
-              ? `They are not converted to money, because one unit is worth cell
-                 ${COMMISSION_UNIT_VALUE_CELL} of the tracker's input values and
-                 that has not been read yet.`
-              : `One unit is ${formatMoney(unitCents)}, read from cell
-                 ${COMMISSION_UNIT_VALUE_CELL} of the tracker — change it there,
-                 not here.`}{' '}
+              ? `They are not converted to money, because one unit's value has not
+                 been read from ${COMMISSION_UNIT_SOURCE} yet.`
+              : `One unit is ${formatMoney(unitCents)}, read from
+                 ${COMMISSION_UNIT_SOURCE} — change it there, not here.`}{' '}
             The forfeiture above{' '}
             {formatPercent(MONTHLY_UNQUALIFIED_LIMIT)} of a month&rsquo;s
             bookings is not applied either: what counts as an unqualified call is

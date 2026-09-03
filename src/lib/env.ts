@@ -82,6 +82,28 @@ const serverSchema = z.object({
   GOOGLE_SERVICE_ACCOUNT_KEY: z.string().min(1).optional(),
   /** The Client Fulfilment Tracker's spreadsheet id, from its URL. */
   FULFILMENT_TRACKER_SHEET_ID: z.string().min(1).optional(),
+  /**
+   * Where the ISA commission rate lives — a DIFFERENT spreadsheet from the
+   * tracker, and deliberately its own setting.
+   *
+   * The rate was described as "B12 in sheet input values", which was assumed to
+   * mean a tab of the tracker. It does not: the tracker's only input-shaped tab
+   * is INPUT CLIENT INFO, a list of clinics, whose B12 holds the client name
+   * "Dental Illusions". Reading that as a number would have produced a rate of
+   * zero and paid nobody.
+   *
+   * So the pointer is explicit rather than inferred, and lives apart from the
+   * tracker id because the two are different files with different owners.
+   */
+  COMMISSION_INPUTS_SHEET_ID: z.string().min(1).optional(),
+  /**
+   * The A1 range holding one commission unit's value, tab name included.
+   *
+   * Defaulted rather than required, so a working guess costs one env var to
+   * correct instead of a deploy — and the sync reports the raw text it read, so
+   * a wrong range is visible on the first run rather than believed.
+   */
+  COMMISSION_UNIT_RANGE: z.string().min(1).default('Input Values!B12'),
 
   HUBSTAFF_TOKEN: z.string().min(1).optional(),
   HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),
