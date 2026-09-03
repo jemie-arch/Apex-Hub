@@ -148,14 +148,25 @@ export const REQUIRED_FIELDS: readonly string[] = TRACKER_COLUMNS.filter(
 export const TRACKER_RANGE = 'Appointment Data!A:Z';
 
 /**
- * How to recognise the tab holding the commission inputs.
+ * How to recognise the tab holding the commission inputs, best guess first.
  *
- * Described only as "sheet input values", so this matches rather than assumes.
- * A1 notation is unforgiving — a tab title off by a word returns a bare 400
- * that names neither the tab nor the mistake — so the sync lists the real
- * titles and tests them against this.
+ * The rate was described as living in "sheet input values", and the tracker's
+ * seventeen tabs contain no such title. What it does contain is INPUT CLIENT
+ * INFO, which is the only visible tab whose name begins with "input" — so that
+ * is the leading candidate, with the literal wording kept behind it in case a
+ * tab is added later.
+ *
+ * Ordered rather than a single pattern because this is a guess about somebody
+ * else's spreadsheet. The sync reports which tab it matched and what the cell
+ * actually held, so one run either confirms the guess or replaces it — the same
+ * approach the header map takes.
  */
-export const INPUT_VALUES_TAB = /^\s*inputs?(\s|_|-)*values?\s*$/i;
+export const INPUT_VALUE_TAB_CANDIDATES: readonly RegExp[] = [
+  /^\s*input\s*client\s*info\s*$/i,
+  /^\s*inputs?(\s|_|-)*values?\s*$/i,
+  /^\s*inputs?\s*$/i,
+  /^\s*setup\s*$/i,
+];
 
 /**
  * Where one commission unit's value sits on that tab.

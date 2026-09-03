@@ -24,7 +24,7 @@
  */
 import {
   HEADER_TO_FIELD,
-  INPUT_VALUES_TAB,
+  INPUT_VALUE_TAB_CANDIDATES,
   REQUIRED_FIELDS,
   TRACKER_RANGE,
   UNIT_VALUE_CELL,
@@ -252,7 +252,16 @@ async function readCommissionUnitValue(
     return;
   }
 
-  const tab = titles.find((title) => INPUT_VALUES_TAB.test(title));
+  /*
+   * Candidates in order, so the best guess wins rather than whichever tab
+   * happens to sit leftmost in a seventeen-tab spreadsheet.
+   */
+  let tab: string | undefined;
+  for (const candidate of INPUT_VALUE_TAB_CANDIDATES) {
+    tab = titles.find((title) => candidate.test(title));
+    if (tab !== undefined) break;
+  }
+
   if (tab === undefined) {
     // The real titles, so the pattern can be corrected from one run rather than
     // from a series of guesses.
@@ -303,5 +312,12 @@ async function readCommissionUnitValue(
     return;
   }
 
+  /*
+   * The tab, the cell and the raw text, not just the parsed number. Which tab
+   * holds the rate is a guess about somebody else's spreadsheet, so the run has
+   * to show its working: "$2.00 from INPUT CLIENT INFO!B12" can be confirmed or
+   * corrected at a glance, where a bare 200 cannot.
+   */
+  ctx.note('unit_value_source', `${tab}!${UNIT_VALUE_CELL} = ${raw}`);
   ctx.note('unit_value_cents', cents);
 }
