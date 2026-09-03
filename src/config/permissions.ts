@@ -142,6 +142,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/tech-support', 'tech_support'],
     ['/forms', 'forms'],
     ['/finance', 'finance'],
+    // Same audience as Finance, so it shares the key rather than inventing one
+    // nobody has been granted.
+    ['/commission', 'finance'],
     ['/billing', 'billing'],
     ['/account', 'account'],
     ['/settings/access', 'access'],

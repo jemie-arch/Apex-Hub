@@ -3378,6 +3378,7 @@ export type Database = {
           adset_external_id: string | null
           amount_spent_cents: number | null
           appointment_status: string | null
+          booked_by: string | null
           booked_for: string | null
           campaign_external_id: string | null
           client_id: string | null
@@ -3396,6 +3397,7 @@ export type Database = {
           adset_external_id?: string | null
           amount_spent_cents?: number | null
           appointment_status?: string | null
+          booked_by?: string | null
           booked_for?: string | null
           campaign_external_id?: string | null
           client_id?: string | null
@@ -3414,6 +3416,7 @@ export type Database = {
           adset_external_id?: string | null
           amount_spent_cents?: number | null
           appointment_status?: string | null
+          booked_by?: string | null
           booked_for?: string | null
           campaign_external_id?: string | null
           client_id?: string | null
