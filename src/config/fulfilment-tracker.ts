@@ -147,32 +147,15 @@ export const REQUIRED_FIELDS: readonly string[] = TRACKER_COLUMNS.filter(
  */
 export const TRACKER_RANGE = 'Appointment Data!A:Z';
 
-/**
- * How to recognise the tab holding the commission inputs, best guess first.
+/*
+ * The commission unit rate is NOT in this spreadsheet.
  *
- * The rate was described as living in "sheet input values", and the tracker's
- * seventeen tabs contain no such title. What it does contain is INPUT CLIENT
- * INFO, which is the only visible tab whose name begins with "input" — so that
- * is the leading candidate, with the literal wording kept behind it in case a
- * tab is added later.
+ * It was described as "B12 in sheet input values", which read as a tab of the
+ * tracker. The tracker has seventeen tabs and no such title; its only
+ * input-shaped one is INPUT CLIENT INFO, a list of clinics whose B12 holds the
+ * client name "Dental Illusions".
  *
- * Ordered rather than a single pattern because this is a guess about somebody
- * else's spreadsheet. The sync reports which tab it matched and what the cell
- * actually held, so one run either confirms the guess or replaces it — the same
- * approach the header map takes.
+ * The rate lives in a separate spreadsheet, pointed at by
+ * COMMISSION_INPUTS_SHEET_ID and COMMISSION_UNIT_RANGE. Left recorded here so
+ * nobody re-adds a tab guess to this file and re-derives a rate of zero.
  */
-export const INPUT_VALUE_TAB_CANDIDATES: readonly RegExp[] = [
-  /^\s*input\s*client\s*info\s*$/i,
-  /^\s*inputs?(\s|_|-)*values?\s*$/i,
-  /^\s*inputs?\s*$/i,
-  /^\s*setup\s*$/i,
-];
-
-/**
- * Where one commission unit's value sits on that tab.
- *
- * Stated as a cell because that is how it was given. Reading it rather than
- * hardcoding a number keeps the rate owned by whoever owns the scheme: they
- * change the sheet, and the Hub follows on the next run.
- */
-export const UNIT_VALUE_CELL = 'B12';

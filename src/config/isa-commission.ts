@@ -85,18 +85,20 @@ export const COUNT_REBOOKINGS_SEPARATELY = false;
 export const UNITS_LOST_PER_UNQUALIFIED = 2;
 
 /**
- * What one commission unit is worth: cell B12 of the tracker's input values.
+ * Where one commission unit's value is read from, for the screen to say so.
  *
- * DELIBERATELY NOT A NUMBER HERE. It lives in the sheet because that is where
- * it was put, and reading it there means the rate can be changed by whoever
- * owns the scheme without a deploy and without me. Hardcoding it would fork the
- * figure, and the copy in the code would win silently.
+ * DELIBERATELY NOT A NUMBER HERE. The rate lives in a spreadsheet because that
+ * is where it was put, and reading it there means whoever owns the scheme can
+ * change it without a deploy and without me. Hardcoding it would fork the
+ * figure and the copy in the code would win silently.
  *
- * Unreadable until the Google service account exists — the sheet returns 401 to
- * anything unauthenticated, unlike the process document — which is a second
- * reason that credential is the blocker on this whole project.
+ * Not the tracker, either — that was the first guess and it was wrong. "B12 in
+ * sheet input values" read as a tab of the Client Fulfilment Tracker, whose
+ * INPUT CLIENT INFO tab holds clinics, not rates: B12 there is the client name
+ * "Dental Illusions". The real location is set by COMMISSION_INPUTS_SHEET_ID
+ * and COMMISSION_UNIT_RANGE, so this is only the human-readable label.
  */
-export const COMMISSION_UNIT_VALUE_CELL = 'B12';
+export const COMMISSION_UNIT_SOURCE = 'the commission inputs sheet';
 
 /**
  * The penalty half of the scheme, WHICH IS NOT IMPLEMENTED AND MUST NOT BE.
