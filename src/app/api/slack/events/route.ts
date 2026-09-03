@@ -36,6 +36,18 @@
  * The bot posts its reply only on the attempt that actually created the row, so
  * three deliveries produce one ticket and one reply.
  *
+ * NOT EVERY MENTION IS A REQUEST
+ *
+ * An announcement about the bot — "for any tech support, please tag @Apex" —
+ * used to become a ticket, assigned to Ally, for a message explaining how to
+ * file tickets. lib/slack/classify decides; when it declines, the message is
+ * kept in tech_ticket_candidates and the thread is told so, and reacting
+ * :ticket: promotes it to a real ticket with nothing retyped.
+ *
+ * Declining fails open everywhere: no API key, a timeout, a malformed answer,
+ * all file the ticket. Noise costs a minute; a swallowed request costs work
+ * nobody knows is missing.
+ *
  * WHAT IT REFUSES TO DO
  *
  * A bare "@apex" with no words after it does not become a ticket. It gets a
@@ -59,6 +71,7 @@ import {
   postThreadReply,
 } from '@/lib/slack/api';
 import { chooseAssignee } from '@/lib/slack/assignee';
+import { looksLikeARequest } from '@/lib/slack/classify';
 import { parseMention } from '@/lib/slack/mention';
 import { verifySlackSignature } from '@/lib/slack/signature';
 import { serviceClient } from '@/lib/supabase/service';
@@ -108,6 +121,144 @@ async function resolveAssignee(): Promise<{
   }
 
   return { id: found.data.id, name: found.data.full_name, email };
+}
+
+interface ReactionAddedEvent {
+  type: string;
+  user?: string;
+  reaction?: string;
+  item?: { type?: string; channel?: string; ts?: string };
+}
+
+/** The emoji that overrules a decline. Matches what the decline reply asks for. */
+const PROMOTE_REACTION = 'ticket';
+
+/**
+ * Somebody reacted :ticket: on a message the classifier declined to file.
+ *
+ * This is the other half of "never silent". The classifier is allowed to be
+ * wrong precisely because being wrong is one click to fix, and the candidate
+ * row holds everything the ticket needs — title, body, priority, who it would
+ * have gone to — so nothing has to be retyped and no detail is lost in the
+ * retelling.
+ *
+ * The candidate is kept and marked rather than deleted. A run of declines that
+ * all got promoted by hand is the evidence that the prompt in classify.ts needs
+ * work, and deleting the rows would delete the evidence.
+ *
+ * Silent about everything it does not recognise. Every reaction in every
+ * channel the bot can see arrives here, and the overwhelming majority are
+ * people reacting to each other.
+ */
+async function promoteCandidate(event: ReactionAddedEvent) {
+  if (event.reaction !== PROMOTE_REACTION) {
+    return NextResponse.json({ ok: true, ignored: 'other reaction' });
+  }
+
+  const channelId = event.item?.channel;
+  const messageTs = event.item?.ts;
+
+  if (event.item?.type !== 'message' || !channelId || !messageTs) {
+    return NextResponse.json({ ok: true, ignored: 'not a message reaction' });
+  }
+
+  const db = serviceClient();
+
+  const found = await db
+    .from('tech_ticket_candidates')
+    .select('*')
+    .eq('slack_channel_id', channelId)
+    .eq('slack_message_ts', messageTs)
+    .maybeSingle();
+
+  if (found.error) {
+    console.error('[slack] candidate lookup failed:', found.error.message);
+    return NextResponse.json({ ok: false, error: found.error.message });
+  }
+
+  /*
+   * No candidate means this is an ordinary :ticket: reaction on an ordinary
+   * message — including the one the bot adds to every ticket it files, which
+   * would otherwise make it react to its own work.
+   */
+  if (!found.data) {
+    return NextResponse.json({ ok: true, ignored: 'no candidate' });
+  }
+
+  const candidate = found.data;
+
+  // Two people reacting, or a Slack retry. Either way the first one won.
+  if (candidate.promoted_ticket_id !== null) {
+    return NextResponse.json({
+      ok: true,
+      ticketId: candidate.promoted_ticket_id,
+      duplicate: true,
+    });
+  }
+
+  const inserted = await db
+    .from('tech_tickets')
+    .insert({
+      title: candidate.title,
+      body: candidate.body,
+      priority: candidate.priority,
+      assigned_to: candidate.assigned_to,
+      raised_by: candidate.raised_by,
+      raised_by_name: candidate.raiser_name,
+      source: 'slack',
+      slack_team_id: candidate.slack_team_id,
+      slack_channel_id: candidate.slack_channel_id,
+      slack_channel_name: candidate.slack_channel_name,
+      slack_message_ts: candidate.slack_message_ts,
+      slack_thread_ts: candidate.slack_thread_ts,
+      slack_permalink: candidate.slack_permalink,
+    })
+    .select('id')
+    .single();
+
+  if (inserted.error) {
+    console.error('[slack] promoting a candidate failed:', inserted.error.message);
+    return NextResponse.json({ ok: false, error: inserted.error.message });
+  }
+
+  await db
+    .from('tech_ticket_candidates')
+    .update({
+      promoted_ticket_id: inserted.data.id,
+      promoted_at: new Date().toISOString(),
+    })
+    .eq('id', candidate.id);
+
+  await notifyUsers({
+    userIds: [candidate.assigned_to, ...candidate.also_notify],
+    kind: 'info',
+    title: `New tech ticket: "${candidate.title}"`,
+    body: candidate.raiser_name
+      ? `Raised by ${candidate.raiser_name} in Slack`
+      : 'Raised in Slack',
+    href: `/tech-support/${inserted.data.id}`,
+  });
+
+  const link = hubUrl(`/tech-support/${inserted.data.id}`);
+  const lines = [
+    `:white_check_mark: Filed after all — *${candidate.title}*`,
+    candidate.assigned_to
+      ? 'Tech Support on the Hub.'
+      : 'Tech Support on the Hub, unassigned.',
+  ];
+  if (link) lines.push(`<${link}|Open the ticket>`);
+
+  await postThreadReply(
+    channelId,
+    candidate.slack_thread_ts ?? messageTs,
+    lines.join('\n'),
+  );
+
+  return NextResponse.json({
+    ok: true,
+    ticketId: inserted.data.id,
+    promotedFrom: candidate.id,
+  });
 }
 
 /** The Hub login belonging to a Slack email, if there is one. */
@@ -179,6 +330,17 @@ export async function POST(request: NextRequest) {
   }
 
   const event = (body.event ?? {}) as AppMentionEvent;
+
+  /*
+   * Somebody overruling a decline. See promoteCandidate.
+   *
+   * Checked before the app_mention gate because it is the other half of the
+   * classifier: without it, "react :ticket: if I have that wrong" is a promise
+   * the bot cannot keep.
+   */
+  if (event.type === 'reaction_added') {
+    return promoteCandidate(event as unknown as ReactionAddedEvent);
+  }
 
   if (event.type !== 'app_mention') {
     return NextResponse.json({ ok: true, ignored: event.type });
@@ -284,6 +446,86 @@ export async function POST(request: NextRequest) {
   });
 
   const db = serviceClient();
+
+  /*
+   * Is this actually a request?
+   *
+   * Runs last, after the lookups, because it reads better with the channel and
+   * the sender than without them — and because everything above is needed
+   * whichever way the verdict goes.
+   *
+   * Fails open on every path: no key, timeout, malformed answer, all file the
+   * ticket. See lib/slack/classify for why the two failure modes are not
+   * symmetric.
+   */
+  const verdict = await looksLikeARequest({
+    text: draft.body ?? draft.title ?? '',
+    raiserName: raiser?.name ?? null,
+    channelName,
+  });
+
+  if (!verdict.file) {
+    /*
+     * Recorded before the reply, so that reacting :ticket: works even if the
+     * reply itself fails to post. The row is the recovery path; the message is
+     * only how somebody learns the row exists.
+     *
+     * Conflicts are ignored: a Slack retry of the same event finds the
+     * candidate already there and must not post a second decline.
+     */
+    const candidate = await db
+      .from('tech_ticket_candidates')
+      .insert({
+        title: draft.title ?? firstPass.title,
+        body: draft.body,
+        priority: draft.priority,
+        assigned_to: assignment.assigneeId,
+        also_notify: assignment.alsoNotify,
+        raiser_slack_id: event.user ?? null,
+        raiser_name: raiser?.name ?? event.user ?? null,
+        raised_by: raisedBy,
+        declined_reason: verdict.reason,
+        slack_team_id: (body.team_id as string | undefined) ?? null,
+        slack_channel_id: channelId,
+        slack_channel_name: channelName,
+        slack_message_ts: messageTs,
+        slack_thread_ts: threadTs,
+        slack_permalink: permalink,
+      })
+      .select('id')
+      .single();
+
+    if (candidate.error) {
+      if (candidate.error.code === UNIQUE_VIOLATION) {
+        return NextResponse.json({ ok: true, filed: false, duplicate: true });
+      }
+
+      /*
+       * The record failed, so the recovery path does not exist. Filing the
+       * ticket is the safe way to be wrong here — better a ticket nobody
+       * wanted than a request with nothing anywhere holding it.
+       */
+      console.error(
+        '[slack] could not record a declined mention, filing it instead:',
+        candidate.error.message,
+      );
+    } else {
+      await postThreadReply(
+        channelId,
+        threadTs,
+        `:speech_balloon: I read that as ${verdict.reason} rather than a ` +
+          'request, so I have not filed a ticket. React :ticket: on your ' +
+          'message if I have that wrong and I will file it.',
+      );
+
+      return NextResponse.json({
+        ok: true,
+        filed: false,
+        candidateId: candidate.data.id,
+        reason: verdict.reason,
+      });
+    }
+  }
 
   const inserted = await db
     .from('tech_tickets')

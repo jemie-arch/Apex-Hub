@@ -3075,6 +3075,94 @@ export type Database = {
           },
         ]
       }
+      tech_ticket_candidates: {
+        Row: {
+          also_notify: string[]
+          assigned_to: string | null
+          body: string | null
+          created_at: string
+          declined_reason: string | null
+          id: string
+          priority: Database["public"]["Enums"]["tech_ticket_priority"]
+          promoted_at: string | null
+          promoted_ticket_id: string | null
+          raised_by: string | null
+          raiser_name: string | null
+          raiser_slack_id: string | null
+          slack_channel_id: string
+          slack_channel_name: string | null
+          slack_message_ts: string
+          slack_permalink: string | null
+          slack_team_id: string | null
+          slack_thread_ts: string | null
+          title: string
+        }
+        Insert: {
+          also_notify?: string[]
+          assigned_to?: string | null
+          body?: string | null
+          created_at?: string
+          declined_reason?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["tech_ticket_priority"]
+          promoted_at?: string | null
+          promoted_ticket_id?: string | null
+          raised_by?: string | null
+          raiser_name?: string | null
+          raiser_slack_id?: string | null
+          slack_channel_id: string
+          slack_channel_name?: string | null
+          slack_message_ts: string
+          slack_permalink?: string | null
+          slack_team_id?: string | null
+          slack_thread_ts?: string | null
+          title: string
+        }
+        Update: {
+          also_notify?: string[]
+          assigned_to?: string | null
+          body?: string | null
+          created_at?: string
+          declined_reason?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["tech_ticket_priority"]
+          promoted_at?: string | null
+          promoted_ticket_id?: string | null
+          raised_by?: string | null
+          raiser_name?: string | null
+          raiser_slack_id?: string | null
+          slack_channel_id?: string
+          slack_channel_name?: string | null
+          slack_message_ts?: string
+          slack_permalink?: string | null
+          slack_team_id?: string | null
+          slack_thread_ts?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tech_ticket_candidates_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_ticket_candidates_promoted_ticket_id_fkey"
+            columns: ["promoted_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tech_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_ticket_candidates_raised_by_fkey"
+            columns: ["raised_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tech_ticket_comments: {
         Row: {
           author_id: string | null
