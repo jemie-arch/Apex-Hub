@@ -25,6 +25,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   ClipboardList,
+  Coins,
   CreditCard,
   FileText,
   GitBranch,
@@ -157,6 +158,7 @@ const SECTIONS: NavSection[] = [
       { href: '/tech-support', label: 'Tech Support', icon: LifeBuoy },
       { href: '/forms', label: 'Forms', icon: FileText },
       { href: '/finance', label: 'Finance', icon: Wallet },
+      { href: '/commission', label: 'ISA Commission', icon: Coins },
     ],
   },
 ];
