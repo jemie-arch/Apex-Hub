@@ -31,16 +31,37 @@ export function SetPasswordForm() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** Supabase's own words for why the link failed, when it gave any. */
+  const [reason, setReason] = useState<string | null>(null);
+  /** Reached with a session and no token — useful, but not proof the link works. */
+  const [alreadySignedIn, setAlreadySignedIn] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const supabase = browserClient();
 
     async function establish() {
+      const query = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
       const accessToken = hash.get('access_token');
       const refreshToken = hash.get('refresh_token');
-      const code = new URLSearchParams(window.location.search).get('code');
+      const code = query.get('code');
+
+      /*
+       * Supabase's own refusal, if it sent one.
+       *
+       * When the verify endpoint rejects a link — an expired token, or a
+       * redirect target that is not on the project's allow list — it does not
+       * drop the tokens silently. It redirects here with error and
+       * error_description instead, in the hash for the implicit flow and the
+       * query for PKCE. Reading them is the difference between "this link has
+       * expired" and knowing which of several quite different faults occurred.
+       */
+      const refusal =
+        hash.get('error_description') ??
+        hash.get('error') ??
+        query.get('error_description') ??
+        query.get('error');
 
       // Scrub before awaiting anything: the credential should not survive in the
       // address bar even for the duration of a network round trip.
@@ -51,6 +72,7 @@ export function SetPasswordForm() {
           access_token: accessToken,
           refresh_token: refreshToken,
         });
+        if (sessionError) setReason(sessionError.message);
         setStage(sessionError ? 'invalid' : 'ready');
         return;
       }
@@ -58,14 +80,40 @@ export function SetPasswordForm() {
       if (code) {
         const { error: exchangeError } =
           await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) setReason(exchangeError.message);
         setStage(exchangeError ? 'invalid' : 'ready');
         return;
       }
 
-      // No token in the URL. Someone already signed in can still set a password
-      // here; anyone else needs a fresh link.
+      if (refusal) {
+        setReason(refusal);
+        setStage('invalid');
+        return;
+      }
+
+      /*
+       * Nothing in the URL at all.
+       *
+       * An already-signed-in person can still set a password here, which is
+       * useful — but it is also how this page hid a real fault for a week. An
+       * admin testing the link while logged in sees the form and concludes it
+       * works, while every recipient, who is by definition signed out, sees
+       * "expired". So the signed-in case now says which situation it is in
+       * rather than looking identical to a successful exchange.
+       */
       const { data } = await supabase.auth.getUser();
-      setStage(data.user ? 'ready' : 'invalid');
+      if (data.user) {
+        setAlreadySignedIn(true);
+        setStage('ready');
+        return;
+      }
+
+      setReason(
+        'The link carried no sign-in token at all. That usually means the ' +
+          "redirect target is not on Supabase's allow list, rather than that " +
+          'the link was used or expired.',
+      );
+      setStage('invalid');
     }
 
     void establish();
@@ -110,14 +158,27 @@ export function SetPasswordForm() {
   if (stage === 'invalid') {
     return (
       <div className="panel rounded-lg border border-line bg-surface p-6">
-        <h1 className="text-sm font-semibold text-fg">This link has expired</h1>
+        <h1 className="text-sm font-semibold text-fg">
+          This link did not work
+        </h1>
         <p className="mt-2 text-sm text-fg-muted">
-          Set-password links are single use and time limited. Ask whoever added
-          you to generate a new one.
+          Set-password links are single use and time limited. The quickest fix is
+          to request a fresh one yourself — you do not need to ask anybody.
         </p>
+        {reason ? (
+          <p className="mt-3 rounded-md bg-surface-sunken px-3 py-2 text-xs text-fg-subtle">
+            {reason}
+          </p>
+        ) : null}
+        <a
+          href="/auth/forgot"
+          className="mt-4 inline-block text-sm font-medium text-accent hover:underline"
+        >
+          Send me a new link
+        </a>
         <a
           href="/login"
-          className="mt-4 inline-block text-sm text-accent hover:underline"
+          className="mt-2 block text-sm text-fg-muted hover:underline"
         >
           Go to sign in
         </a>
@@ -145,6 +206,13 @@ export function SetPasswordForm() {
         At least {MIN_LENGTH} characters. This is the only thing standing between
         a stranger and every client&rsquo;s data, so make it a long one.
       </p>
+      {alreadySignedIn ? (
+        <p className="mt-3 rounded-md bg-warning-subtle px-3 py-2 text-xs text-warning">
+          You reached this page with no link token, and you are already signed
+          in — so this form works for you regardless of whether the link does.
+          It is not a test of somebody else&rsquo;s link.
+        </p>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         <label className="block">
