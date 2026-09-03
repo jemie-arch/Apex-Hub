@@ -85,6 +85,23 @@ const ORDER = [
   'appointment-ledger',
   'crm-calls',
   /*
+   * 'fulfilment-tracker' is deliberately NOT here yet, for the same reason as
+   * the two below: GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_KEY and
+   * FULFILMENT_TRACKER_SHEET_ID are unset, so including it would guarantee a
+   * failed sync every night.
+   *
+   * It is registered, so it runs from settings and the CLI the moment the
+   * credentials exist. Add it here at that point, EARLY -- before
+   * appointment-ledger, which reads tracker_appointments and would otherwise
+   * reconcile against yesterday's import. Somewhere around crm-appointments is
+   * right: both are feeds, neither depends on the other.
+   *
+   * The first run matters more than most. Its notes print every header the
+   * sheet has and every one the config could not place, which is how the column
+   * map gets corrected -- it was written from the shape of the existing table,
+   * not from the sheet, because the sheet could not be read until this existed.
+   */
+  /*
    * 'scenario-audit' is deliberately NOT here yet, for the same reason as
    * payout-hours below: MAKE_TOKEN is not set, so including it would guarantee
    * a failed sync every night, and a cycle that always reports a failure is how
