@@ -57,6 +57,24 @@ function siteOrigin(): string | null {
  * generateLink returns the link instead of sending it, which is the point: the
  * account gets created here and the message goes out however you choose, under
  * your name rather than the software's.
+ *
+ * ADDRESSED TO THIS SITE, NOT TO SUPABASE
+ *
+ * generateLink also hands back action_link, which points at
+ * <project>.supabase.co/auth/v1/verify and bounces here afterwards. That works,
+ * but it is the wrong thing to paste into a message to a client: it shows a
+ * hosting provider's domain rather than ours, which reads as a phishing link to
+ * anybody who checks before clicking, and reasonably so.
+ *
+ * So the same one-time token is carried on our own address instead, and
+ * /auth/set-password redeems it with verifyOtp. Nothing is weakened — it is the
+ * identical hashed token, single use and time limited either way.
+ *
+ * There is a second benefit worth naming, because it is the fault that started
+ * all this. Supabase's own URL is spent by a GET, so Slack, Teams, Outlook and
+ * Gmail consume the token when they fetch it to build a preview, and the person
+ * clicks a link that was already used. Ours is only redeemed by JavaScript
+ * running in a real browser, which a preview fetch does not do.
  */
 async function setPasswordLink(email: string): Promise<
   { ok: true; link: string } | { ok: false; message: string }
@@ -76,14 +94,18 @@ async function setPasswordLink(email: string): Promise<
     options: { redirectTo: `${origin}/auth/set-password` },
   });
 
-  if (generated.error || !generated.data.properties?.action_link) {
+  if (generated.error || !generated.data.properties?.hashed_token) {
     return {
       ok: false,
       message: generated.error?.message ?? 'Could not generate a link.',
     };
   }
 
-  return { ok: true, link: generated.data.properties.action_link };
+  const link = new URL('/auth/set-password', origin);
+  link.searchParams.set('token_hash', generated.data.properties.hashed_token);
+  link.searchParams.set('type', 'recovery');
+
+  return { ok: true, link: link.toString() };
 }
 
 /**
