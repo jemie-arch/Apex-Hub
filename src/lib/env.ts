@@ -62,6 +62,27 @@ const serverSchema = z.object({
    * log, never in the browser. Optional so its absence stops the payout sync
    * rather than the whole app.
    */
+  /*
+   * Google, for reading the Client Fulfilment Tracker.
+   *
+   * Two variables rather than the whole service-account JSON blob: the blob is
+   * awkward to paste into a hosting panel and carries fields nothing here uses.
+   * The key arrives with its newlines either intact or escaped depending on the
+   * platform, and google-sheets normalises both.
+   *
+   * Optional like every other integration credential. Without them the tracker
+   * sync stops with an explanation and nothing else is affected -- it is not
+   * registered in the nightly cycle until they exist, for the same reason
+   * scenario-audit and payout-hours are not.
+   *
+   * The service account can see nothing until somebody shares the sheet with
+   * its email address, so setting these grants no access on its own.
+   */
+  GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email().optional(),
+  GOOGLE_SERVICE_ACCOUNT_KEY: z.string().min(1).optional(),
+  /** The Client Fulfilment Tracker's spreadsheet id, from its URL. */
+  FULFILMENT_TRACKER_SHEET_ID: z.string().min(1).optional(),
+
   HUBSTAFF_TOKEN: z.string().min(1).optional(),
   HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),
   /** The organisation whose members and time are read. */

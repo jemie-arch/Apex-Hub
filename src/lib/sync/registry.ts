@@ -8,6 +8,7 @@ import { syncCrmAppointments } from '@/lib/sync/crm-appointments';
 import { syncCrmCalls } from '@/lib/sync/crm-calls';
 import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
+import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
 import { syncProvisionPending } from '@/lib/sync/provision-pending';
@@ -45,6 +46,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
     description:
       'GoHighLevel conversation calls into the call-centre leaderboard',
     run: syncCrmCalls,
+  },
+  'fulfilment-tracker': {
+    name: 'fulfilment-tracker',
+    description:
+      'The Client Fulfilment Tracker sheet into tracker_appointments — needs a ' +
+      'Google service account and FULFILMENT_TRACKER_SHEET_ID',
+    run: syncFulfilmentTracker,
   },
   'onboarding-calls': {
     name: 'onboarding-calls',
