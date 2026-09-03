@@ -108,6 +108,18 @@ export function LoginForm() {
       >
         {busy ? 'Signing in…' : 'Sign in'}
       </Button>
+
+      {/*
+        * Reads as an invitation, not a recovery. Most people arriving here for
+        * the first time have an account created for them and no password yet,
+        * and "Forgot password?" tells them nothing about what to do about that.
+        */}
+      <a
+        href="/auth/forgot"
+        className="mt-4 block text-center text-sm text-fg-muted hover:underline"
+      >
+        Set or reset your password
+      </a>
     </form>
   );
 }
