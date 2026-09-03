@@ -46,19 +46,50 @@ export function Modal({
     [onClose],
   );
 
+  /*
+   * Focus the panel when it OPENS, and at no other time.
+   *
+   * This used to live in the effect below, whose dependencies include
+   * handleKeyDown, which depends on onClose. Every caller passes an inline
+   * `onClose={() => setOpen(false)}`, so onClose is a new function on every
+   * render of the caller — and any caller holding state for a controlled input
+   * re-renders on each keystroke.
+   *
+   * The result: type one character, the caller re-renders, onClose changes
+   * identity, handleKeyDown changes identity, the effect re-runs, and
+   * `panelRef.current.focus()` pulls focus off the input. The second character
+   * goes nowhere. Ally hit it on the resolve note — "it doesnt let me type more
+   * than 1 letter" — and it would have hit every controlled field in every
+   * modal this app has.
+   *
+   * Keyed on `open` alone, so it fires once per opening. The listener effect
+   * below keeps its own dependencies, because a stale Escape handler would
+   * close using an outdated onClose.
+   */
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+  }, [open]);
+
+  // Stop the page behind from scrolling under the overlay. Separate from the
+  // listener for the same reason: it should run when the modal opens, not
+  // whenever the caller happens to re-render.
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return undefined;
 
     document.addEventListener('keydown', handleKeyDown);
-    // Stop the page behind from scrolling under the overlay.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    panelRef.current?.focus();
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, handleKeyDown]);
 
   if (!open) return null;
