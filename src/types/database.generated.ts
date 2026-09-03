@@ -3075,6 +3075,107 @@ export type Database = {
           },
         ]
       }
+      tech_tickets: {
+        Row: {
+          assigned_to: string | null
+          body: string | null
+          client_group_id: string | null
+          created_at: string
+          id: string
+          priority: Database["public"]["Enums"]["tech_ticket_priority"]
+          raised_by: string | null
+          raised_by_name: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          slack_channel_id: string | null
+          slack_channel_name: string | null
+          slack_message_ts: string | null
+          slack_permalink: string | null
+          slack_team_id: string | null
+          slack_thread_ts: string | null
+          source: string
+          status: Database["public"]["Enums"]["tech_ticket_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          body?: string | null
+          client_group_id?: string | null
+          created_at?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["tech_ticket_priority"]
+          raised_by?: string | null
+          raised_by_name?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          slack_channel_id?: string | null
+          slack_channel_name?: string | null
+          slack_message_ts?: string | null
+          slack_permalink?: string | null
+          slack_team_id?: string | null
+          slack_thread_ts?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["tech_ticket_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          body?: string | null
+          client_group_id?: string | null
+          created_at?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["tech_ticket_priority"]
+          raised_by?: string | null
+          raised_by_name?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          slack_channel_id?: string | null
+          slack_channel_name?: string | null
+          slack_message_ts?: string | null
+          slack_permalink?: string | null
+          slack_team_id?: string | null
+          slack_thread_ts?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["tech_ticket_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tech_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_tickets_client_group_id_fkey"
+            columns: ["client_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_tickets_raised_by_fkey"
+            columns: ["raised_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_tickets_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_off_requests: {
         Row: {
           created_at: string
@@ -3946,6 +4047,8 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "no_show"
+      tech_ticket_priority: "low" | "normal" | "high" | "urgent"
+      tech_ticket_status: "open" | "in_progress" | "resolved" | "closed"
       time_off_kind: "vacation" | "sick" | "unpaid" | "parental" | "other"
       user_role:
         | "admin"
@@ -4188,6 +4291,8 @@ export const Constants = {
         "cancelled",
         "no_show",
       ],
+      tech_ticket_priority: ["low", "normal", "high", "urgent"],
+      tech_ticket_status: ["open", "in_progress", "resolved", "closed"],
       time_off_kind: ["vacation", "sick", "unpaid", "parental", "other"],
       user_role: [
         "admin",
