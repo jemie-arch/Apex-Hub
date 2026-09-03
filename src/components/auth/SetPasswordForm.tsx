@@ -46,6 +46,8 @@ export function SetPasswordForm() {
       const accessToken = hash.get('access_token');
       const refreshToken = hash.get('refresh_token');
       const code = query.get('code');
+      const tokenHash = query.get('token_hash');
+      const otpType = query.get('type');
 
       /*
        * Supabase's own refusal, if it sent one.
@@ -66,6 +68,29 @@ export function SetPasswordForm() {
       // Scrub before awaiting anything: the credential should not survive in the
       // address bar even for the duration of a network round trip.
       window.history.replaceState({}, '', window.location.pathname);
+
+      /*
+       * A token carried on our own domain.
+       *
+       * The link handed out by Settings now addresses this site rather than
+       * <project>.supabase.co, because a hosting provider's domain in a message
+       * to a client reads as phishing to anybody who looks. The token is the
+       * same hashed one-time value Supabase would have verified itself; this
+       * just redeems it here.
+       *
+       * Checked before the other shapes because it is the one we issue. The
+       * hash and code branches below remain for links Supabase sends directly
+       * from an email template, which still arrive in their own formats.
+       */
+      if (tokenHash) {
+        const { error: otpError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: (otpType ?? 'recovery') as 'recovery',
+        });
+        if (otpError) setReason(otpError.message);
+        setStage(otpError ? 'invalid' : 'ready');
+        return;
+      }
 
       if (accessToken && refreshToken) {
         const { error: sessionError } = await supabase.auth.setSession({
