@@ -17,7 +17,8 @@
     "check:onboarding": "tsx scripts/check-onboarding-adapter.ts",
     "list:custom-values": "tsx scripts/list-custom-values.ts",
     "check:auth": "tsx scripts/check-service-key.ts",
-    "check:tracker": "tsx scripts/check-tracker-columns.ts"
+    "check:tracker": "tsx scripts/check-tracker-columns.ts",
+    "check:slack": "tsx scripts/check-slack-mention.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

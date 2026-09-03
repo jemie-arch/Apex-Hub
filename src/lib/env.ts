@@ -146,6 +146,46 @@ const serverSchema = z.object({
     .startsWith('https://hooks.slack.com/', 'must be a Slack webhook URL')
     .optional(),
 
+  /**
+   * The @apex ticket bot. Separate credentials from SLACK_WEBHOOK_URL above,
+   * which is an incoming webhook that can only post alerts to #tech-team.
+   *
+   * SLACK_SIGNING_SECRET is what authenticates inbound events. It cannot be
+   * optional-in-effect the way an API key can: /api/slack/events has a public
+   * URL — Slack decides what it sends and cannot be told to add an
+   * Authorization header — so the signature is the only thing standing between
+   * the ticket table and anyone who finds the URL. The route answers 503 when
+   * this is unset rather than accepting unsigned requests.
+   *
+   * The `xoxb-` prefix on the token is enforced for the same reason the Stripe
+   * key must be `rk_`. A user token (`xoxp-`) would work for every call the bot
+   * makes while also carrying the full reach of whoever installed it — every
+   * private channel and DM they can see. Pasting one in fails the deploy
+   * instead of quietly widening what a leaked value is worth.
+   */
+  SLACK_SIGNING_SECRET: z.string().min(1).optional(),
+  SLACK_BOT_TOKEN: z
+    .string()
+    .startsWith(
+      'xoxb-',
+      'must be a bot token (xoxb-…). User tokens (xoxp-…) carry the installing ' +
+        "person's whole reach and are rejected on purpose",
+    )
+    .optional(),
+
+  /**
+   * Who a Slack-raised ticket is assigned to. Ally by default, because that is
+   * who runs tech support.
+   *
+   * An email rather than a user id: ids are opaque, and somebody rotating this
+   * to a different person on a Friday afternoon should not have to run a query
+   * to find the value. Matched case-insensitively against user_profiles.
+   */
+  TECH_SUPPORT_ASSIGNEE_EMAIL: z
+    .string()
+    .email()
+    .default('ally@apexdentalmarketing.net'),
+
   /** Public origin, used to link back from an alert. Vercel sets VERCEL_URL. */
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 
@@ -407,6 +447,51 @@ export function stripeCredentials(): StripeCredentials {
   }
 
   return { apiKey: env.STRIPE_RESTRICTED_KEY };
+}
+
+/**
+ * The Slack signing secret, or a loud error.
+ *
+ * Called by /api/slack/events before anything else, so an unconfigured
+ * deployment answers 503 — "not set up" — rather than 401, which reads as a
+ * wrong secret and sends somebody hunting the wrong problem. The same
+ * distinction the service-key routes draw.
+ */
+export function slackSigningSecret(): string {
+  const env = serverEnv();
+
+  if (!env.SLACK_SIGNING_SECRET) {
+    throw new Error(
+      'The Slack ticket bot is not configured: SLACK_SIGNING_SECRET is not ' +
+        'set, so inbound events cannot be verified and are all rejected. Copy ' +
+        'it from the Slack app under Basic Information then App Credentials.',
+    );
+  }
+
+  return env.SLACK_SIGNING_SECRET;
+}
+
+/**
+ * The bot token, or a loud error.
+ *
+ * Separate from the signing secret because they fail differently and are worth
+ * failing differently. Without the signing secret no ticket can be filed at
+ * all. Without the token tickets are filed perfectly well and the bot simply
+ * cannot say so in Slack — which is a degraded bot, not a broken one, and
+ * lib/slack/api treats it as one.
+ */
+export function slackBotToken(): string {
+  const env = serverEnv();
+
+  if (!env.SLACK_BOT_TOKEN) {
+    throw new Error(
+      'SLACK_BOT_TOKEN is not set, so the bot cannot reply in Slack. Tickets ' +
+        'are still filed. Copy the Bot User OAuth Token (xoxb-…) from the ' +
+        'Slack app under OAuth & Permissions.',
+    );
+  }
+
+  return env.SLACK_BOT_TOKEN;
 }
 
 /** The two values the browser is allowed to see. */

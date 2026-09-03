@@ -45,6 +45,18 @@ const SECRET_PREFIXES = [
   '/api/health',
   // Inbound recorder webhook: checks CRON_SECRET in the route itself.
   '/api/webhooks',
+  /*
+   * The @apex ticket bot. Slack cannot carry a session cookie or a bearer
+   * token — it posts to a URL configured once in the app and decides for
+   * itself what it sends — so this route authenticates by request signature
+   * instead, in lib/slack/signature.
+   *
+   * It has to be listed here. Without it middleware sees an unauthenticated
+   * POST and redirects to /login, Slack reads the 307 as a failed delivery,
+   * and after enough of them it disables the endpoint. No ticket would ever be
+   * filed and nothing in the app would record why.
+   */
+  '/api/slack',
 ];
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {

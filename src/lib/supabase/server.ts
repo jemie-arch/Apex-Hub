@@ -8,8 +8,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+import type { PermissionKey } from '@/config/permissions';
 import { isPrivileged } from '@/config/roles';
 import { publicEnv } from '@/lib/env';
+import { serviceClient } from '@/lib/supabase/service';
 import type { Database, UserRole } from '@/types/database';
 
 /** Derived from the factory — see the note in browser.ts. */
@@ -83,5 +85,49 @@ export async function requireAdmin(): Promise<Caller> {
   if (!caller || !isPrivileged(caller.role)) {
     throw new Error('Not authorised.');
   }
+  return caller;
+}
+
+/**
+ * Throws unless the caller holds a permission key — or is privileged, which
+ * reaches everything by definition.
+ *
+ * requireAdmin is the wrong guard for anything a teammate is supposed to do.
+ * Tech support is the case that forced this: Ally is role 'tech', holds the
+ * tech_support key, and is who every Slack ticket is assigned to — and under
+ * requireAdmin she could see her own tickets and not touch one of them.
+ *
+ * Read from user_profiles rather than the JWT, the same way middleware does.
+ * Permission keys are not mirrored into the token, so a key granted on the
+ * access screen takes effect on the next request instead of the next sign-in.
+ */
+export async function requirePermission(key: PermissionKey): Promise<Caller> {
+  const caller = await currentCaller();
+  if (!caller) throw new Error('Not authorised.');
+  if (isPrivileged(caller.role)) return caller;
+
+  // A client login is scoped to its own practice and holds no staff keys, so
+  // it is refused before a lookup that could only ever come back empty.
+  if (caller.role === 'client') throw new Error('Not authorised.');
+
+  /*
+   * The service client, deliberately, for a read that decides authorisation.
+   *
+   * currentCaller() has already established who this is from the signed JWT,
+   * and the row read is theirs by id — so nothing here trusts input. Going
+   * through the cookie-backed client instead would make the answer depend on
+   * whether an RLS policy happens to let somebody read their own permissions,
+   * and a policy change would then quietly revoke every action on this path
+   * rather than failing anywhere visible.
+   */
+  const profile = await serviceClient()
+    .from('user_profiles')
+    .select('permissions')
+    .eq('id', caller.id)
+    .maybeSingle();
+
+  const granted: readonly string[] = profile.data?.permissions ?? [];
+  if (!granted.includes(key)) throw new Error('Not authorised.');
+
   return caller;
 }

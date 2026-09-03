@@ -10,6 +10,7 @@
  * Every function here is best-effort. A failed alert must never fail the sync
  * that was trying to report; the sync_runs row is already the durable record.
  */
+import { hubUrl } from '@/lib/app-url';
 import { serverEnv } from '@/lib/env';
 
 export interface SyncAlert {
@@ -32,13 +33,7 @@ function webhookUrl(): string | null {
 
 /** Where to send someone to look. Vercel provides VERCEL_URL automatically. */
 function settingsUrl(): string | null {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL;
-  if (explicit) return `${explicit.replace(/\/$/, '')}/settings`;
-
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel}/settings`;
-
-  return null;
+  return hubUrl('/settings');
 }
 
 export function slackConfigured(): boolean {
