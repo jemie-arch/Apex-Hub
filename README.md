@@ -160,6 +160,33 @@ page: visible and cheap, where a silent misassignment is neither.
 Tag somebody Slack knows but the Hub does not and the reply says so by name,
 rather than quietly falling back.
 
+### Not every mention is a request
+
+This used to become a ticket, assigned to Ally:
+
+> for any tech support, please tag @Apex. if you need a task specifically done,
+> tag me or ally. or else it will automatically gona assign ally.
+
+An announcement about the bot, filed as work. No rule separates that from a real
+request without also breaking real ones — it contains "tech support", "task" and
+"assign". So `src/lib/slack/classify.ts` asks Claude, and the answer decides.
+
+**It fails open, everywhere.** No `ANTHROPIC_API_KEY`, a timeout, a rate limit, a
+malformed response — every failure files the ticket. The prompt is told to bias
+toward filing when it is arguable. This asymmetry is the whole design: a ticket
+nobody needed costs a minute to close, while a declined request is work nobody
+knows was asked for.
+
+**It is never silent.** A decline is announced in the thread and the message is
+kept in `tech_ticket_candidates` with everything the ticket would have had.
+React :ticket: and it is filed — nothing retyped, no detail lost in the
+retelling. Promoted rows are kept and marked rather than deleted, because a run
+of declines that all got promoted by hand is the evidence that the prompt needs
+work.
+
+Set `SLACK_CLASSIFIER_MODEL` to point at a cheaper model if this team's volume
+makes that the better trade.
+
 Tickets live in `tech_tickets`, which is deliberately **not** `tech_calls`. A
 tech call is a booking — it has a time, a confirm step, and can end in a
 no-show. A ticket is a piece of work and ends resolved. One table covering both
@@ -210,6 +237,7 @@ can only post to `#tech-team`.
    | `users:read.email` | match them to a Hub login — without it `raised_by` is always null |
    | `channels:read` | the channel name on public channels |
    | `groups:read` | the same on private ones |
+   | `reactions:read` | see the :ticket: reaction that overrules a decline |
 
 3. **Install to Workspace**, then copy the Bot User OAuth Token (`xoxb-…`) into
    `SLACK_BOT_TOKEN` and the signing secret from **Basic Information → App
@@ -223,7 +251,8 @@ can only post to `#tech-team`.
 
    Slack sends a signed `url_verification` challenge immediately. It only
    passes once the signing secret is deployed, so do step 3 first. Under
-   *Subscribe to bot events* add **`app_mention`** and save.
+   *Subscribe to bot events* add **`app_mention`** and **`reaction_added`**,
+   then save.
 5. **Invite the bot** to each channel it should watch: `/invite @apex`. It
    cannot see a channel it is not in, which is the intended blast radius.
 

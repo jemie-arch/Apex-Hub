@@ -186,6 +186,28 @@ const serverSchema = z.object({
     .email()
     .default('ally@apexdentalmarketing.net'),
 
+  /**
+   * Anthropic API key, used for one thing: deciding whether a message that
+   * tagged @apex is actually asking for work.
+   *
+   * Optional, and its absence is a supported state rather than a broken one.
+   * Without it every mention becomes a ticket — which is exactly how the bot
+   * behaved before the classifier existed. lib/slack/classify fails open on
+   * every path for the same reason: an outage at Anthropic must never turn a
+   * real support request into silence.
+   */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+
+  /**
+   * Which model triages mentions. Opus 5 by default.
+   *
+   * Overridable because the tradeoff is a judgement about this team's traffic,
+   * not a code decision: a cheaper, faster model may well be enough for a
+   * two-way classification on three sentences, and the person paying the bill
+   * should be able to make that call without a deploy.
+   */
+  SLACK_CLASSIFIER_MODEL: z.string().min(1).default('claude-opus-5'),
+
   /** Public origin, used to link back from an alert. Vercel sets VERCEL_URL. */
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 

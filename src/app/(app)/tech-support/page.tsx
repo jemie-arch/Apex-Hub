@@ -6,6 +6,8 @@ import {
   ConfirmTechCall,
   TechCallStatusButtons,
 } from '@/components/tech/TechCallControls';
+import { TicketDetail, type TicketSummary } from '@/components/tech/TicketDetail';
+import type { TicketComment } from '@/components/tech/TicketComments';
 import {
   TicketAssignee,
   TicketPriority,
@@ -19,6 +21,7 @@ import { StatusPill, type Tone } from '@/components/ui/StatusPill';
 import { ASSIGNABLE_ROLES } from '@/config/roles';
 import { tenant } from '@/config/tenant.config';
 import { formatCount, formatDateTimeInZone } from '@/lib/format';
+import { currentCaller } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
@@ -93,6 +96,43 @@ export default async function TechSupportPage() {
   const groupById = new Map((groups.data ?? []).map((row) => [row.id, row.name]));
   const zone = tenant.defaultTimezone;
 
+  /*
+   * Every comment on every listed ticket, in one query, rather than one query
+   * per modal when it opens.
+   *
+   * The modal should feel instant — it is a panel over a list, not a page load
+   * — and a spinner inside it for a support queue this size would be paying a
+   * round trip to avoid reading a few hundred short rows. Revisit if a ticket
+   * ever accumulates a thread worth paginating.
+   */
+  const ticketIds = (tickets.data ?? []).map((row) => row.id);
+
+  const [comments, caller] = await Promise.all([
+    ticketIds.length > 0
+      ? db
+          .from('tech_ticket_comments')
+          .select('id, ticket_id, author_id, author_name, body, created_at')
+          .in('ticket_id', ticketIds)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    currentCaller(),
+  ]);
+
+  if (comments.error) throw comments.error;
+
+  const commentsByTicket = new Map<string, TicketComment[]>();
+  for (const comment of comments.data ?? []) {
+    const thread = commentsByTicket.get(comment.ticket_id) ?? [];
+    thread.push({
+      id: comment.id,
+      authorName: comment.author_name?.trim() || 'Somebody',
+      body: comment.body,
+      when: formatDateTimeInZone(comment.created_at, zone, 'd MMM, HH:mm'),
+      isOwn: comment.author_id !== null && comment.author_id === caller?.id,
+    });
+    commentsByTicket.set(comment.ticket_id, thread);
+  }
+
   const people: Person[] = (staff.data ?? []).map((row) => ({
     id: row.id,
     // Somebody who has never set a name is still assignable; their email is
@@ -121,6 +161,27 @@ export default async function TechSupportPage() {
     id: row.id,
     name: row.name,
   }));
+
+  /** The shape the modal wants, from the row the table already has. */
+  function summarise(row: (typeof ticketRows)[number]): TicketSummary {
+    return {
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      priority: row.priority,
+      assignedTo: row.assigned_to,
+      raisedByName: row.raised_by_name,
+      channelName: row.slack_channel_name,
+      permalink: row.slack_permalink,
+      clientGroupId: row.client_group_id,
+      clientName: row.client_group_id
+        ? (groupById.get(row.client_group_id) ?? null)
+        : null,
+      raisedWhen: formatDateTimeInZone(row.created_at, zone, 'd MMM yyyy'),
+      resolution: row.resolution,
+    };
+  }
 
   function ClientCell({ groupId }: { groupId: string | null }) {
     if (groupId === null) {
@@ -184,12 +245,13 @@ export default async function TechSupportPage() {
                 <tr key={row.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3 align-top">
                     <span className="flex items-center gap-2">
-                      <Link
-                        href={`/tech-support/${row.id}`}
-                        className="font-medium text-fg hover:text-accent"
+                      <TicketDetail
+                        ticket={summarise(row)}
+                        comments={commentsByTicket.get(row.id) ?? []}
+                        people={people}
                       >
                         {row.title}
-                      </Link>
+                      </TicketDetail>
                       {row.priority === 'normal' ? null : (
                         <StatusPill
                           value={row.priority}
@@ -260,12 +322,13 @@ export default async function TechSupportPage() {
                 {doneTickets.map((row) => (
                   <tr key={row.id} className="border-b border-line last:border-0">
                     <td className="px-4 py-3 align-top text-fg">
-                      <Link
-                        href={`/tech-support/${row.id}`}
-                        className="hover:text-accent"
+                      <TicketDetail
+                        ticket={summarise(row)}
+                        comments={commentsByTicket.get(row.id) ?? []}
+                        people={people}
                       >
                         {row.title}
-                      </Link>
+                      </TicketDetail>
                       <span className="block text-xs text-fg-subtle">
                         <ClientCell groupId={row.client_group_id} />
                         {row.assigned_to
