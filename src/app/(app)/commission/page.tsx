@@ -12,8 +12,10 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import {
   type BookingRow,
   collapseDuplicates,
+  commissionCentsFor,
   dailyTallies,
   monthlySummaries,
+  parseScheme,
   unattributedCount,
 } from '@/lib/isa-commission';
 import { formatCount, formatMoney, formatPercent } from '@/lib/format';
@@ -65,21 +67,19 @@ export default async function CommissionPage({
   const to = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
 
   /*
-   * The unit rate as the sheet last reported it, or null.
+   * The scheme as the sheet last reported it, or null.
    *
-   * Null is a first-class case rather than a fallback to some default. A guessed
-   * rate would render a plausible payable figure, and somebody would pay it.
+   * Null is a first-class case rather than a fallback to plausible defaults. A
+   * guessed rate renders a payable-looking figure, and somebody pays it.
    */
-  const rate = await serviceClient()
+  const stored = await serviceClient()
     .from('app_settings')
     .select('value, updated_at')
-    .eq('key', 'isa_commission_unit_cents')
+    .eq('key', 'isa_commission_scheme')
     .maybeSingle();
 
-  const unitCents =
-    typeof rate.data?.value === 'number' && rate.data.value > 0
-      ? rate.data.value
-      : null;
+  const scheme = parseScheme(stored.data?.value ?? null);
+  const schemeReadAt = stored.data?.updated_at ?? null;
 
   const booked = await serviceClient()
     .from('tracker_appointments')
@@ -142,11 +142,13 @@ export default async function CommissionPage({
             Units are counted — bookings less{' '}
             {PENDING_PENALTY_RULES.unitsLostPerUnqualified} for each unqualified
             one.{' '}
-            {unitCents === null
-              ? `They are not converted to money, because one unit's value has not
-                 been read from ${COMMISSION_UNIT_SOURCE} yet.`
-              : `One unit is ${formatMoney(unitCents)}, read from
-                 ${COMMISSION_UNIT_SOURCE} — change it there, not here.`}{' '}
+            {scheme === null
+              ? `They are not converted to money, because the rates have not been
+                 read from ${COMMISSION_UNIT_SOURCE} yet — run commission-inputs.`
+              : `Paid at ${formatMoney(scheme.unitAmount)} per booking below
+                 ${scheme.quota1Threshold}, ${formatMoney(scheme.quota1Amount)} below
+                 ${scheme.quota2Threshold}, then ${formatMoney(scheme.quota2Amount)} —
+                 read from ${COMMISSION_UNIT_SOURCE}, so change it there, not here.`}{' '}
             The forfeiture above{' '}
             {formatPercent(MONTHLY_UNQUALIFIED_LIMIT)} of a month&rsquo;s
             bookings is not applied either: what counts as an unqualified call is
@@ -267,9 +269,9 @@ export default async function CommissionPage({
                         }
                       >
                         {row.commissionUnits}
-                        {unitCents === null ? null : (
+                        {scheme === null ? null : (
                           <span className="ml-1 font-normal text-fg-subtle">
-                            ({formatMoney(row.commissionUnits * unitCents)})
+                            ({formatMoney(commissionCentsFor(row.commissionUnits, scheme))})
                           </span>
                         )}
                       </td>
@@ -366,6 +368,9 @@ export default async function CommissionPage({
           {PENDING_PENALTY_RULES.confirmedOn}. Earl designed this scheme and has
           left, so there is nobody to check it against — these answers are the
           record.
+          {schemeReadAt === null
+            ? ' Rates have never been read from the sheet.'
+            : ` Rates last read from the sheet on ${schemeReadAt.slice(0, 10)}.`}
         </p>
       </section>
     </>

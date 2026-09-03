@@ -363,3 +363,121 @@ export function monthlySummaries(rows: BookingRow[]): MonthlySummary[] {
 export function unattributedCount(rows: BookingRow[]): number {
   return rows.filter((row) => classify(row) === 'unattributed').length;
 }
+
+/**
+ * The scheme as the sheet defines it, in cents and booking counts.
+ *
+ * Read by the commission-inputs sync from INPUT VALUES on the Call Center Agent
+ * Dashboard. Optional everywhere: the config values in config/isa-commission
+ * stand in until a run has happened, and the page says which it is using.
+ */
+export interface CommissionScheme {
+  /** Cents per booking below quota1Threshold bookings. */
+  unitAmount: number;
+  /** Cents per booking below quota2Threshold. */
+  quota1Amount: number;
+  /** Cents per booking at or above quota2Threshold. */
+  quota2Amount: number;
+  quota1Threshold: number;
+  quota2Threshold: number;
+  tier1Bonus: number;
+  tier2Bonus: number;
+  tier3Bonus: number;
+  tier1Threshold: number;
+  tier2Threshold: number;
+  tier3Threshold: number;
+  /** Bookings lost per invalid booking. A COUNT, not an amount. */
+  bookingsLostPerInvalid: number;
+}
+
+const SCHEME_FIELDS: readonly (keyof CommissionScheme)[] = [
+  'unitAmount',
+  'quota1Amount',
+  'quota2Amount',
+  'quota1Threshold',
+  'quota2Threshold',
+  'tier1Bonus',
+  'tier2Bonus',
+  'tier3Bonus',
+  'tier1Threshold',
+  'tier2Threshold',
+  'tier3Threshold',
+  'bookingsLostPerInvalid',
+];
+
+/**
+ * A stored scheme, or null if it is not a complete one.
+ *
+ * All or nothing on purpose. A half-populated scheme would pay from a mixture
+ * of the sheet and the fallback, and no figure on screen would say which — so a
+ * missing field discards the lot and the page falls back visibly.
+ */
+export function parseScheme(value: unknown): CommissionScheme | null {
+  if (value === null || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+
+  const scheme = {} as CommissionScheme;
+  for (const field of SCHEME_FIELDS) {
+    const raw = record[field];
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+    scheme[field] = raw;
+  }
+  return scheme;
+}
+
+/**
+ * Cents per booking, at this volume.
+ *
+ * The rate steps with how many bookings the ISA has: $8 below 96, $10 below
+ * 128, $12 above. Reproduces STATS DASHBOARD!O2, which nests the same three
+ * cases in the same order.
+ */
+export function ratePerBookingCents(
+  bookings: number,
+  scheme: CommissionScheme,
+): number {
+  if (bookings < scheme.quota1Threshold) return scheme.unitAmount;
+  if (bookings < scheme.quota2Threshold) return scheme.quota1Amount;
+  return scheme.quota2Amount;
+}
+
+/**
+ * Commission for a month's units.
+ *
+ * ONE ASSUMPTION, STATED: the volume tier is chosen by units — bookings after
+ * the invalid-booking deduction — rather than by gross bookings. The sheet's
+ * formula multiplies and tiers on the same figure, so it cannot distinguish the
+ * two, and they differ only for somebody sitting within two bookings of 96 or
+ * 128. Tiering on units is the consistent reading: it pays the rate the ISA's
+ * countable work earned. If gross should decide it, this is the one line to
+ * change.
+ *
+ * Negative units earn nothing rather than owing money. Whether a negative
+ * carries against anything is undecided, and inventing a debt is worse than
+ * paying zero.
+ */
+export function commissionCentsFor(
+  units: number,
+  scheme: CommissionScheme,
+): number {
+  if (units <= 0) return 0;
+  return units * ratePerBookingCents(units, scheme);
+}
+
+/**
+ * The daily bonus under a scheme read from the sheet.
+ *
+ * Uses >= at every tier, matching STATS DASHBOARD!P2. TODAY'S DATA!M3 uses = on
+ * tiers 1 and 2, so seven bookings there fall through every branch and pay
+ * nothing — which contradicts what was confirmed for seven, so this follows the
+ * dashboard and treats the other as the bug it appears to be.
+ */
+export function dailyBonusCentsFrom(
+  qualifyingBookings: number,
+  scheme: CommissionScheme,
+): number {
+  if (qualifyingBookings >= scheme.tier3Threshold) return scheme.tier3Bonus;
+  if (qualifyingBookings >= scheme.tier2Threshold) return scheme.tier2Bonus;
+  if (qualifyingBookings >= scheme.tier1Threshold) return scheme.tier1Bonus;
+  return 0;
+}
