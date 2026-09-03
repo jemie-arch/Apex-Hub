@@ -19,7 +19,8 @@
     "check:auth": "tsx scripts/check-service-key.ts",
     "check:tracker": "tsx scripts/check-tracker-columns.ts",
     "check:slack": "tsx scripts/check-slack-mention.ts",
-    "check:commission": "tsx scripts/check-isa-commission.ts"
+    "check:commission": "tsx scripts/check-isa-commission.ts",
+    "check:pay": "tsx scripts/check-agent-pay.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
