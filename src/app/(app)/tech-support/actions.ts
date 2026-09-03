@@ -9,6 +9,8 @@
  */
 import { revalidatePath } from 'next/cache';
 
+import { ASSIGNABLE_ROLES } from '@/config/roles';
+import { notifyUsers } from '@/lib/notify/inbox';
 import { requireAdmin, requirePermission } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
@@ -196,16 +198,37 @@ export async function assignTicket(input: {
   id: string;
   userId: string | null;
 }): Promise<TechCallResult> {
-  await requirePermission('tech_support');
+  const caller = await requirePermission('tech_support');
+  const db = serviceClient();
 
-  const written = await serviceClient()
+  const written = await db
     .from('tech_tickets')
     .update({ assigned_to: input.userId })
-    .eq('id', input.id);
+    .eq('id', input.id)
+    .select('title')
+    .maybeSingle();
 
   if (written.error) return { ok: false, message: written.error.message };
 
+  /*
+   * Being handed a ticket is the one thing that most deserves a notification:
+   * it is work that has just become yours, decided by somebody else, with no
+   * other signal that it happened. Unassigning notifies nobody — there is no
+   * recipient — and taking a ticket yourself notifies nobody either, which
+   * notifyUsers handles through actorId.
+   */
+  if (input.userId) {
+    await notifyUsers({
+      userIds: [input.userId],
+      actorId: caller.id,
+      kind: 'info',
+      title: `You were assigned "${written.data?.title ?? 'a tech ticket'}"`,
+      href: `/tech-support/${input.id}`,
+    });
+  }
+
   revalidatePath('/tech-support');
+  revalidatePath(`/tech-support/${input.id}`);
   return { ok: true, message: 'Assigned.' };
 }
 
@@ -235,4 +258,117 @@ export async function setTicketPriority(input: {
 
   revalidatePath('/tech-support');
   return { ok: true, message: 'Updated.' };
+}
+
+/* ===========================================================================
+ * COMMENTS
+ *
+ * The conversation about a ticket, and telling the people it concerns.
+ * ======================================================================== */
+
+/** Longer than this and it is a document, not a comment. */
+const COMMENT_LIMIT = 8000;
+
+export interface CommentResult extends TechCallResult {
+  /** How many people were told. Reported back so the writer can see it. */
+  notified?: number;
+}
+
+/**
+ * Add a comment, and notify the people it concerns.
+ *
+ * WHO GETS TOLD, AND WHY THOSE PEOPLE
+ *
+ * Everyone tagged, plus the ticket's assignee. The assignee is included even
+ * when nobody tagged them, because a comment on a ticket somebody owns is
+ * addressed to them whether or not the writer typed their name — and the
+ * alternative is a ticket where the owner has to keep checking the page to
+ * find out something happened.
+ *
+ * Never the author, however they were reached. See notifyUsers.
+ *
+ * The mentioned ids are validated against staff rather than trusted. They
+ * arrive from a browser and are written into a column that decides who gets
+ * notified and, through RLS, who can read the thread; an id that is not a
+ * teammate has no business in either.
+ */
+export async function addTicketComment(input: {
+  ticketId: string;
+  body: string;
+  mentionedUserIds?: readonly string[];
+}): Promise<CommentResult> {
+  const caller = await requirePermission('tech_support');
+
+  const body = input.body.trim();
+  if (body === '') return { ok: false, message: 'Say something first.' };
+  if (body.length > COMMENT_LIMIT) {
+    return { ok: false, message: 'That is too long for a comment.' };
+  }
+
+  const db = serviceClient();
+
+  const ticket = await db
+    .from('tech_tickets')
+    .select('id, title, assigned_to')
+    .eq('id', input.ticketId)
+    .maybeSingle();
+
+  if (ticket.error) return { ok: false, message: ticket.error.message };
+  if (!ticket.data) return { ok: false, message: 'That ticket no longer exists.' };
+
+  // Only real teammates, and only ones that exist. An unknown id is dropped
+  // silently rather than failing the comment: the words are what matter, and
+  // refusing to save them over a stale mention would be the wrong trade.
+  const claimed = [...new Set(input.mentionedUserIds ?? [])];
+  let mentioned: string[] = [];
+
+  if (claimed.length > 0) {
+    const people = await db
+      .from('user_profiles')
+      .select('id')
+      .in('id', claimed)
+      .in('role', [...ASSIGNABLE_ROLES]);
+
+    mentioned = (people.data ?? []).map((row) => row.id);
+  }
+
+  const author = await db
+    .from('user_profiles')
+    .select('full_name, email')
+    .eq('id', caller.id)
+    .maybeSingle();
+
+  const authorName =
+    author.data?.full_name?.trim() || author.data?.email || 'Somebody';
+
+  const written = await db.from('tech_ticket_comments').insert({
+    ticket_id: input.ticketId,
+    author_id: caller.id,
+    author_name: authorName,
+    body,
+    mentioned_user_ids: mentioned,
+  });
+
+  if (written.error) return { ok: false, message: written.error.message };
+
+  /*
+   * Notifications are written after the comment, never in the same breath.
+   * A failure here must not roll back the comment — the words are saved and
+   * visible on the ticket either way, and notifyUsers swallows its own errors
+   * for exactly that reason.
+   */
+  const notified = await notifyUsers({
+    userIds: [...mentioned, ticket.data.assigned_to],
+    actorId: caller.id,
+    kind: 'info',
+    title: `${authorName} commented on "${ticket.data.title}"`,
+    // Trimmed: the bell is a prompt to go and read, not the reading itself.
+    body: body.length > 160 ? `${body.slice(0, 157)}…` : body,
+    href: `/tech-support/${input.ticketId}`,
+  });
+
+  revalidatePath('/tech-support');
+  revalidatePath(`/tech-support/${input.ticketId}`);
+
+  return { ok: true, message: 'Added.', notified };
 }

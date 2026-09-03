@@ -49,6 +49,7 @@ export type ProjectNoteRow = Tables<'project_notes'>;
 export type TimeOffRequestRow = Tables<'time_off_requests'>;
 export type TechCallRow = Tables<'tech_calls'>;
 export type TechTicketRow = Tables<'tech_tickets'>;
+export type TechTicketCommentRow = Tables<'tech_ticket_comments'>;
 
 export type UserRole = Enums<'user_role'>;
 export type Funnel = Enums<'funnel'>;
