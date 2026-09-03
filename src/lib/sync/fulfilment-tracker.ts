@@ -24,12 +24,14 @@
  */
 import {
   HEADER_TO_FIELD,
+  INPUT_VALUES_TAB,
   REQUIRED_FIELDS,
   TRACKER_RANGE,
+  UNIT_VALUE_CELL,
   normaliseHeader,
 } from '@/config/fulfilment-tracker';
 import { serverEnv } from '@/lib/env';
-import { readSheet } from '@/lib/integrations/google-sheets';
+import { listSheetTitles, readSheet } from '@/lib/integrations/google-sheets';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -219,4 +221,87 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
     `${records.length} tracker row(s) imported from the sheet. ` +
       `${records.filter((row) => row['booked_by'] !== null).length} name who booked them.`,
   );
+
+  await readCommissionUnitValue(ctx, db, sheetId);
+}
+
+/**
+ * Pick up what one commission unit is worth, from the sheet that owns it.
+ *
+ * Kept out of the import above and never allowed to fail the run. The rate is
+ * useful, and the 1,300 consultation records are the point — a missing tab must
+ * not cost us the import.
+ *
+ * Stored rather than returned so the commission page can price units without a
+ * second Google round trip on every request, and so the figure has a visible
+ * last-read time when somebody asks why a payslip changed.
+ */
+async function readCommissionUnitValue(
+  ctx: SyncContext,
+  db: ReturnType<typeof serviceClient>,
+  sheetId: string,
+): Promise<void> {
+  let titles: string[];
+  try {
+    titles = await listSheetTitles(sheetId);
+  } catch (error) {
+    ctx.note(
+      'unit_value_unread',
+      `could not list the tabs: ${error instanceof Error ? error.message : 'unknown'}`,
+    );
+    return;
+  }
+
+  const tab = titles.find((title) => INPUT_VALUES_TAB.test(title));
+  if (tab === undefined) {
+    // The real titles, so the pattern can be corrected from one run rather than
+    // from a series of guesses.
+    ctx.note('unit_value_tab_not_found', titles);
+    return;
+  }
+
+  let cells: string[][];
+  try {
+    cells = await readSheet(sheetId, `${tab}!${UNIT_VALUE_CELL}`);
+  } catch (error) {
+    ctx.note(
+      'unit_value_unread',
+      `${tab}!${UNIT_VALUE_CELL}: ${error instanceof Error ? error.message : 'unknown'}`,
+    );
+    return;
+  }
+
+  const raw = cells[0]?.[0]?.trim() ?? '';
+
+  /*
+   * Read as currency a person typed: "$2.00", "2", "2.50", maybe with a comma.
+   * Anything else is reported rather than coerced — a rate silently parsed to 0
+   * would pay nobody, and a rate parsed to 200 would pay a hundredfold.
+   */
+  const numeric = Number(raw.replace(/[^0-9.-]/g, ''));
+  if (raw === '' || !Number.isFinite(numeric) || numeric <= 0) {
+    ctx.note('unit_value_unusable', raw === '' ? '(empty)' : raw);
+    return;
+  }
+
+  const cents = Math.round(numeric * 100);
+
+  const written = await db.from('app_settings').upsert(
+    {
+      key: 'isa_commission_unit_cents',
+      value: cents,
+      description:
+        `One ISA commission unit, read from ${tab}!${UNIT_VALUE_CELL} of the ` +
+        'fulfilment tracker. Change it in the sheet, not here — the next run ' +
+        'overwrites this.',
+    },
+    { onConflict: 'key' },
+  );
+
+  if (written.error) {
+    ctx.note('unit_value_not_stored', written.error.message);
+    return;
+  }
+
+  ctx.note('unit_value_cents', cents);
 }

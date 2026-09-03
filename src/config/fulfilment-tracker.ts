@@ -146,3 +146,22 @@ export const REQUIRED_FIELDS: readonly string[] = TRACKER_COLUMNS.filter(
  * than being invisible. Rows are unbounded — Sheets returns only what exists.
  */
 export const TRACKER_RANGE = 'Appointment Data!A:Z';
+
+/**
+ * How to recognise the tab holding the commission inputs.
+ *
+ * Described only as "sheet input values", so this matches rather than assumes.
+ * A1 notation is unforgiving — a tab title off by a word returns a bare 400
+ * that names neither the tab nor the mistake — so the sync lists the real
+ * titles and tests them against this.
+ */
+export const INPUT_VALUES_TAB = /^\s*inputs?(\s|_|-)*values?\s*$/i;
+
+/**
+ * Where one commission unit's value sits on that tab.
+ *
+ * Stated as a cell because that is how it was given. Reading it rather than
+ * hardcoding a number keeps the rate owned by whoever owns the scheme: they
+ * change the sheet, and the Hub follows on the next run.
+ */
+export const UNIT_VALUE_CELL = 'B12';

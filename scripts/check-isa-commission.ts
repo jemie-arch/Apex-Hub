@@ -20,6 +20,7 @@ import { dailyBonusCents } from '../src/config/isa-commission';
 import {
   type BookingRow,
   classify,
+  collapseDuplicates,
   dailyTallies,
   monthlySummaries,
   unattributedCount,
@@ -343,6 +344,153 @@ check(
     ...Array.from({ length: 4 }, () => booked('Maria', '2026-09-02')),
   ]).map((month) => [month.total, month.unqualified, month.commissionUnits]),
   [[10, 1, 8]],
+);
+
+section('The same booking twice');
+
+/** A named patient at a named practice, so the collapse can see it. */
+function forPatient(
+  patient: string,
+  createdOn: string,
+  bookedFor: string,
+  outcome: string | null = 'Closed',
+  isa = 'Maria',
+): BookingRow {
+  return {
+    bookedBy: isa,
+    createdOn,
+    appointmentStatus: outcome === null ? null : 'Showed',
+    statusIfShowed: outcome,
+    patientName: patient,
+    locationName: 'Bright Smile Dental',
+    bookedFor,
+  };
+}
+
+check(
+  'a straight duplicate — same patient, practice and appointment date — merges',
+  (() => {
+    const { rows, merged } = collapseDuplicates([
+      forPatient('Ana Reyes', '2026-09-01', '2026-09-10'),
+      forPatient('Ana Reyes', '2026-09-01', '2026-09-10'),
+    ]);
+    return [rows.length, merged];
+  })(),
+  [1, 1],
+);
+
+check(
+  'a reschedule counts once, not twice',
+  (() => {
+    const { rows, merged } = collapseDuplicates([
+      forPatient('Ana Reyes', '2026-09-01', '2026-09-10'),
+      forPatient('Ana Reyes', '2026-09-04', '2026-09-18'),
+    ]);
+    return [rows.length, merged];
+  })(),
+  [1, 1],
+);
+
+// The day the ISA did the work is the first one. Keeping the later date would
+// move the bonus to a day they only moved an appointment.
+check(
+  'the surviving row keeps the earliest booking day, whatever the row order',
+  collapseDuplicates([
+    forPatient('Ana Reyes', '2026-09-04', '2026-09-18'),
+    forPatient('Ana Reyes', '2026-09-01', '2026-09-10'),
+  ]).rows.map((row) => row.createdOn),
+  ['2026-09-01'],
+);
+
+/*
+ * And the credit follows the day. Sam booked first and Maria moved it; the
+ * booking is Sam's. Comparing against whichever row arrived first would have
+ * paid whoever the sheet happened to list above the other.
+ */
+check(
+  'the ISA credited is the one who booked it, not the one who rescheduled it',
+  [
+    collapseDuplicates([
+      forPatient('Ana Reyes', '2026-09-01', '2026-09-10', 'Closed', 'Sam'),
+      forPatient('Ana Reyes', '2026-09-04', '2026-09-18', 'Closed', 'Maria'),
+    ]).rows.map((row) => row.bookedBy),
+    collapseDuplicates([
+      forPatient('Ana Reyes', '2026-09-04', '2026-09-18', 'Closed', 'Maria'),
+      forPatient('Ana Reyes', '2026-09-01', '2026-09-10', 'Closed', 'Sam'),
+    ]).rows.map((row) => row.bookedBy),
+  ],
+  [['Sam'], ['Sam']],
+);
+
+/*
+ * ...but the outcome comes from the LATEST appointment, because that is what
+ * happened to the patient. Taking the first would credit an ISA for a
+ * consultation that was moved and then disqualified.
+ */
+check(
+  'and the outcome of the latest appointment',
+  collapseDuplicates([
+    forPatient('Ana Reyes', '2026-09-01', '2026-09-10', 'Closed'),
+    forPatient('Ana Reyes', '2026-09-04', '2026-09-18', 'DQ'),
+  ]).rows.map((row) => row.statusIfShowed),
+  ['DQ'],
+);
+
+check(
+  'the same name at a different practice is a different patient',
+  (() => {
+    const first = forPatient('Ana Reyes', '2026-09-01', '2026-09-10');
+    const elsewhere = {
+      ...forPatient('Ana Reyes', '2026-09-01', '2026-09-10'),
+      locationName: 'Harbour Dental',
+    };
+    const { rows, merged } = collapseDuplicates([first, elsewhere]);
+    return [rows.length, merged];
+  })(),
+  [2, 0],
+);
+
+check(
+  'two different patients are left alone',
+  collapseDuplicates([
+    forPatient('Ana Reyes', '2026-09-01', '2026-09-10'),
+    forPatient('Tom Blake', '2026-09-01', '2026-09-10'),
+  ]).rows.length,
+  2,
+);
+
+// Merging on absence would silently delete work, so unnamed rows pass through
+// untouched however many there are.
+check(
+  'rows with no patient name are never merged together',
+  (() => {
+    const { rows, merged } = collapseDuplicates([
+      booked('Maria', '2026-09-01'),
+      booked('Maria', '2026-09-01'),
+      booked('Maria', '2026-09-01'),
+    ]);
+    return [rows.length, merged];
+  })(),
+  [3, 0],
+);
+
+// A reschedule counted twice would have paid a tier that was never earned.
+check(
+  'five patients booked once each pay $10 even when three rescheduled',
+  (() => {
+    const { rows } = collapseDuplicates([
+      forPatient('A', '2026-09-01', '2026-09-10'),
+      forPatient('B', '2026-09-01', '2026-09-10'),
+      forPatient('C', '2026-09-01', '2026-09-10'),
+      forPatient('D', '2026-09-01', '2026-09-10'),
+      forPatient('E', '2026-09-01', '2026-09-10'),
+      forPatient('A', '2026-09-01', '2026-09-20'),
+      forPatient('B', '2026-09-01', '2026-09-21'),
+      forPatient('C', '2026-09-01', '2026-09-22'),
+    ]);
+    return dailyTallies(rows).map((day) => [day.total, day.bonusCents]);
+  })(),
+  [[5, 1000]],
 );
 
 section('An empty month is not an error');

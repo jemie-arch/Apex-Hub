@@ -200,3 +200,45 @@ export async function readSheet(
     Array.isArray(row) ? row.map((cell) => (cell === null || cell === undefined ? '' : String(cell))) : [],
   );
 }
+
+/**
+ * The titles of a spreadsheet's tabs, in order.
+ *
+ * Exists so a sync can find a tab by what it is called rather than by a name
+ * hardcoded from somebody's description of it. The commission unit rate lives
+ * in "cell B12 of the input values" — which is a tab title nobody has spelled
+ * out, and A1 notation does not forgive a near miss: 'Input Values'!B12 and
+ * 'Inputs'!B12 both come back as a flat 400 with no hint which part was wrong.
+ *
+ * Asking the spreadsheet what its tabs are called turns a guess into a lookup,
+ * and lets the caller report the real titles when none of them match.
+ */
+export async function listSheetTitles(spreadsheetId: string): Promise<string[]> {
+  const token = await accessToken();
+
+  const response = await fetch(
+    `${SHEETS_BASE}/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' },
+  );
+
+  const text = await response.text();
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(
+        `Google refused to open ${spreadsheetId} (403). Share it as a Viewer ` +
+          `with ${googleCredentials().clientEmail}. Detail: ${text.slice(0, 300)}`,
+      );
+    }
+    throw new Error(
+      `Google Sheets metadata read failed (${response.status}): ${text.slice(0, 400)}`,
+    );
+  }
+
+  const body = JSON.parse(text) as {
+    sheets?: { properties?: { title?: string } }[];
+  };
+
+  return (body.sheets ?? [])
+    .map((sheet) => sheet.properties?.title)
+    .filter((title): title is string => typeof title === 'string');
+}
