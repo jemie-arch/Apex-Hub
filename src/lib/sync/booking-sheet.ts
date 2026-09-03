@@ -27,6 +27,7 @@ import {
   normaliseSheetHeader,
 } from '@/config/booking-sheet';
 import { serverEnv } from '@/lib/env';
+import { parseSheetDate } from '@/lib/sheet-dates';
 import { listSheetTitles, readSheet } from '@/lib/integrations/google-sheets';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
@@ -36,57 +37,6 @@ const BATCH = 200;
 function text(value: string | undefined): string | null {
   const trimmed = (value ?? '').trim();
   return trimmed === '' ? null : trimmed;
-}
-
-/**
- * A date as the sheet displays it.
- *
- * Both tabs show dates as people typed or formatted them, and the two tabs do
- * not agree with each other: BOOKING SHEET showed 7/10/2026 while APPOINTMENT
- * DATA showed 01-07-2026. So both separators are handled, and an unparseable
- * date returns null rather than a guess — a booking filed on the wrong day pays
- * the wrong tier, and nothing downstream could detect it.
- *
- * Ambiguity is NOT resolved by preference. A value like 01-07-2026 could be
- * 1 July or 7 January, so anything where both halves are 12 or under and the
- * order is not settled by the sheet's own formatting is refused and counted.
- * Guessing here silently moves bookings between months.
- */
-function asDate(value: string | undefined): { date: string | null; ambiguous: boolean } {
-  const raw = text(value);
-  if (raw === null) return { date: null, ambiguous: false };
-
-  // Already ISO.
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return { date: raw.slice(0, 10), ambiguous: false };
-
-  const parts = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (!parts) {
-    const parsed = new Date(raw);
-    return Number.isNaN(parsed.getTime())
-      ? { date: null, ambiguous: false }
-      : { date: parsed.toISOString().slice(0, 10), ambiguous: false };
-  }
-
-  const [, first, second, year] = parts;
-  const a = Number(first);
-  const b = Number(second);
-
-  /*
-   * A day above 12 settles the order on its own. Otherwise the sheet is read as
-   * US month-first, which is what the tracker uses and what Google renders for
-   * a US locale — but the row is flagged, so a file that turns out to be
-   * day-first shows up as a count rather than as a month of misplaced pay.
-   */
-  if (a > 12) {
-    return { date: `${year}-${String(b).padStart(2, '0')}-${String(a).padStart(2, '0')}`, ambiguous: false };
-  }
-  if (b > 12) {
-    return { date: `${year}-${String(a).padStart(2, '0')}-${String(b).padStart(2, '0')}`, ambiguous: false };
-  }
-  return {
-    date: `${year}-${String(a).padStart(2, '0')}-${String(b).padStart(2, '0')}`,
-    ambiguous: true,
-  };
 }
 
 /** Map headers to fields, reporting whatever could not be placed. */
@@ -187,7 +137,7 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
 
   bookingRows.forEach((row, offset) => {
     const agent = text(bookingCell(row, 'agent'));
-    const parsed = asDate(bookingCell(row, 'date'));
+    const parsed = parseSheetDate(bookingCell(row, 'date'), 'month-first');
     const disposition = text(bookingCell(row, 'disposition'));
 
     // An entirely empty row is spreadsheet padding, not a booking.
@@ -335,8 +285,11 @@ async function importInvalidBookings(
     const stamp = text(
       columnOf.has('reported_at') ? row[columnOf.get('reported_at')!] : undefined,
     );
-    const invalidOn = asDate(
+    // The form writes its own date field; same convention as BOOKING SHEET,
+    // since both are entered by the same people in the same locale.
+    const invalidOn = parseSheetDate(
       columnOf.has('invalid_on') ? row[columnOf.get('invalid_on')!] : undefined,
+      'month-first',
     );
 
     if (agent === null && stamp === null) return;

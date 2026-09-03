@@ -39,8 +39,20 @@ export const BOOKING_SHEET_COLUMNS: Readonly<Record<string, string>> = {
   'location name': 'location_name',
   clinic: 'location_name',
 
-  // Whether this carries attendance decides whether the daily bonus can
-  // exclude no-shows at all, so it is imported even though nothing reads it yet.
+  /*
+   * IT CARRIES NOTHING. Column stats on the live tab: 362 of 362 data rows read
+   * "Booked", and that is the only value. Presumably the inbound webhook maps a
+   * GoHighLevel field called Disposition, but whatever arrives is always the
+   * same string.
+   *
+   * Which answers a question that had been open: the daily bonus CANNOT exclude
+   * no-shows from this source, because attendance is not here in any form. No
+   * filter or tweak gets there — it would have to be joined from GoHighLevel or
+   * from tracker_appointments.appointment_status.
+   *
+   * Still imported, so that if the webhook ever starts sending real values the
+   * change shows up in the sync notes rather than going unnoticed.
+   */
   disposition: 'disposition',
   outcome: 'disposition',
   status: 'disposition',
