@@ -8,9 +8,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { TrackerTab } from '@/components/cft/TrackerTab';
 import { BarChart } from '@/components/ui/BarChart';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterPillLinks } from '@/components/ui/FilterPills';
 import { KPICard } from '@/components/ui/KPICard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -132,6 +134,65 @@ function GoalBar({ goal }: { goal: GoalProgress }) {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
+  /*
+   * Two views of the book: the rollup, and the tracker's own per-campaign
+   * table. Tabs rather than a second page, because they answer the same
+   * question at different grains and Josh reads the second one in a
+   * spreadsheet today.
+   *
+   * FilterPillLinks is the app's existing link-driven segmented control, so the
+   * selection lives in the URL and the page keeps rendering on the server.
+   */
+  const tab = single(searchParams['tab']) === 'tracker' ? 'tracker' : 'overview';
+
+  const tabHref = (next: string): string => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(searchParams)) {
+      const flat = Array.isArray(value) ? value[0] : value;
+      if (flat) params.set(key, flat);
+    }
+    if (next === 'tracker') params.set('tab', 'tracker');
+    else params.delete('tab');
+    const query = params.toString();
+    return query ? `/dashboard?${query}` : '/dashboard';
+  };
+
+  const tabs = (
+    <div className="mb-4">
+      <FilterPillLinks
+        options={[
+          { key: 'overview', label: 'Overview', href: tabHref('overview') },
+          {
+            key: 'tracker',
+            label: 'Client Fulfilment Tracker',
+            href: tabHref('tracker'),
+          },
+        ]}
+        value={tab}
+      />
+    </div>
+  );
+
+  if (tab === 'tracker') {
+    /*
+     * Returned before the dashboard's own queries run. They compute rollups for
+     * every client, an eight-month trend and the goal progress, none of which
+     * appears on this tab — doing that work anyway would make the tracker
+     * slower than the spreadsheet it replaces.
+     */
+    return (
+      <>
+        <PageHeader
+          eyebrow="Dashboard"
+          title="Client Fulfilment Tracker"
+          description="The STATS DASHBOARD tab, column for column, from the Hub's own data."
+        />
+        {tabs}
+        <TrackerTab searchParams={searchParams} basePath="/dashboard" />
+      </>
+    );
+  }
+
   const range = resolveRange({
     preset: single(searchParams['preset']),
     from: single(searchParams['from']),
@@ -203,6 +264,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         }
         actions={<DateRangePicker />}
       />
+
+      {tabs}
 
       {metrics.isEmpty ? (
         <EmptyState

@@ -1,8 +1,8 @@
 import { TriangleAlert } from 'lucide-react';
 
-import { ClientPicker } from '@/components/b2c/ClientPicker';
-import { StatsDashboardTable } from '@/components/b2c/StatsDashboardTable';
-import { WideTableScroll } from '@/components/b2c/WideTableScroll';
+import { ClientPicker } from '@/components/cft/ClientPicker';
+import { StatsDashboardTable } from '@/components/cft/StatsDashboardTable';
+import { WideTableScroll } from '@/components/cft/WideTableScroll';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FilterPillLinks } from '@/components/ui/FilterPills';
 import {
@@ -57,8 +57,11 @@ const day = (value: string | null): string =>
 
 export async function TrackerTab({
   searchParams,
+  basePath,
 }: {
   searchParams: Record<string, string | string[] | undefined>;
+  /** The page hosting the tab, so its own controls link back to it. */
+  basePath: string;
 }) {
   const single = (key: string): string | undefined => {
     const value = searchParams[key];
@@ -79,7 +82,7 @@ export async function TrackerTab({
     }
     for (const [key, value] of Object.entries(next)) params.set(key, value);
     params.set('tab', 'tracker');
-    return `/b2c?${params.toString()}`;
+    return `${basePath}?${params.toString()}`;
   };
 
   /*
