@@ -2,7 +2,9 @@ import {
   ConsultationsTable,
   type ConsultationRow,
 } from '@/components/b2c/ConsultationsTable';
+import { TrackerTab } from '@/components/b2c/TrackerTab';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
+import { FilterPillLinks } from '@/components/ui/FilterPills';
 import { KPICard } from '@/components/ui/KPICard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
@@ -30,6 +32,65 @@ function single(value: string | string[] | undefined): string | undefined {
  * "what happened today", which is a different question and needs its own page.
  */
 export default async function ConsultationsPage({ searchParams }: PageProps) {
+  /*
+   * Two views of the same subject, so tabs rather than a second page: one is
+   * every consultation as a row, the other is the tracker's own per-campaign
+   * roll-up. Josh reads the second in the spreadsheet today.
+   *
+   * Built with FilterPillLinks — the app's existing link-driven segmented
+   * control — rather than a new tab component, so the selection lives in the
+   * URL and the whole page keeps rendering on the server.
+   */
+  const tab = single(searchParams['tab']) === 'tracker' ? 'tracker' : 'consultations';
+
+  const tabHref = (next: string): string => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(searchParams)) {
+      const flat = Array.isArray(value) ? value[0] : value;
+      if (flat) params.set(key, flat);
+    }
+    if (next === 'tracker') params.set('tab', 'tracker');
+    else params.delete('tab');
+    const query = params.toString();
+    return query ? `/b2c?${query}` : '/b2c';
+  };
+
+  const tabs = (
+    <div className="mb-4">
+      <FilterPillLinks
+        options={[
+          { key: 'consultations', label: 'Consultations', href: tabHref('consultations') },
+          {
+            key: 'tracker',
+            label: 'Client Fulfilment Tracker',
+            href: tabHref('tracker'),
+          },
+        ]}
+        value={tab}
+      />
+    </div>
+  );
+
+  if (tab === 'tracker') {
+    /*
+     * Returned before the consultation queries run. They fetch four hundred
+     * appointments and the whole outcome queue, and none of it appears on this
+     * tab — doing that work anyway would make the tracker slower than the
+     * spreadsheet it replaces.
+     */
+    return (
+      <>
+        <PageHeader
+          eyebrow="Consultations"
+          title="Client Fulfilment Tracker"
+          description="The STATS DASHBOARD tab, column for column, from the Hub's own data."
+        />
+        {tabs}
+        <TrackerTab searchParams={searchParams} />
+      </>
+    );
+  }
+
   const range = resolveRange({
     preset: single(searchParams['preset']) ?? 'last_30',
     from: single(searchParams['from']),
@@ -196,6 +257,8 @@ export default async function ConsultationsPage({ searchParams }: PageProps) {
         }
         actions={<DateRangePicker />}
       />
+
+      {tabs}
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard

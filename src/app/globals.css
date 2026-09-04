@@ -360,3 +360,36 @@ a:hover > .logo-mark,
 button:hover > .logo-mark {
   opacity: 0.85;
 }
+
+/* ---------------------------------------------------------------------------
+   Scrollbars that stay put.
+
+   The rule above sets `scrollbar-width: thin`, which is right for a page. It is
+   wrong for a table thirty-three columns wide, where the scrollbar is not
+   decoration but the only sign that there is more to the right. macOS hides
+   overlay scrollbars until something moves, and a reader who never sees one
+   concludes the table does not scroll — which is exactly what happened with the
+   spreadsheet this mirrors.
+
+   Applied by class, never globally: forcing visible scrollbars everywhere would
+   put a permanent grey gutter down every panel on the page.
+   --------------------------------------------------------------------------- */
+.scrollbar-always {
+  scrollbar-width: auto;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.scrollbar-always::-webkit-scrollbar {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+}
+
+.scrollbar-always::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  background-color: var(--border-strong);
+}
+
+.scrollbar-always::-webkit-scrollbar-track {
+  background-color: transparent;
+}

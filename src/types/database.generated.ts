@@ -3754,6 +3754,58 @@ export type Database = {
       }
     }
     Views: {
+      v_cft_call_daily: {
+        Row: {
+          calls_2min: number | null
+          calls_total: number | null
+          client_id: string | null
+          client_name: string | null
+          connected_any: number | null
+          connected_outbound: number | null
+          day: string | null
+          dialed_calls: number | null
+          group_id: string | null
+          inbound_calls: number | null
+          speed_to_lead_min_sum: number | null
+          speed_to_lead_n: number | null
+          speed_to_lead_over_24h: number | null
+        }
+        Relationships: []
+      }
+      v_cft_stats_dashboard: {
+        Row: {
+          appts_created: number | null
+          appts_not_in_ledger: number | null
+          appts_to_be_taken: number | null
+          campaign_id_external: string | null
+          campaign_name: string | null
+          campaign_status: string | null
+          campaign_uuid: string | null
+          cancels: number | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          closes: number | null
+          day: string | null
+          dqs: number | null
+          follow_ups: number | null
+          group_id: string | null
+          impressions: number | null
+          is_active: boolean | null
+          last_appt_date: string | null
+          leads_best: number | null
+          leads_tracker: number | null
+          leads_windsor: number | null
+          no_shows: number | null
+          notes: string | null
+          offer_name: string | null
+          revenue_cents: number | null
+          shows: number | null
+          spend_cents: number | null
+          status: string | null
+        }
+        Relationships: []
+      }
       appointment_exceptions: {
         Row: {
           amount_cents: number | null
