@@ -15,11 +15,13 @@
  *
  * No database, no network, no sheet.
  */
+import { COLUMNS, LETTERS, SECTIONS } from '../src/lib/cft-columns';
 import {
   type CallViewRow,
   type StatsViewRow,
   aggregate,
   derive,
+  sortRows,
   windowFor,
 } from '../src/lib/cft-stats';
 
@@ -327,6 +329,116 @@ const nothing = aggregate([], [], campaign);
 check('no rows', nothing.rows.length, 0);
 check('totals are zero rather than absent', nothing.totals.spendCents, 0);
 check('and its CPL is blank', derive(nothing.totals).cpl, null);
+
+section('The column model matches the sheet');
+
+check('thirty-three columns', COLUMNS.length, 33);
+check('lettered A to AG in order', COLUMNS.map((c) => c.letter), LETTERS);
+check('and the letters end at AG', LETTERS[32], 'AG');
+check(
+  'the six section headers span every column',
+  SECTIONS.reduce((total, s) => total + s.span, 0),
+  33,
+);
+check(
+  'the sections are the sheet\x27s, in order',
+  SECTIONS.map((s) => s.label),
+  ['', 'CAMPAIGN INFORMATION', '1. AD DATA', '2. CALL DATA', '3. APPOINTMENT DATA', '4. DEALS', '5. KPI METRICS'],
+);
+// Columns J to O are the call block, and the only ones hatched at campaign grain.
+check(
+  'exactly the call columns are blocked in a campaign breakdown',
+  COLUMNS.filter((c) => c.blockedAt?.('campaign')).map((c) => c.letter),
+  ['J', 'K', 'L', 'M', 'N', 'O'],
+);
+check(
+  'and none of them are blocked at client grain',
+  COLUMNS.filter((c) => c.blockedAt?.('client')).length,
+  0,
+);
+check(
+  'three columns have no Hub source at all',
+  COLUMNS.filter((c) => c.noSource).map((c) => c.letter),
+  ['A', 'AC', 'AD'],
+);
+
+section('Sorting');
+
+const forSort = [
+  { n: 3 as number | string | null },
+  { n: 1 },
+  { n: 2 },
+];
+
+check(
+  'descending is the default direction',
+  sortRows(forSort, (r) => r.n, 'desc').map((r) => r.n),
+  [3, 2, 1],
+);
+check(
+  'ascending reverses it',
+  sortRows(forSort, (r) => r.n, 'asc').map((r) => r.n),
+  [1, 2, 3],
+);
+
+/*
+ * Blanks sink in BOTH directions. A campaign with no leads has no CPL, and
+ * letting null sort as zero parks every unmeasurable row at the top of
+ * "cheapest cost per lead" — the most expensive misreading available on a page
+ * somebody scans to decide where to put money.
+ */
+const withBlanks = [{ n: 2 as number | null }, { n: null }, { n: 1 }];
+check(
+  'blanks sink when sorting ascending',
+  sortRows(withBlanks, (r) => r.n, 'asc').map((r) => r.n),
+  [1, 2, null],
+);
+check(
+  'and when sorting descending',
+  sortRows(withBlanks, (r) => r.n, 'desc').map((r) => r.n),
+  [2, 1, null],
+);
+check(
+  'text sorts as text, not by code point accident',
+  sortRows([{ n: 'b' as string }, { n: 'A' }, { n: 'c' }], (r) => r.n, 'asc').map((r) => r.n),
+  ['A', 'b', 'c'],
+);
+// Sorting reads the value, not the rendered string: 9 must sit below 10.
+check(
+  'numbers sort numerically',
+  sortRows([{ n: 9 as number }, { n: 10 }, { n: 100 }], (r) => r.n, 'asc').map((r) => r.n),
+  [9, 10, 100],
+);
+
+section('Clients dialled with no live campaign');
+
+/*
+ * Outbound dials against zero spend, zero leads and zero appointments. Either
+ * the campaign is missing an ad_account_id or the team is working a dead list.
+ * Invisible in a table sorted by spend, where these rows sit at the bottom
+ * looking like quiet clients.
+ */
+const dialledOnly = aggregate(
+  [stat({ client_id: 'c1', spend_cents: 5000, leads_best: 10 })],
+  [
+    call({ client_id: 'c1', dialed_calls: 30 }),
+    call({ client_id: 'c9', client_name: 'Diamond Dental', dialed_calls: 32 }),
+  ],
+  client,
+);
+
+check(
+  'the dialled-but-unadvertised client is present in the rows',
+  dialledOnly.rows
+    .filter((row) => row.spendCents === 0 && (row.calls?.dialed ?? 0) > 0)
+    .map((row) => [row.clientName, row.calls?.dialed]),
+  [['Diamond Dental', 32]],
+);
+check(
+  'and the advertised one is not flagged',
+  dialledOnly.rows.filter((row) => row.spendCents > 0).length,
+  1,
+);
 
 // ---------------------------------------------------------------------------
 

@@ -393,3 +393,17 @@ button:hover > .logo-mark {
 .scrollbar-always::-webkit-scrollbar-track {
   background-color: transparent;
 }
+
+/* A cell whose value cannot exist at the grain on screen — call data on a
+   campaign row. Hatched rather than blank: a blank cell reads as zero, or as
+   nobody having filled it in, and both are wrong. The table's legend explains
+   the pattern. */
+.cft-blocked {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    var(--surface-sunken) 5px,
+    var(--surface-sunken) 6px
+  );
+}

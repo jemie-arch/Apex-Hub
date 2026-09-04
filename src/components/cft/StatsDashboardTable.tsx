@@ -1,260 +1,53 @@
-import { cplTone } from '@/config/cft-dashboard';
+import Link from 'next/link';
+
+import { RENDERERS } from '@/components/cft/cells';
 import {
-  type Breakdown,
-  type DashboardRow,
-  derive,
-} from '@/lib/cft-stats';
-import { formatMoney, formatPercent } from '@/lib/format';
+  COLUMNS,
+  FROZEN_WIDTHS,
+  LEFT_OFFSETS,
+  SECTIONS,
+} from '@/lib/cft-columns';
+import { type Breakdown, type DashboardRow, derive } from '@/lib/cft-stats';
 import { cn } from '@/lib/cn';
 
 /**
  * The STATS DASHBOARD tab, column for column.
  *
- * Thirty-three columns in the sheet's own order under the sheet's own six
- * section headers, because its whole purpose is that somebody who knows the
- * spreadsheet can read this without relearning it. Columns are not reordered,
- * renamed or dropped for tidiness — including the three that have no Hub source
- * and render blank, since a missing column reads as an oversight while a blank
- * one reads as a gap.
+ * Thirty-three columns in the sheet's order under the sheet's six section
+ * headers, with each column's sheet letter printed beneath its heading — that
+ * letter is the point of the whole page: it is what lets somebody check a cell
+ * here against the same cell in the spreadsheet without counting across.
  *
- * Frozen columns are done with `position: sticky` and explicit left offsets,
- * which is the pattern already used on the client comparison page. The offsets
- * have to be computed from real widths, so the five frozen columns carry fixed
- * widths and everything else is free.
+ * The columns themselves live in lib/cft-columns, so a column's letter, its
+ * sort value and whether it can be sourced at this grain are one entry rather
+ * than three places that can disagree.
  *
- * The table sets `border-separate`, not the Tailwind default of
- * `border-collapse: collapse`. Collapsed borders are painted by the table
+ * Frozen columns use position: sticky with explicit left offsets, the pattern
+ * already on the client comparison page. The table sets border-separate, not
+ * Tailwind's default collapse: collapsed borders are painted by the table
  * rather than the cell, so a sticky cell scrolls out from under its own border
  * and leaves a gap down the frozen edge.
  */
-
-/** Fixed widths for the frozen columns, in order. Left offsets derive from these. */
-const FROZEN = [
-  { label: 'Notes', width: 56 },
-  { label: 'Status', width: 88 },
-  { label: 'Client Name', width: 170 },
-  { label: 'Campaign Name', width: 200 },
-  { label: 'Campaign ID', width: 130 },
-] as const;
-
-const LEFT_OFFSETS = FROZEN.reduce<number[]>((offsets, column, index) => {
-  offsets.push(index === 0 ? 0 : offsets[index - 1]! + FROZEN[index - 1]!.width);
-  return offsets;
-}, []);
-
-/** Section headers, sheet row 4. The first column sits under no section. */
-const SECTIONS = [
-  { label: '', span: 1 },
-  { label: 'CAMPAIGN INFORMATION', span: 5 },
-  { label: '1. AD DATA', span: 3 },
-  { label: '2. CALL DATA', span: 6 },
-  { label: '3. APPOINTMENT DATA', span: 11 },
-  { label: '4. DEALS', span: 4 },
-  { label: '5. KPI METRICS', span: 3 },
-] as const;
-
-/** Column headings, sheet row 5, in sheet order A to AG. */
-const HEADINGS = [
-  'Notes',
-  'Status',
-  'Client Name',
-  'Campaign Name',
-  'Campaign ID',
-  'Offer Name',
-  'Amount Spent',
-  'Leads',
-  'CPL',
-  'Number of dialed calls',
-  'Calls 2+ minutes',
-  'Speed To Lead (minutes)',
-  'Pickup %',
-  'Conversation %',
-  'Dials per Lead',
-  'Appointments Created',
-  'Appointments To Be Taken',
-  'Last Appt Date',
-  'Schedule %',
-  'Shows',
-  'No Shows',
-  'Cancels',
-  "DQ's",
-  'DQ %',
-  'Cancel %',
-  'Show %',
-  'Closes',
-  'Close %',
-  'Revenue',
-  'ROI',
-  'Cost Per Booking',
-  'Cost Per Show',
-  'Cost Per Close',
-] as const;
-
-const num = (value: number): string => value.toLocaleString();
-
-/** A figure that has no denominator is blank, never zero. */
-const pct = (value: number | null): string =>
-  value === null ? '—' : formatPercent(value, 1);
-
-const money = (value: number | null): string =>
-  value === null ? '—' : formatMoney(Math.round(value * 100));
-
-const TONE_CLASS: Record<string, string> = {
-  positive: 'text-positive',
-  warning: 'text-warning',
-  negative: 'text-negative',
-  neutral: 'text-fg-muted',
-};
-
-function Frozen({
-  index,
-  children = null,
-  total,
-  header,
-}: {
-  index: number;
-  children?: React.ReactNode;
-  total?: boolean;
-  header?: boolean;
-}) {
-  const column = FROZEN[index]!;
-  return (
-    <td
-      style={{ left: LEFT_OFFSETS[index], width: column.width, minWidth: column.width }}
-      className={cn(
-        'sticky z-10 border-b border-line px-3 py-2',
-        total ? 'bg-surface-sunken font-semibold' : 'bg-surface',
-        header && 'font-medium',
-      )}
-    >
-      {children}
-    </td>
-  );
-}
-
-function Num({
-  children = null,
-  total,
-  className,
-}: {
-  children: React.ReactNode;
-  total?: boolean;
-  className?: string;
-}) {
-  return (
-    <td
-      className={cn(
-        'numeric whitespace-nowrap border-b border-line px-3 py-2 text-right',
-        total ? 'bg-surface-sunken font-semibold text-fg' : 'text-fg-muted',
-        className,
-      )}
-    >
-      {children}
-    </td>
-  );
-}
-
-function Row({ row, breakdown, total }: { row: DashboardRow; breakdown: Breakdown; total?: boolean }) {
-  const d = derive(row);
-  const calls = row.calls;
-  const tone = cplTone(d.cpl);
-
-  /*
-   * Call columns are blank in a campaign breakdown rather than repeating the
-   * client's total on each of its campaign rows. The calls table has no
-   * campaign reference at all, so the client figure is not this campaign's
-   * share of anything — printing it on five campaign rows would show the same
-   * calls five times.
-   */
-  const callCell = (value: string) => (calls ? value : '—');
-
-  return (
-    <tr className={cn(!total && 'hover:bg-surface-hover')}>
-      <Frozen index={0} total={total}>
-        {/* Column A is typed by hand in the sheet. No Hub store exists. */}
-      </Frozen>
-      <Frozen index={1} total={total}>
-        <span className="text-xs text-fg-muted">{total ? '' : (row.status ?? '—')}</span>
-      </Frozen>
-      <Frozen index={2} total={total} header>
-        <span className="truncate text-fg">{total ? 'Total' : (row.clientName ?? '—')}</span>
-      </Frozen>
-      <Frozen index={3} total={total}>
-        <span className="text-fg-muted">
-          {total ? '' : breakdown === 'client' ? '—' : (row.campaignName ?? '(no campaign)')}
-        </span>
-      </Frozen>
-      <Frozen index={4} total={total}>
-        <span className="numeric text-xs text-fg-subtle">
-          {total ? '' : (row.campaignId ?? '—')}
-        </span>
-      </Frozen>
-
-      <Num total={total} className="text-left">
-        {total ? '' : (row.offerName ?? '—')}
-      </Num>
-
-      {/* 1. AD DATA */}
-      <Num total={total}>{formatMoney(row.spendCents)}</Num>
-      <Num total={total}>{num(row.leads)}</Num>
-      <Num total={total} className={tone ? TONE_CLASS[tone] : undefined}>
-        {money(d.cpl)}
-      </Num>
-
-      {/* 2. CALL DATA — client grain only */}
-      <Num total={total}>{callCell(num(calls?.dialed ?? 0))}</Num>
-      <Num total={total}>{callCell(num(calls?.calls2min ?? 0))}</Num>
-      <Num total={total}>
-        {calls
-          ? d.speedToLead === null
-            ? '—'
-            : `${d.speedToLead.toFixed(1)}${calls.speedToLeadOver24h > 0 ? ` (+${calls.speedToLeadOver24h})` : ''}`
-          : '—'}
-      </Num>
-      <Num total={total}>{callCell(pct(d.pickupPct))}</Num>
-      <Num total={total}>{callCell(pct(d.conversationPct))}</Num>
-      <Num total={total}>
-        {calls ? (d.dialsPerLead === null ? '—' : d.dialsPerLead.toFixed(1)) : '—'}
-      </Num>
-
-      {/* 3. APPOINTMENT DATA */}
-      <Num total={total}>{num(row.apptsCreated)}</Num>
-      <Num total={total}>{num(row.apptsToBeTaken)}</Num>
-      <Num total={total}>{row.lastApptDate ?? '—'}</Num>
-      <Num total={total}>{pct(d.schedulePct)}</Num>
-      <Num total={total}>{num(row.shows)}</Num>
-      <Num total={total}>{num(row.noShows)}</Num>
-      <Num total={total}>{num(row.cancels)}</Num>
-      <Num total={total}>{num(row.dqs)}</Num>
-      <Num total={total}>{pct(d.dqPct)}</Num>
-      <Num total={total}>{pct(d.cancelPct)}</Num>
-      <Num total={total}>{pct(d.showPct)}</Num>
-
-      {/* 4. DEALS — Revenue and ROI have no Hub source. */}
-      <Num total={total}>{num(row.closes)}</Num>
-      <Num total={total}>{pct(d.closePct)}</Num>
-      <Num total={total}>—</Num>
-      <Num total={total}>—</Num>
-
-      {/* 5. KPI METRICS */}
-      <Num total={total}>{money(d.costPerBooking)}</Num>
-      <Num total={total}>{money(d.costPerShow)}</Num>
-      <Num total={total}>{money(d.costPerClose)}</Num>
-    </tr>
-  );
-}
-
 export function StatsDashboardTable({
   rows,
   totals,
   breakdown,
+  sort,
+  direction,
+  hrefForSort,
 }: {
   rows: DashboardRow[];
   totals: DashboardRow;
   breakdown: Breakdown;
+  /** Index into COLUMNS, or null for the default spend ordering. */
+  sort: number | null;
+  direction: 'asc' | 'desc';
+  hrefForSort: (index: number) => string;
 }) {
+  const frozen = FROZEN_WIDTHS.length;
+
   return (
-    <table className="w-full border-separate border-spacing-0 text-sm">
+    <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
       <thead>
         {/* Sheet row 4. */}
         <tr>
@@ -262,57 +55,164 @@ export function StatsDashboardTable({
             <th
               key={`${section.label}-${index}`}
               colSpan={section.span}
-              /*
-               * The first section covers only the frozen Notes column, so it is
-               * sticky too — otherwise the section band scrolls away from the
-               * column it labels.
-               */
-              style={index === 0 ? { left: 0, width: FROZEN[0]!.width } : undefined}
+              style={index === 0 ? { left: 0, width: FROZEN_WIDTHS[0] } : undefined}
               className={cn(
-                'sticky top-0 border-b border-line bg-surface-sunken px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-fg-subtle',
-                index === 0 && 'z-30',
-                index > 0 && 'z-20',
+                'sticky top-0 whitespace-nowrap border-b border-line bg-surface-sunken px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-fg-subtle',
+                index === 0 ? 'z-40' : 'z-30',
+                index > 0 && 'border-l border-line',
               )}
             >
               {section.label}
             </th>
           ))}
         </tr>
-        {/* Sheet row 5. */}
+
+        {/* Sheet row 5, with the sheet's own letters under each heading. */}
         <tr>
-          {HEADINGS.map((heading, index) => {
-            const frozen = index < FROZEN.length;
+          {COLUMNS.map((column, index) => {
+            const isFrozen = index < frozen;
+            const sorted = sort === index;
+
             return (
               <th
-                key={heading}
-                style={
-                  frozen
+                key={column.letter}
+                style={{
+                  top: 33,
+                  ...(isFrozen
                     ? {
                         left: LEFT_OFFSETS[index],
-                        top: 33,
-                        width: FROZEN[index]!.width,
-                        minWidth: FROZEN[index]!.width,
+                        width: FROZEN_WIDTHS[index],
+                        minWidth: FROZEN_WIDTHS[index],
                       }
-                    : { top: 33 }
-                }
+                    : { minWidth: 78 }),
+                }}
                 className={cn(
-                  'sticky whitespace-nowrap border-b border-line bg-surface px-3 py-2 text-xs font-medium uppercase tracking-wide text-fg-subtle',
-                  index < 6 ? 'text-left' : 'text-right',
-                  frozen ? 'z-30' : 'z-20',
+                  'sticky whitespace-nowrap border-b border-line px-3 py-1.5 align-bottom text-[11px] font-medium uppercase tracking-wide',
+                  sorted ? 'bg-accent-subtle text-accent' : 'bg-surface text-fg-subtle',
+                  column.align === 'left' ? 'text-left' : 'text-right',
+                  isFrozen ? 'z-30' : 'z-20',
                 )}
+                aria-sort={sorted ? (direction === 'asc' ? 'ascending' : 'descending') : undefined}
               >
-                {heading}
+                {/*
+                  A link, not a button: sorting lives in the URL like every
+                  other control on this page, so the table stays server
+                  rendered and a sorted view can be sent to somebody.
+                */}
+                <Link
+                  href={hrefForSort(index)}
+                  className="block hover:text-fg"
+                  scroll={false}
+                >
+                  {column.heading}
+                  {sorted ? (direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  <span className="numeric mt-0.5 block text-[9px] font-normal tracking-widest text-fg-subtle/70">
+                    {column.letter}
+                  </span>
+                </Link>
               </th>
             );
           })}
         </tr>
       </thead>
+
       <tbody>
-        {rows.map((row) => (
-          <Row key={row.key} row={row} breakdown={breakdown} />
-        ))}
-        <Row row={totals} breakdown={breakdown} total />
+        {rows.map((row) => {
+          const derived = derive(row);
+          return (
+            <tr key={row.key} className="group">
+              {COLUMNS.map((column, index) => (
+                <Cell
+                  key={column.letter}
+                  index={index}
+                  breakdown={breakdown}
+                  body={RENDERERS[column.letter]?.(row, derived) ?? null}
+                  column={column}
+                />
+              ))}
+            </tr>
+          );
+        })}
       </tbody>
+
+      <tfoot>
+        <tr>
+          {COLUMNS.map((column, index) => {
+            const derived = derive(totals);
+            const isFrozen = index < frozen;
+            const blocked = column.blockedAt?.(breakdown) ?? false;
+
+            return (
+              <td
+                key={column.letter}
+                style={
+                  isFrozen
+                    ? {
+                        left: LEFT_OFFSETS[index],
+                        width: FROZEN_WIDTHS[index],
+                        minWidth: FROZEN_WIDTHS[index],
+                      }
+                    : undefined
+                }
+                className={cn(
+                  'numeric whitespace-nowrap border-t-2 border-line-strong bg-surface-sunken px-3 py-2 font-semibold text-fg',
+                  column.align === 'left' ? 'text-left' : 'text-right',
+                  isFrozen && 'sticky z-10',
+                )}
+              >
+                {/* The label sits in Client Name, where the eye already is. */}
+                {index === 2
+                  ? 'Total'
+                  : blocked || column.noSource || index < 2 || (index > 2 && index < 6)
+                    ? null
+                    : (RENDERERS[column.letter]?.(totals, derived) ?? null)}
+              </td>
+            );
+          })}
+        </tr>
+      </tfoot>
     </table>
+  );
+}
+
+function Cell({
+  index,
+  breakdown,
+  body,
+  column,
+}: {
+  index: number;
+  breakdown: Breakdown;
+  body: React.ReactNode;
+  column: (typeof COLUMNS)[number];
+}) {
+  const isFrozen = index < FROZEN_WIDTHS.length;
+  const blocked = column.blockedAt?.(breakdown) ?? false;
+
+  return (
+    <td
+      style={
+        isFrozen
+          ? {
+              left: LEFT_OFFSETS[index],
+              width: FROZEN_WIDTHS[index],
+              minWidth: FROZEN_WIDTHS[index],
+            }
+          : undefined
+      }
+      className={cn(
+        'numeric overflow-hidden text-ellipsis whitespace-nowrap border-b border-line px-3 py-1.5',
+        column.align === 'left' ? 'text-left' : 'text-right',
+        isFrozen
+          ? 'sticky z-10 bg-surface font-medium text-fg'
+          : 'bg-surface text-fg-muted',
+        // Hatched, not blank. A blank cell reads as zero or as nobody having
+        // filled it in; hatching reads as "cannot be known at this grain",
+        // which is what the legend below the table explains.
+        blocked && 'cft-blocked',
+      )}
+    >
+      {blocked ? null : body}
+    </td>
   );
 }

@@ -205,6 +205,18 @@ export interface DashboardResult {
   totals: DashboardRow;
   /** Every client in either feed, for the client filter. */
   clients: { id: string; name: string }[];
+  /**
+   * Clients being dialled with no live campaign behind them.
+   *
+   * Computed at client grain whatever breakdown is on screen, because it is a
+   * fact about the book rather than about the current view: outbound dials
+   * against zero spend, zero leads and zero appointments means either the
+   * campaign is missing an ad_account_id or the team is working a list that no
+   * longer has ads behind it. Both are worth knowing and neither is visible in
+   * a table sorted by spend, where these rows sit at the bottom reading as
+   * quiet clients.
+   */
+  dialledWithoutCampaign: { name: string; dials: number }[];
   from: string;
   to: string;
 }
@@ -247,7 +259,27 @@ export async function loadStatsDashboard(
     ),
   ]);
 
-  return { ...aggregate(stats, calls, options), from, to };
+  const result = aggregate(stats, calls, options);
+
+  // Always at client grain, so the finding does not appear and disappear with
+  // the breakdown control.
+  const byClient =
+    options.breakdown === 'client'
+      ? result
+      : aggregate(stats, calls, { ...options, breakdown: 'client' });
+
+  const dialledWithoutCampaign = byClient.rows
+    .filter(
+      (row) =>
+        (row.calls?.dialed ?? 0) > 0 &&
+        row.spendCents === 0 &&
+        row.leads === 0 &&
+        row.apptsCreated === 0,
+    )
+    .map((row) => ({ name: row.clientName ?? '—', dials: row.calls?.dialed ?? 0 }))
+    .sort((a, b) => b.dials - a.dials);
+
+  return { ...result, dialledWithoutCampaign, from, to };
 }
 
 /**
@@ -264,7 +296,7 @@ export function aggregate(
   stats: StatsViewRow[],
   calls: CallViewRow[],
   options: { breakdown: Breakdown; clientId?: string | undefined },
-): Omit<DashboardResult, 'from' | 'to'> {
+): Omit<DashboardResult, 'from' | 'to' | 'dialledWithoutCampaign'> {
   // Every client in either feed, so the filter and the client breakdown both
   // include the call-only ones.
   const clientNames = new Map<string, string>();
@@ -439,4 +471,37 @@ export function aggregate(
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   };
+}
+
+/**
+ * Sort the rows by one of the sheet's columns.
+ *
+ * Blanks always sink, in both directions. A campaign with no leads has no CPL,
+ * and letting null sort as zero would park every unmeasurable row at the top of
+ * "cheapest cost per lead" — the most expensive possible misreading of a column
+ * somebody is scanning to decide where to put money.
+ *
+ * The comparison is by value rather than by rendered text, so 9 sorts below 10
+ * and "40.0%" sorts as 0.4.
+ */
+export function sortRows<T>(
+  rows: T[],
+  valueOf: (row: T) => number | string | null,
+  direction: 'asc' | 'desc',
+): T[] {
+  const sign = direction === 'asc' ? 1 : -1;
+
+  return [...rows].sort((a, b) => {
+    const left = valueOf(a);
+    const right = valueOf(b);
+
+    if (left === null && right === null) return 0;
+    if (left === null) return 1;
+    if (right === null) return -1;
+
+    if (typeof left === 'number' && typeof right === 'number') {
+      return (left - right) * sign;
+    }
+    return String(left).localeCompare(String(right)) * sign;
+  });
 }
