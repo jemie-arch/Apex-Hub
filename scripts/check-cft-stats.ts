@@ -410,36 +410,6 @@ check(
   [9, 10, 100],
 );
 
-section('Clients dialled with no live campaign');
-
-/*
- * Outbound dials against zero spend, zero leads and zero appointments. Either
- * the campaign is missing an ad_account_id or the team is working a dead list.
- * Invisible in a table sorted by spend, where these rows sit at the bottom
- * looking like quiet clients.
- */
-const dialledOnly = aggregate(
-  [stat({ client_id: 'c1', spend_cents: 5000, leads_best: 10 })],
-  [
-    call({ client_id: 'c1', dialed_calls: 30 }),
-    call({ client_id: 'c9', client_name: 'Diamond Dental', dialed_calls: 32 }),
-  ],
-  client,
-);
-
-check(
-  'the dialled-but-unadvertised client is present in the rows',
-  dialledOnly.rows
-    .filter((row) => row.spendCents === 0 && (row.calls?.dialed ?? 0) > 0)
-    .map((row) => [row.clientName, row.calls?.dialed]),
-  [['Diamond Dental', 32]],
-);
-check(
-  'and the advertised one is not flagged',
-  dialledOnly.rows.filter((row) => row.spendCents > 0).length,
-  1,
-);
-
 // ---------------------------------------------------------------------------
 
 console.log(

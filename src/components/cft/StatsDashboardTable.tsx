@@ -45,6 +45,8 @@ export function StatsDashboardTable({
   hrefForSort: (index: number) => string;
 }) {
   const frozen = FROZEN_WIDTHS.length;
+  // Once, not once per column: this was being recomputed 33 times a render.
+  const totalsDerived = derive(totals);
 
   return (
     <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
@@ -55,10 +57,23 @@ export function StatsDashboardTable({
             <th
               key={`${section.label}-${index}`}
               colSpan={section.span}
-              style={index === 0 ? { left: 0, width: FROZEN_WIDTHS[0] } : undefined}
+              /*
+                Sections 0 and 1 sit over the frozen columns, so they are pinned
+                left as well as top. Without it "CAMPAIGN INFORMATION" scrolls
+                away while the columns it labels stay put, and the next section
+                slides into its place — the header stops describing what is
+                underneath it.
+              */
+              style={
+                index === 0
+                  ? { left: 0, width: FROZEN_WIDTHS[0] }
+                  : index === 1
+                    ? { left: FROZEN_WIDTHS[0] }
+                    : undefined
+              }
               className={cn(
                 'sticky top-0 whitespace-nowrap border-b border-line bg-surface-sunken px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-fg-subtle',
-                index === 0 ? 'z-40' : 'z-30',
+                index <= 1 ? 'z-40' : 'z-30',
                 index > 0 && 'border-l border-line',
               )}
             >
@@ -138,7 +153,6 @@ export function StatsDashboardTable({
       <tfoot>
         <tr>
           {COLUMNS.map((column, index) => {
-            const derived = derive(totals);
             const isFrozen = index < frozen;
             const blocked = column.blockedAt?.(breakdown) ?? false;
 
@@ -165,7 +179,7 @@ export function StatsDashboardTable({
                   ? 'Total'
                   : blocked || column.noSource || index < 2 || (index > 2 && index < 6)
                     ? null
-                    : (RENDERERS[column.letter]?.(totals, derived) ?? null)}
+                    : (RENDERERS[column.letter]?.(totals, totalsDerived) ?? null)}
               </td>
             );
           })}

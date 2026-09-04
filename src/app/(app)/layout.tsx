@@ -91,7 +91,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         isSuperAdmin={isSuperAdmin}
         theme={theme}
       />
-      <main className="flex-1 overflow-y-auto">
+      {/*
+        min-w-0 matters: a flex child defaults to min-width:auto, so it grows to
+        fit its widest descendant rather than letting that descendant scroll.
+        Without it the 33-column tracker table dragged the whole page sideways —
+        sidebar and header with it — instead of scrolling inside its own
+        container.
+      */}
+      <main className="min-w-0 flex-1 overflow-y-auto">
         {/*
           The switcher sits above the page rather than inside the sidebar: it
           moves you between portals, which is a different kind of action from
