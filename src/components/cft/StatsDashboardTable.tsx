@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 
 import { RENDERERS } from '@/components/cft/cells';
@@ -28,13 +30,27 @@ import { cn } from '@/lib/cn';
  * rather than the cell, so a sticky cell scrolls out from under its own border
  * and leaves a gap down the frozen edge.
  */
+/*
+ * The group row's height, fixed and shared.
+ *
+ * Both header rows are sticky, so the second has to be offset by exactly the
+ * height of the first. That offset was hardcoded at 33px against a row whose
+ * real height was set by its padding and line-height — so the second row sat
+ * slightly wrong and the first data row scrolled up underneath it, clipped in
+ * half. Pinning the height here and reading it in both places means the two
+ * cannot drift again.
+ */
+const GROUP_ROW_HEIGHT = 30;
+
 export function StatsDashboardTable({
   rows,
   totals,
   breakdown,
   sort,
   direction,
-  hrefForSort,
+  sortHrefs,
+  selectedKey,
+  onSelect,
 }: {
   rows: DashboardRow[];
   totals: DashboardRow;
@@ -42,7 +58,14 @@ export function StatsDashboardTable({
   /** Index into COLUMNS, or null for the default spend ordering. */
   sort: number | null;
   direction: 'asc' | 'desc';
-  hrefForSort: (index: number) => string;
+  /*
+   * Built on the server and handed over as strings, one per column. This is a
+   * client component, and a builder function cannot cross that boundary —
+   * FilterPillLinks records the render-time error that taught the codebase so.
+   */
+  sortHrefs: string[];
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }) {
   const frozen = FROZEN_WIDTHS.length;
   // Once, not once per column: this was being recomputed 33 times a render.
@@ -66,13 +89,13 @@ export function StatsDashboardTable({
               */
               style={
                 index === 0
-                  ? { left: 0, width: FROZEN_WIDTHS[0] }
+                  ? { left: 0, width: FROZEN_WIDTHS[0], height: GROUP_ROW_HEIGHT }
                   : index === 1
-                    ? { left: FROZEN_WIDTHS[0] }
-                    : undefined
+                    ? { left: FROZEN_WIDTHS[0], height: GROUP_ROW_HEIGHT }
+                    : { height: GROUP_ROW_HEIGHT }
               }
               className={cn(
-                'sticky top-0 whitespace-nowrap border-b border-line bg-surface-sunken px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-fg-subtle',
+                'sticky top-0 whitespace-nowrap border-b border-line bg-surface-sunken px-3 py-0 text-left text-[10px] font-semibold uppercase tracking-widest text-fg-subtle',
                 index <= 1 ? 'z-40' : 'z-30',
                 index > 0 && 'border-l border-line',
               )}
@@ -92,7 +115,7 @@ export function StatsDashboardTable({
               <th
                 key={column.letter}
                 style={{
-                  top: 33,
+                  top: GROUP_ROW_HEIGHT,
                   ...(isFrozen
                     ? {
                         left: LEFT_OFFSETS[index],
@@ -115,7 +138,7 @@ export function StatsDashboardTable({
                   rendered and a sorted view can be sent to somebody.
                 */}
                 <Link
-                  href={hrefForSort(index)}
+                  href={sortHrefs[index] ?? '#'}
                   className="block hover:text-fg"
                   scroll={false}
                 >
@@ -135,7 +158,21 @@ export function StatsDashboardTable({
         {rows.map((row) => {
           const derived = derive(row);
           return (
-            <tr key={row.key} className="group">
+            <tr
+              key={row.key}
+              onClick={() => onSelect(row.key)}
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(row.key);
+                }
+              }}
+              className={cn(
+                'row-interactive cursor-pointer focus:outline-none',
+                row.key === selectedKey && 'cft-selected',
+              )}
+            >
               {COLUMNS.map((column, index) => (
                 <Cell
                   key={column.letter}

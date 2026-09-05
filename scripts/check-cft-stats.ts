@@ -47,6 +47,7 @@ function section(title: string) {
 function stat(over: Partial<StatsViewRow> = {}): StatsViewRow {
   return {
     client_id: 'c1',
+    group_id: 'g1',
     client_name: 'Bright Smile',
     status: 'Active',
     campaign_name: 'Implants',
@@ -69,6 +70,7 @@ function stat(over: Partial<StatsViewRow> = {}): StatsViewRow {
 function call(over: Partial<CallViewRow> = {}): CallViewRow {
   return {
     client_id: 'c1',
+    group_id: 'g1',
     client_name: 'Bright Smile',
     dialed_calls: 0,
     calls_2min: 0,

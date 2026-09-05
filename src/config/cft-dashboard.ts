@@ -19,6 +19,18 @@
  */
 export const CPL_COLOUR_BANDS_ENABLED = false;
 
+/**
+ * The same bands, ON for the single CPL headline figure.
+ *
+ * Split from the per-row flag deliberately. The reason the row bands are off is
+ * volume, not correctness: with leads undercounted almost every one of forty
+ * rows paints red, and a table that is red everywhere reads as "everything is
+ * broken" rather than as a ranking. One figure carrying a band, with the
+ * undercount named in the line beneath it, is a reading somebody can weigh.
+ * Forty are noise.
+ */
+export const CPL_COLOUR_BANDS_ON_KPI = true;
+
 export interface CplBand {
   /** Inclusive lower bound, in whole currency units. */
   from: number;
@@ -36,8 +48,11 @@ export const CPL_BANDS: readonly CplBand[] = [
   { from: 25, to: null, tone: 'neutral' },
 ];
 
-export function cplTone(cpl: number | null): CplBand['tone'] | null {
-  if (!CPL_COLOUR_BANDS_ENABLED || cpl === null) return null;
+export function cplTone(
+  cpl: number | null,
+  enabled: boolean = CPL_COLOUR_BANDS_ENABLED,
+): CplBand['tone'] | null {
+  if (!enabled || cpl === null) return null;
   return (
     CPL_BANDS.find((band) => cpl >= band.from && (band.to === null || cpl < band.to))
       ?.tone ?? null

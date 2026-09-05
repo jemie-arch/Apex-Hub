@@ -43,6 +43,8 @@ export function isWindow(value: unknown): value is WindowDays {
 export interface DashboardRow {
   key: string;
   clientId: string | null;
+  /** The practice this location belongs to, so a row can link into the Hub. */
+  groupId: string | null;
   status: string | null;
   clientName: string | null;
   campaignName: string | null;
@@ -159,6 +161,7 @@ async function readAll<T>(
 
 export interface StatsViewRow {
   client_id: string | null;
+  group_id: string | null;
   client_name: string | null;
   status: string | null;
   campaign_name: string | null;
@@ -178,6 +181,7 @@ export interface StatsViewRow {
 
 export interface CallViewRow {
   client_id: string | null;
+  group_id: string | null;
   client_name: string | null;
   dialed_calls: number | null;
   calls_2min: number | null;
@@ -229,7 +233,7 @@ export async function loadStatsDashboard(
       db
         .from('v_cft_stats_dashboard')
         .select(
-          'client_id, client_name, status, campaign_name, campaign_id_external, offer_name, spend_cents, leads_best, appts_created, appts_to_be_taken, last_appt_date, shows, no_shows, cancels, dqs, closes',
+          'client_id, group_id, client_name, status, campaign_name, campaign_id_external, offer_name, spend_cents, leads_best, appts_created, appts_to_be_taken, last_appt_date, shows, no_shows, cancels, dqs, closes',
         )
         .gte('day', from)
         .lte('day', to)
@@ -239,7 +243,7 @@ export async function loadStatsDashboard(
       db
         .from('v_cft_call_daily')
         .select(
-          'client_id, client_name, dialed_calls, calls_2min, connected_outbound, speed_to_lead_min_sum, speed_to_lead_n, speed_to_lead_over_24h',
+          'client_id, group_id, client_name, dialed_calls, calls_2min, connected_outbound, speed_to_lead_min_sum, speed_to_lead_n, speed_to_lead_over_24h',
         )
         .gte('day', from)
         .lte('day', to)
@@ -319,6 +323,7 @@ export function aggregate(
       {
         key,
         clientId: row.client_id,
+        groupId: row.group_id,
         status: options.breakdown === 'client' ? null : row.status,
         clientName: row.client_name,
         campaignName: options.breakdown === 'client' ? null : row.campaign_name,
@@ -366,6 +371,7 @@ export function aggregate(
       byKey.set(clientId, {
         key: clientId,
         clientId,
+        groupId: null,
         status: null,
         clientName: clientNames.get(clientId) ?? '—',
         campaignName: null,
@@ -391,6 +397,7 @@ export function aggregate(
   const totals: DashboardRow = {
     key: '__totals__',
     clientId: null,
+    groupId: null,
     status: null,
     clientName: null,
     campaignName: null,

@@ -407,3 +407,14 @@ button:hover > .logo-mark {
     var(--surface-sunken) 6px
   );
 }
+
+/* The selected tracker row. Set on the cells, not the row: every cell in this
+   table paints its own background so the frozen columns stay opaque while the
+   rest scrolls under them, and a background on the <tr> would sit behind all of
+   them and never be seen. */
+.cft-selected td {
+  background-color: var(--accent-subtle) !important;
+}
+.cft-selected td:first-child {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}

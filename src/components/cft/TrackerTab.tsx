@@ -1,8 +1,8 @@
 import { ClientPicker } from '@/components/cft/ClientPicker';
-import { StatsDashboardTable } from '@/components/cft/StatsDashboardTable';
-import { WideTableScroll } from '@/components/cft/WideTableScroll';
+import { StatsDashboard } from '@/components/cft/StatsDashboard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FilterPillLinks } from '@/components/ui/FilterPills';
+import { CPL_COLOUR_BANDS_ON_KPI, cplTone } from '@/config/cft-dashboard';
 import { COLUMNS } from '@/lib/cft-columns';
 import {
   type Breakdown,
@@ -12,6 +12,7 @@ import {
   loadStatsDashboard,
   sortRows,
 } from '@/lib/cft-stats';
+import { cn } from '@/lib/cn';
 import { formatCount, formatMoney, formatPercent } from '@/lib/format';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -58,22 +59,57 @@ const day = (value: string | null): string =>
         timeZone: 'UTC',
       });
 
+type Tone = 'positive' | 'warning' | 'negative' | 'neutral';
+
+const VALUE_TONE: Record<Tone, string> = {
+  positive: 'text-positive',
+  warning: 'text-warning',
+  negative: 'text-negative',
+  neutral: 'text-fg',
+};
+
+/**
+ * One headline figure.
+ *
+ * The colour sits on the number and on a rule down the left edge, not on the
+ * whole card. Six coloured cards in a row compete with each other and none of
+ * them reads as a warning; a coloured figure against a plain card does.
+ */
 function Kpi({
   label,
   value,
   note,
-  stale,
+  tone = 'neutral',
+  noteTone,
 }: {
   label: string;
   value: string;
   note: string;
-  stale?: boolean;
+  tone?: Tone;
+  noteTone?: Tone;
 }) {
   return (
-    <div className="bg-surface px-4 py-3">
+    <div
+      className={cn(
+        'bg-surface px-4 py-3',
+        tone !== 'neutral' && 'border-l-2',
+        tone === 'positive' && 'border-positive',
+        tone === 'warning' && 'border-warning',
+        tone === 'negative' && 'border-negative',
+      )}
+    >
       <p className="text-[10px] uppercase tracking-widest text-fg-subtle">{label}</p>
-      <p className="numeric mt-1 text-2xl font-semibold text-fg">{value}</p>
-      <p className={stale ? 'mt-0.5 text-xs font-medium text-warning' : 'mt-0.5 text-xs text-fg-muted'}>
+      <p className={cn('numeric mt-1 text-2xl font-semibold', VALUE_TONE[tone])}>
+        {value}
+      </p>
+      <p
+        className={cn(
+          'mt-0.5 text-xs',
+          noteTone && noteTone !== 'neutral'
+            ? `font-medium ${VALUE_TONE[noteTone]}`
+            : 'text-fg-muted',
+        )}
+      >
         {note}
       </p>
     </div>
@@ -206,20 +242,40 @@ export async function TrackerTab({
             <Kpi
               label="Leads"
               value={formatCount(result.totals.leads)}
-              note="Windsor reports 0 for 30 of 32 accounts"
-              stale={result.totals.leads === 0}
+              note={
+                freshness.leads === null
+                  ? 'no leads recorded at all'
+                  : `last one ${day(freshness.leads)} · Windsor reports 0 for 30 of 32 accounts`
+              }
+              tone={result.totals.leads === 0 ? 'negative' : 'neutral'}
+              noteTone="warning"
             />
+            {/*
+              The one figure carrying Joshua's colour bands. Per-row bands stay
+              off: with leads undercounted forty rows would paint red and read as
+              a broken page rather than a ranking. One banded figure with the
+              undercount named beneath it is a reading somebody can weigh.
+            */}
             <Kpi
               label="CPL"
               value={totals.cpl === null ? '—' : formatMoney(Math.round(totals.cpl * 100))}
-              note="spend ÷ leads, over the whole window"
+              note="spend ÷ leads · band assumes leads are complete, and they are not"
+              tone={cplTone(totals.cpl, CPL_COLOUR_BANDS_ON_KPI) ?? 'neutral'}
+              noteTone="warning"
             />
             <Kpi
               label="Appointments"
               value={formatCount(result.totals.apptsCreated)}
               note={`last one ${day(freshness.appts)}`}
-              stale={stale}
+              tone={stale ? 'warning' : 'neutral'}
+              noteTone={stale ? 'warning' : 'neutral'}
             />
+            {/*
+              Shows and Closes carry no band. Nobody has agreed a good show rate
+              or a good close rate, and inventing thresholds here would be the
+              same mistake as assuming a band above $25 CPL — a colour reads as
+              a judgement whether or not one was made.
+            */}
             <Kpi
               label="Shows"
               value={formatCount(result.totals.shows)}
@@ -232,18 +288,14 @@ export async function TrackerTab({
             />
           </div>
 
-          <div className="panel overflow-hidden rounded-lg border border-line bg-surface">
-            <WideTableScroll>
-              <StatsDashboardTable
-                rows={rows}
-                totals={result.totals}
-                breakdown={breakdown}
-                sort={sort}
-                direction={direction}
-                hrefForSort={hrefForSort}
-              />
-            </WideTableScroll>
-          </div>
+          <StatsDashboard
+            rows={rows}
+            totals={result.totals}
+            breakdown={breakdown}
+            sort={sort}
+            direction={direction}
+            sortHrefs={COLUMNS.map((_column, index) => hrefForSort(index))}
+          />
 
         </>
       )}
