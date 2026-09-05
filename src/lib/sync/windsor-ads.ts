@@ -117,6 +117,9 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
 
   const accountsWithData = new Set<string>();
 
+  /** Ad-days Windsor sent more than once in a single run. See the note below. */
+  let duplicateAdDays = 0;
+
   for (const batch of chunk([...clientByAccount.keys()], BATCH_SIZE)) {
     let rows;
     try {
@@ -197,14 +200,33 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
         adsetName: row.adsetName,
       });
 
+      /*
+       * ONE ROW PER AD PER DAY. NOT A SUM.
+       *
+       * This used to add, and the numbers were exactly double Meta's for every
+       * account and every day: City Dental 25 August read $343.66 against
+       * Windsor's $171.83, and the same 2.0 ratio held on 26, 27, 28 and 31
+       * August and 1 and 2 September. Windsor was returning each ad-day twice
+       * and the sync was faithfully totalling both copies.
+       *
+       * Adding was never right at this grain. The request carries no
+       * breakdown — no placement, no platform, no age — so Windsor has exactly
+       * one row per ad per day to give, and a second row with the same key is
+       * a duplicate rather than another slice to be included. Summing made the
+       * sync depend on the API never repeating itself, and it repeated itself.
+       *
+       * The client-day snapshot below still adds, and must: that key is
+       * client + date, so it genuinely sums many ads into one day.
+       *
+       * Duplicates are counted and reported rather than silently dropped. The
+       * count is how we learn whether Windsor stops doing this, or why it
+       * started — most likely the same ad account connected twice in the
+       * Windsor workspace, which nothing on our side can see.
+       */
       const insightKey = `${row.adExternalId}:${row.date}`;
       const existing = insights.get(insightKey);
       if (existing) {
-        existing.metrics.spendCents += row.spendCents;
-        existing.metrics.impressions += row.impressions;
-        existing.metrics.clicks += row.clicks;
-        existing.metrics.leads += row.metaLeads;
-        existing.metrics.reach += row.reach;
+        duplicateAdDays += 1;
       } else {
         insights.set(insightKey, {
           clientId: client.id,
@@ -372,8 +394,25 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
     );
   }
 
+  if (duplicateAdDays > 0) {
+    /*
+     * An error, not a note. Until this was found every cost figure in the Hub
+     * was double what Meta reported — CPL, cost per booking, cost per show, and
+     * the ad spend the client portal used to show a practice. It is corrected
+     * here, but the cause is upstream and somebody has to go and look at it.
+     */
+    ctx.recordError(
+      `Windsor returned ${duplicateAdDays} ad-day row(s) more than once. Each ` +
+        'duplicate was ignored rather than added, which is why these figures no ' +
+        'longer read double. The likeliest cause is the same ad account being ' +
+        'connected twice in the Windsor workspace.',
+      { duplicateAdDays },
+    );
+  }
+
   ctx.log(
     `${WINDSOR_CONNECTOR}: ${campaigns.size} campaigns, ${ads.size} ads, ` +
-      `${insights.size} ad-days, ${snapshots.size} client-days`,
+      `${insights.size} ad-days, ${snapshots.size} client-days` +
+      (duplicateAdDays > 0 ? `, ${duplicateAdDays} duplicate row(s) ignored` : ''),
   );
 }
