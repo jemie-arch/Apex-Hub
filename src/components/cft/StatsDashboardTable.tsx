@@ -125,7 +125,7 @@ export function StatsDashboardTable({
                     : { minWidth: 78 }),
                 }}
                 className={cn(
-                  'sticky whitespace-nowrap border-b border-line px-3 py-1.5 align-bottom text-[11px] font-medium uppercase tracking-wide',
+                  'group/th sticky whitespace-nowrap border-b border-line px-3 py-1.5 align-bottom text-[11px] font-medium uppercase tracking-wide',
                   sorted ? 'bg-accent-subtle text-accent' : 'bg-surface text-fg-subtle',
                   column.align === 'left' ? 'text-left' : 'text-right',
                   isFrozen ? 'z-30' : 'z-20',
@@ -143,7 +143,15 @@ export function StatsDashboardTable({
                   scroll={false}
                 >
                   {column.heading}
-                  {sorted ? (direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'ml-1',
+                      sorted ? 'text-accent' : 'text-fg-subtle/40 group-hover/th:text-fg-subtle',
+                    )}
+                  >
+                    {sorted ? (direction === 'asc' ? '↑' : '↓') : '↕'}
+                  </span>
                   <span className="numeric mt-0.5 block text-[9px] font-normal tracking-widest text-fg-subtle/70">
                     {column.letter}
                   </span>

@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -107,6 +108,20 @@ function RowDetail({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-widest text-fg-subtle">
+          Row detail
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close row detail"
+          className="rounded-md border border-line p-1 text-fg-muted hover:bg-surface-hover hover:text-fg"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
       <Inspector
         title={row.clientName ?? '—'}
         subtitle={

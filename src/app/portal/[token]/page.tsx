@@ -86,12 +86,26 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
       .lte('scheduled_at', end)
       .order('scheduled_at', { ascending: false })
       .limit(300),
+    /*
+     * The same source the Hub's own tracker reads, deliberately.
+     *
+     * This was ad_snapshots while the Client Fulfilment Tracker tab reads
+     * ad_level_insights through v_cft_stats_dashboard, and the two do not agree:
+     * over 6 August to 4 September they differ by $5.26, all of it SMYLE Dental
+     * Centers, where a campaign present in the insights table is missing from
+     * the snapshots one.
+     *
+     * Small money, but the wrong kind of wrong. A practice reading its portal
+     * and an account manager reading the Hub were quoting different spend for
+     * the same month, and neither had any way to tell. Reading one source means
+     * they cannot diverge again, whatever the ingestion does next.
+     */
     db
-      .from('ad_snapshots')
+      .from('v_cft_stats_dashboard')
       .select('spend_cents')
       .in('client_id', locationIds)
-      .gte('snapshot_on', dateStart)
-      .lte('snapshot_on', dateEnd),
+      .gte('day', dateStart)
+      .lte('day', dateEnd),
   ]);
 
   if (appointments.error) throw appointments.error;
@@ -125,8 +139,10 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
     }
   }
 
+  // The view's columns are nullable where the snapshot table's were not, so a
+  // day with no spend contributes nothing rather than poisoning the sum.
   const spendCents = (snapshots.data ?? []).reduce(
-    (total, row) => total + row.spend_cents,
+    (total, row) => total + (row.spend_cents ?? 0),
     0,
   );
   const costPerBooking =
