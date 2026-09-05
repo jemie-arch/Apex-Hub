@@ -16,8 +16,29 @@ import { serviceClient } from '@/lib/supabase/service';
 
 const PLATFORM = 'meta';
 
-/** Days of history rewritten each run, including today. */
-const WINDOW_DAYS = 7;
+/**
+ * Days of history rewritten each run, including today. Seven by default.
+ *
+ * Overridable because the window is also the only way to repair history. When
+ * the double-counting fix landed it corrected the seven days it rewrote and
+ * left everything older still doubled — the run cannot reach back further than
+ * this number, so a one-off backfill means widening it, running once, and
+ * putting it back.
+ *
+ * Prefer rewriting from Windsor over arithmetic. Halving the old rows in SQL
+ * would have been quicker and would have assumed the very thing that needs
+ * proving; a rewrite takes the number from the source either way.
+ *
+ * Kept at seven for the nightly run because it is the cheap end of the trade:
+ * each extra week is another round trip per account, and maxDuration on the
+ * route is 300 seconds. Thirty days is comfortably inside that; a year is not.
+ */
+const WINDOW_DAYS = (() => {
+  const configured = Number(process.env['WINDSOR_WINDOW_DAYS']);
+  return Number.isInteger(configured) && configured > 0 && configured <= 400
+    ? configured
+    : 7;
+})();
 
 /** Accounts per request: one call for all 45 makes a timeout lose everything. */
 const BATCH_SIZE = 10;

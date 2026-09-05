@@ -54,6 +54,14 @@ const serverSchema = z.object({
 
   // Windsor.ai — the ad data source. One key covers every connected ad
   // account, so there is no per-account token to expire.
+  /**
+   * Days of ad history rewritten on each windsor-ads run. Default 7.
+   *
+   * Raise it for a one-off backfill — it is the only way the sync can reach
+   * back and correct older rows — then put it back. Above about 30 the run
+   * approaches the routes 300-second limit.
+   */
+  WINDSOR_WINDOW_DAYS: z.coerce.number().int().positive().max(400).optional(),
   WINDSOR_API_KEY: z.string().min(1).optional(),
 
   /*
