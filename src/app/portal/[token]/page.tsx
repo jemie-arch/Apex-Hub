@@ -5,10 +5,12 @@
  * every query below is scoped by the business the token resolves to, so a
  * different token resolves to nothing rather than to a neighbour's records.
  *
- * What it deliberately does NOT show: retainer, internal health, other
- * clients, or anything about Apex's own funnel.
+ * What it deliberately does NOT show: ad spend, cost per booking, retainer,
+ * internal health, other clients, or anything about Apex's own funnel. The
+ * creatives page states the same rule — no spend, no cost per lead, that is our
+ * side of the arrangement — and this page used to contradict it.
  */
-import { CalendarCheck, CircleDollarSign, Megaphone, UserCheck } from 'lucide-react';
+import { CalendarCheck, CircleDollarSign, UserCheck, UserX } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
 import { OutcomeRow, type PortalAppointment } from '@/components/portal/OutcomeRow';
@@ -75,7 +77,7 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
   const locationIds = locations.map((row) => row.id);
   const locationById = new Map(locations.map((row) => [row.id, row]));
 
-  const [appointments, snapshots] = await Promise.all([
+  const [appointments] = await Promise.all([
     db
       .from('appointments')
       .select(
@@ -86,30 +88,9 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
       .lte('scheduled_at', end)
       .order('scheduled_at', { ascending: false })
       .limit(300),
-    /*
-     * The same source the Hub's own tracker reads, deliberately.
-     *
-     * This was ad_snapshots while the Client Fulfilment Tracker tab reads
-     * ad_level_insights through v_cft_stats_dashboard, and the two do not agree:
-     * over 6 August to 4 September they differ by $5.26, all of it SMYLE Dental
-     * Centers, where a campaign present in the insights table is missing from
-     * the snapshots one.
-     *
-     * Small money, but the wrong kind of wrong. A practice reading its portal
-     * and an account manager reading the Hub were quoting different spend for
-     * the same month, and neither had any way to tell. Reading one source means
-     * they cannot diverge again, whatever the ingestion does next.
-     */
-    db
-      .from('v_cft_stats_dashboard')
-      .select('spend_cents')
-      .in('client_id', locationIds)
-      .gte('day', dateStart)
-      .lte('day', dateEnd),
   ]);
 
   if (appointments.error) throw appointments.error;
-  if (snapshots.error) throw snapshots.error;
 
   const rows = appointments.data ?? [];
   let showed = 0;
@@ -118,9 +99,11 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
   let valuedWon = 0;
   let answered = 0;
   let awaiting = 0;
+  let noShow = 0;
 
   for (const row of rows) {
     if (row.showed === true) showed += 1;
+    if (row.showed === false) noShow += 1;
     if (row.outcome === 'pending') awaiting += 1;
     else answered += 1;
     if (row.outcome === 'won') {
@@ -139,14 +122,6 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
     }
   }
 
-  // The view's columns are nullable where the snapshot table's were not, so a
-  // day with no spend contributes nothing rather than poisoning the sum.
-  const spendCents = (snapshots.data ?? []).reduce(
-    (total, row) => total + (row.spend_cents ?? 0),
-    0,
-  );
-  const costPerBooking =
-    rows.length === 0 ? null : Math.round(spendCents / rows.length);
 
   const portalRows: PortalAppointment[] = rows.map((row) => {
     const owner = locationById.get(row.client_id);
@@ -172,7 +147,7 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
    *
    * This is the card a practice reads as "did the advertising work", and until
    * migration 0031 it rendered 0 with a "$0 in value" hint on every portal in
-   * the fleet — beside an Ad spend card showing real money. The sum was correct
+   * the fleet, beside what was then an Ad spend card. The sum was correct
    * and the message was false: nobody had ever written an outcome, because the
    * 918 answers sitting in tracker_appointments.status_if_showed were not read
    * by anything.
@@ -219,16 +194,28 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
           hint={treatmentHint}
           icon={<CircleDollarSign size={16} />}
         />
+        {/*
+          Where Ad spend used to be.
+
+          A practice sees what happened to its patients, not what Apex paid to
+          make it happen: spend and cost per booking are the agency's buy price
+          sitting beside what the practice is charged.
+
+          No-shows rather than "still to come", which the first card already
+          reports as "still to confirm" — a second card saying the same number a
+          different way is worse than no card. This one is the figure a practice
+          can act on, and the only one of the four it directly controls.
+        */}
         <KPICard
-          label="Ad spend"
-          value={formatMoneyCompact(spendCents, group.currency)}
+          label="Did not attend"
+          value={formatCount(noShow)}
           higherIsBetter={false}
           hint={
-            costPerBooking === null
-              ? 'no bookings yet'
-              : `${formatMoney(costPerBooking, group.currency)} per ${booking.singular}`
+            rows.length === 0
+              ? 'nothing booked yet'
+              : `${formatPercent(noShow / rows.length, 0)} of ${formatCount(rows.length)} booked`
           }
-          icon={<Megaphone size={16} />}
+          icon={<UserX size={16} />}
         />
       </section>
 
