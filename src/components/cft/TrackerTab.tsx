@@ -1,4 +1,5 @@
 import { ClientPicker } from '@/components/cft/ClientPicker';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { StatsDashboard } from '@/components/cft/StatsDashboard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FilterPillLinks } from '@/components/ui/FilterPills';
@@ -142,6 +143,16 @@ export async function TrackerTab({
       if (flat) params.set(key, flat);
     }
     for (const [key, value] of Object.entries(next)) params.set(key, value);
+    /*
+     * Picking one of the three preset windows drops any custom range. Leaving
+     * it would light up the pill while the table went on showing the range,
+     * which is the kind of control that teaches people not to trust controls.
+     */
+    if (next['win']) {
+      params.delete('from');
+      params.delete('to');
+      params.delete('preset');
+    }
     params.set('tab', 'tracker');
     return `${basePath}?${params.toString()}`;
   };
@@ -157,6 +168,24 @@ export async function TrackerTab({
    */
   const days = (WINDOWS.find((option) => String(option) === single('win')) ??
     30) as WindowDays;
+  /*
+   * A custom range, if the shared DateRangePicker has written one.
+   *
+   * It writes ?from and ?to as ISO dates, the same params every other page in
+   * the Hub reads, so a range chosen here means the same thing it means on the
+   * dashboard. Only accepted when both ends parse — a half-written range should
+   * fall back to the preset rather than silently querying from the epoch.
+   */
+  const isDay = (value: string | undefined): value is string =>
+    typeof value === 'string' && /^d{4}-d{2}-d{2}$/.test(value);
+
+  const customFrom = single('from');
+  const customTo = single('to');
+  const range =
+    isDay(customFrom) && isDay(customTo) && customFrom <= customTo
+      ? { from: customFrom, to: customTo }
+      : undefined;
+
   const breakdown: Breakdown = single('bd') === 'client' ? 'client' : 'campaign';
   const clientId = single('client') !== '' ? single('client') : undefined;
 
@@ -170,7 +199,7 @@ export async function TrackerTab({
   const db = serviceClient();
 
   const [result, freshness] = await Promise.all([
-    loadStatsDashboard(db, { days, breakdown, clientId }),
+    loadStatsDashboard(db, { days, range, breakdown, clientId }),
     feedFreshness(db),
   ]);
 
@@ -209,7 +238,7 @@ export async function TrackerTab({
             label: `Last ${option} Days`,
             href: href({ win: String(option) }),
           }))}
-          value={String(days)}
+          value={range ? '' : String(days)}
         />
         <FilterPillLinks
           options={[
@@ -219,6 +248,7 @@ export async function TrackerTab({
           value={breakdown}
         />
         <ClientPicker clients={result.clients} />
+        <DateRangePicker />
         <span className="numeric ml-auto text-right text-[10px] leading-relaxed text-fg-subtle">
           {result.from} to {result.to}
           <br />

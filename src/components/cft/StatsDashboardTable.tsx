@@ -81,22 +81,22 @@ export function StatsDashboardTable({
               key={`${section.label}-${index}`}
               colSpan={section.span}
               /*
-                Sections 0 and 1 sit over the frozen columns, so they are pinned
-                left as well as top. Without it "CAMPAIGN INFORMATION" scrolls
-                away while the columns it labels stay put, and the next section
-                slides into its place — the header stops describing what is
-                underneath it.
+                Pinned to the top only, never to the left.
+                
+                An earlier version pinned the first two sections leftwards so
+                they would stay with the frozen columns. They did — and because
+                "CAMPAIGN INFORMATION" spans five columns, its band came with
+                them and sat on top of "1. AD DATA" and "2. CALL DATA", hiding
+                both. A band that spans a range cannot be pinned to a point.
+                
+                So the section row scrolls with its columns. The cost is that
+                the leftmost section label leaves the screen when you scroll
+                right; the alternative was a label covering two others, which
+                is worse than a label that is absent.
               */
-              style={
-                index === 0
-                  ? { left: 0, width: FROZEN_WIDTHS[0], height: GROUP_ROW_HEIGHT }
-                  : index === 1
-                    ? { left: FROZEN_WIDTHS[0], height: GROUP_ROW_HEIGHT }
-                    : { height: GROUP_ROW_HEIGHT }
-              }
+              style={{ height: GROUP_ROW_HEIGHT }}
               className={cn(
-                'sticky top-0 whitespace-nowrap border-b border-line bg-surface-sunken px-3 py-0 text-left text-[10px] font-semibold uppercase tracking-widest text-fg-subtle',
-                index <= 1 ? 'z-40' : 'z-30',
+                'sticky top-0 z-20 whitespace-nowrap border-b border-line bg-surface-sunken px-2 py-0 text-left text-[10px] font-semibold uppercase tracking-widest text-fg-subtle',
                 index > 0 && 'border-l border-line',
               )}
             >

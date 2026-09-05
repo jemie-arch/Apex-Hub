@@ -224,9 +224,20 @@ export interface DashboardResult {
  */
 export async function loadStatsDashboard(
   db: SupabaseClient,
-  options: { days: WindowDays; breakdown: Breakdown; clientId?: string | undefined },
+  options: {
+    /** A preset window, or an explicit range when the caller has one. */
+    days?: WindowDays;
+    range?: { from: string; to: string } | undefined;
+    breakdown: Breakdown;
+    clientId?: string | undefined;
+  },
 ): Promise<DashboardResult> {
-  const { from, to } = windowFor(options.days);
+  /*
+   * An explicit range wins over the preset. The sheet offers three windows and
+   * a custom range answers questions none of them do — "what did August cost" —
+   * so both exist rather than one replacing the other.
+   */
+  const { from, to } = options.range ?? windowFor(options.days ?? 30);
 
   const [stats, calls] = await Promise.all([
     readAll<StatsViewRow>((lo, hi) =>
