@@ -30,6 +30,16 @@ export interface Column {
   blockedAt?: (breakdown: Breakdown) => boolean;
   /** True when nothing in the Hub can ever supply it. */
   noSource?: boolean;
+  /**
+   * Cap for a free-text column, in pixels.
+   *
+   * Without one, a cell sizes itself to its longest value: an offer name like
+   * "Apex | Hancock & Johnston Dentistry | $3497 Total Price for Invisalign and
+   * $1,000 off on Braces - Copy" made its column wider than the screen and
+   * pushed every money column out of view. Numeric columns need no cap — their
+   * content is short by nature.
+   */
+  maxWidth?: number;
 }
 
 /** Section headers, sheet row 4. */
@@ -92,6 +102,7 @@ export const COLUMNS: Column[] = [
     letter: 'F',
     heading: 'Offer Name',
     align: 'left',
+    maxWidth: 170,
     value: (row) => row.offerName,
   },
 
@@ -288,7 +299,7 @@ export const COLUMNS: Column[] = [
 ];
 
 /** Fixed widths for the frozen columns A-E, matching the sheet's frozen panes. */
-export const FROZEN_WIDTHS = [54, 82, 178, 196, 148];
+export const FROZEN_WIDTHS = [36, 76, 156, 180, 124];
 
 export const LEFT_OFFSETS = FROZEN_WIDTHS.reduce<number[]>((offsets, width, index) => {
   offsets.push(index === 0 ? 0 : offsets[index - 1]! + FROZEN_WIDTHS[index - 1]!);

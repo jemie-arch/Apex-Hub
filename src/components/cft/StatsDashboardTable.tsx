@@ -122,10 +122,11 @@ export function StatsDashboardTable({
                         width: FROZEN_WIDTHS[index],
                         minWidth: FROZEN_WIDTHS[index],
                       }
-                    : { minWidth: 78 }),
+                    : { minWidth: 68, maxWidth: column.maxWidth ?? 108 }),
                 }}
                 className={cn(
-                  'group/th sticky whitespace-nowrap border-b border-line px-3 py-1.5 align-bottom text-[11px] font-medium uppercase tracking-wide',
+                  'group/th sticky border-b border-line px-2 py-1.5 align-bottom text-[10px] font-medium uppercase leading-tight tracking-wide',
+                  isFrozen && 'whitespace-nowrap',
                   sorted ? 'bg-accent-subtle text-accent' : 'bg-surface text-fg-subtle',
                   column.align === 'left' ? 'text-left' : 'text-right',
                   isFrozen ? 'z-30' : 'z-20',
@@ -210,11 +211,14 @@ export function StatsDashboardTable({
                         left: LEFT_OFFSETS[index],
                         width: FROZEN_WIDTHS[index],
                         minWidth: FROZEN_WIDTHS[index],
+                        maxWidth: FROZEN_WIDTHS[index],
                       }
-                    : undefined
+                    : column.maxWidth
+                      ? { maxWidth: column.maxWidth }
+                      : undefined
                 }
                 className={cn(
-                  'numeric whitespace-nowrap border-t-2 border-line-strong bg-surface-sunken px-3 py-2 font-semibold text-fg',
+                  'numeric overflow-hidden text-ellipsis whitespace-nowrap border-t-2 border-line-strong bg-surface-sunken px-2 py-1.5 font-semibold text-fg',
                   column.align === 'left' ? 'text-left' : 'text-right',
                   isFrozen && 'sticky z-10',
                 )}
@@ -256,11 +260,14 @@ function Cell({
               left: LEFT_OFFSETS[index],
               width: FROZEN_WIDTHS[index],
               minWidth: FROZEN_WIDTHS[index],
+              maxWidth: FROZEN_WIDTHS[index],
             }
-          : undefined
+          : column.maxWidth
+            ? { maxWidth: column.maxWidth }
+            : undefined
       }
       className={cn(
-        'numeric overflow-hidden text-ellipsis whitespace-nowrap border-b border-line px-3 py-1.5',
+        'numeric overflow-hidden text-ellipsis whitespace-nowrap border-b border-line px-2 py-1',
         column.align === 'left' ? 'text-left' : 'text-right',
         isFrozen
           ? 'sticky z-10 bg-surface font-medium text-fg'
