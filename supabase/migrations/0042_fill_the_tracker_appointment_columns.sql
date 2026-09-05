@@ -1,0 +1,33 @@
+-- Fill the tracker's appointment columns. Two causes, both fixed here.
+--
+-- ONE: the day key was created_on, which is null on 1,108 of 1,281 tracker
+-- rows. A null day matches nothing in the spine join, so those appointments
+-- contributed nothing at all — they were not merely undated, they were
+-- invisible. appts_created for a 30-day window read 95; the true figure is 185.
+-- 1,095 of the 1,108 carry booked_for, so that is the fallback.
+--
+-- The approximation is worth naming: "created on day X" becomes "created on X,
+-- or where that is unknown, the day of the appointment". Inside a window that
+-- contains both the booking and the consultation the totals are unchanged; at a
+-- window edge a booking can shift by the gap between the two. A far smaller
+-- error than dropping six sevenths of the rows.
+--
+-- TWO: consultations booked after 22 August exist only in the CRM, because the
+-- tracker sheet has not been re-imported since. Forty-nine of them in a
+-- thirty-day window. They come from appointment_ledger where no tracker row
+-- matched, carry no campaign — a CRM appointment has none — and land on the
+-- blank-campaign row alongside the 118 tracker rows without a campaign id.
+--
+-- They supply created, shows, no-shows and cancels only. DQ, Closed and Follow
+-- up are the sheet's own vocabulary, written by hand into status_if_showed, and
+-- ledger_outcome has no equivalent: pending, showed, no_show, cancelled,
+-- rescheduled. Zero on those columns for a CRM row is honest. A mapping would
+-- be invented.
+--
+-- Verified: 136 tracker rows by the coalesced day plus 49 CRM-only rows equals
+-- the 185 the view now reports for 2026-08-06 to 2026-09-04. Nothing is counted
+-- twice.
+--
+-- The full definition is applied via the Supabase migration of the same name;
+-- this file records the reasoning. Read COMMENT ON VIEW v_cft_stats_dashboard
+-- for the column-by-column contract.
