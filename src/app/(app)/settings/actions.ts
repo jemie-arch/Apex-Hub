@@ -16,8 +16,34 @@ export interface RunSyncState {
 }
 
 export async function runSyncNow(name: string): Promise<RunSyncState> {
-  // Checked here, not in the component that renders the button.
-  await requireAdmin();
+  /*
+   * Checked here, not in the component that renders the button — and answered
+   * rather than thrown.
+   *
+   * requireAdmin throws a plain Error, which in a server action becomes a 500
+   * with a digest and no message. This page is reached by permission, not by
+   * role: middleware admits anyone holding 'settings', and the page itself
+   * queries with the service role, so a teammate granted that key sees all
+   * fifteen Run now buttons. Pressing one gave them an unhandled 500 and a
+   * button that flicked back to "Run now" as though nothing had happened.
+   *
+   * Found from the other side of it: a session on the 'tech' account posted
+   * two of these and both came back 500, which read as a broken sync until the
+   * network log showed the action itself had failed.
+   *
+   * Who may run a sync is unchanged. Only the answer is: a refusal the button
+   * can display, instead of a crash it cannot.
+   */
+  try {
+    await requireAdmin();
+  } catch {
+    return {
+      ok: false,
+      message:
+        'Running a sync by hand needs an admin. Your account can see this ' +
+        'page but not start a sync.',
+    };
+  }
 
   const definition = findSync(name);
   if (!definition) {

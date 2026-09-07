@@ -56,6 +56,38 @@ const ORDER = [
   // waiting on somebody noticing a button.
   'provision-pending',
   /*
+   * The three sheet reads, and the reason they are ahead of the ledger.
+   *
+   * All three were held out of this cycle while GOOGLE_SERVICE_ACCOUNT_KEY was
+   * unset, on the rule this file keeps everywhere: a sync that cannot succeed
+   * must not run nightly, because a cycle that always reports a failure is how
+   * a real failure stops being noticed.
+   *
+   * That condition is gone. On 7 September the key was accepted and both
+   * sheets were read — fulfilment-tracker returned all fourteen of the
+   * tracker's headings, and commission-inputs returned the pay scheme and
+   * updated it. So the rule now points the other way, and leaving them out
+   * means they only ever run when somebody presses a button.
+   *
+   * Nothing had ever pressed it for booking-sheet. It is the sheet the live
+   * pay calculation actually reads and it had never run once, which is the
+   * whole argument for scheduling rather than remembering. It needs no new
+   * configuration: it reads COMMISSION_INPUTS_SHEET_ID, the same workbook
+   * commission-inputs just succeeded against, a different tab of it.
+   *
+   * fulfilment-tracker goes BEFORE appointment-ledger and that placement is
+   * load-bearing — the ledger reads tracker_appointments, so importing after
+   * it would reconcile today's appointments against yesterday's sheet and
+   * report the difference as exceptions.
+   *
+   * Cost is small enough not to threaten the 240s start budget: the two
+   * measured runs took 2.2s and 3.2s against a cycle whose slowest member,
+   * crm-calls, takes 45s.
+   */
+  'fulfilment-tracker',
+  'booking-sheet',
+  'commission-inputs',
+  /*
    * 'onboarding-calls' is deliberately NOT here, for the same reason as
    * 'scenario-audit' and 'payout-hours' below.
    *
@@ -85,21 +117,10 @@ const ORDER = [
   'appointment-ledger',
   'crm-calls',
   /*
-   * 'fulfilment-tracker' is deliberately NOT here yet, for the same reason as
-   * the two below: GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_KEY and
-   * FULFILMENT_TRACKER_SHEET_ID are unset, so including it would guarantee a
-   * failed sync every night.
-   *
-   * It is registered, so it runs from settings and the CLI the moment the
-   * credentials exist. Add it here at that point, EARLY -- before
-   * appointment-ledger, which reads tracker_appointments and would otherwise
-   * reconcile against yesterday's import. Somewhere around crm-appointments is
-   * right: both are feeds, neither depends on the other.
-   *
-   * The first run matters more than most. Its notes print every header the
-   * sheet has and every one the config could not place, which is how the column
-   * map gets corrected -- it was written from the shape of the existing table,
-   * not from the sheet, because the sheet could not be read until this existed.
+   * 'fulfilment-tracker' moved up, above appointment-ledger. It used to sit
+   * here with a note explaining that the Google credentials were unset and
+   * what to do when they arrived. They arrived; that was done. Left as a
+   * marker only so the instruction is not read as still outstanding.
    */
   /*
    * 'scenario-audit' is deliberately NOT here yet, for the same reason as
