@@ -24,6 +24,7 @@
  */
 import {
   HEADER_TO_FIELD,
+  IGNORED_HEADERS,
   REQUIRED_FIELDS,
   TRACKER_RANGE,
   normaliseHeader,
@@ -69,6 +70,44 @@ function asDate(value: string | undefined): string | null {
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 }
+
+/**
+ * A money cell the sheet displays, as integer cents.
+ *
+ * "$1,234.56", "1234.56", "($12.34)" and "" all arrive here, because column N
+ * is typed by hand. Symbols, thousands separators and stray spaces are
+ * stripped; accounting parentheses read as negative, which is what a
+ * spreadsheet means by them.
+ *
+ * Unparseable returns null rather than zero. A spend of zero and a spend
+ * nobody has recorded yet are different facts, and averaging over the second
+ * as though it were the first would understate cost per booking on every row
+ * the call centre had not filled in.
+ *
+ * Rounded rather than truncated, so a column of odd fractions does not drift
+ * by a cent a row.
+ */
+function asCents(value: string | undefined): number | null {
+  const raw = text(value);
+  if (raw === null) return null;
+
+  const bracketed = raw.startsWith('(') && raw.endsWith(')');
+  const digits = raw.replace(/[^0-9.-]/g, '');
+  if (digits === '' || digits === '-' || digits === '.') return null;
+
+  const amount = Number(digits);
+  if (!Number.isFinite(amount)) return null;
+
+  const cents = Math.round(Math.abs(amount) * 100);
+  return bracketed || amount < 0 ? -cents : cents;
+}
+
+/*
+ * Exported under test names so check:tracker can exercise them against the
+ * real headings without reaching for a sheet or a database. Not for callers.
+ */
+export { asDate as parseTrackerDateForTests };
+export { asCents as parseTrackerMoneyForTests };
 
 export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
@@ -144,12 +183,21 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
    * config gets corrected, and it is a note rather than an error because an
    * extra column the Hub has no use for is normal, not a fault.
    */
+  const ignored = new Set(IGNORED_HEADERS.map(normaliseHeader));
+
   const columnOf = new Map<string, number>();
   const unmatched: string[] = [];
+  let ignoredSeen = 0;
 
   (headerRow ?? []).forEach((header, index) => {
     const key = normaliseHeader(header);
     if (key === '') return;
+    // Known and deliberately not imported. Counted, not listed, so the
+    // unrecognised list below stays worth reading.
+    if (ignored.has(key)) {
+      ignoredSeen += 1;
+      return;
+    }
     const field = HEADER_TO_FIELD.get(key);
     if (field === undefined) {
       unmatched.push(header.trim());
@@ -161,6 +209,7 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
 
   ctx.note('headers_seen', (headerRow ?? []).length);
   ctx.note('headers_mapped', [...columnOf.keys()].sort());
+  if (ignoredSeen > 0) ctx.note('headers_ignored_by_design', ignoredSeen);
   if (unmatched.length > 0) ctx.note('headers_unrecognised', unmatched);
 
   const missingRequired = REQUIRED_FIELDS.filter((field) => !columnOf.has(field));
@@ -221,6 +270,12 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
       campaign_external_id: text(cell(row, 'campaign_external_id')),
       adset_external_id: text(cell(row, 'adset_external_id')),
       ad_external_id: text(cell(row, 'ad_external_id')),
+      /*
+       * Column N, stored and NOT the spend figure the Hub reports. That comes
+       * from Windsor at ad-and-day grain and reconciles against Meta day for
+       * day. Keeping this one means the two can be compared.
+       */
+      amount_spent_cents: asCents(cell(row, 'amount_spent')),
       imported_at: importedAt,
     });
   });
@@ -255,9 +310,24 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
     ctx.counts.updated += batch.length;
   }
 
+  /*
+   * booked_by is counted anyway, and is expected to be zero.
+   *
+   * The tracker has no column naming who set an appointment — fourteen
+   * headings, none of them a person. Attribution comes from BOOKING SHEET,
+   * which sync/booking-sheet imports. Counting it here means the day somebody
+   * adds the column to the tracker, this line is what notices.
+   */
+  const named = records.filter((row) => row['booked_by'] !== null).length;
+  const priced = records.filter((row) => row['amount_spent_cents'] !== null).length;
+
   ctx.log(
     `${records.length} tracker row(s) imported from the sheet. ` +
-      `${records.filter((row) => row['booked_by'] !== null).length} name who booked them.`,
+      `${priced} carry a spend figure. ` +
+      (named === 0
+        ? 'None name who booked them — the tracker has no such column, so ' +
+          'attribution comes from BOOKING SHEET.'
+        : `${named} name who booked them.`),
   );
 }
 

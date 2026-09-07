@@ -59,15 +59,49 @@ export const TRACKER_COLUMNS: readonly TrackerColumn[] = [
     headers: ['date added', 'created', 'created on', 'date created', 'booked on'],
   },
   {
+    /*
+     * "Date Booked" is the sheet's own spelling, column D, and its absence is
+     * what stopped every run until now: the import read fourteen headings,
+     * matched ten, and refused to write a row because the one column it cannot
+     * do without was called something this map had never heard of.
+     *
+     * Note how close it sits to "Date Created" in column C, which maps to
+     * created_on. Booked means the appointment; created means the booking.
+     * Reading them the wrong way round would move every consultation in the
+     * Hub to the day it was set.
+     */
     field: 'booked_for',
-    headers: ['app date', 'appointment date', 'booked for', 'appt date', 'consult date'],
+    headers: [
+      'date booked',
+      'app date',
+      'appointment date',
+      'booked for',
+      'appt date',
+      'consult date',
+    ],
     required: true,
   },
   {
     /*
-     * The reason this sync exists at all. The ISR bonus is paid per person per
-     * day, and no other source can say who set an appointment — GoHighLevel
-     * stamps a user on 2% of calls because inbound forwards off-platform.
+     * THIS COLUMN DOES NOT EXIST IN THE TRACKER. Kept, and kept documented.
+     *
+     * This sync was built on the belief that the tracker names whoever set each
+     * appointment, and that belief is why tracker_appointments has a booked_by
+     * column at all. The first successful read settled it — fourteen headings
+     * on row 4, not one of them an agent, a setter or an ISR:
+     *
+     *   Month Created | Month Booked | Date Created | Date Booked |
+     *   Location Name | Name | Email | Campaign ID | Ad Set ID | Ad ID |
+     *   Offer Name | Appointment Status | Status if Showed | Amount Spent
+     *
+     * So attribution never lived here. It lives in BOOKING SHEET column B on
+     * the Call Center Agent Dashboard, which is what sync/booking-sheet reads
+     * and what the live pay calculation already runs on.
+     *
+     * The spellings stay because they cost nothing and the tracker gains
+     * columns regularly; the day one appears, it is picked up without a code
+     * change. What must not happen is somebody reading booked_by, finding it
+     * null on every row, and concluding the import is broken.
      */
     field: 'booked_by',
     headers: ['booked by', 'agent', 'isr', 'set by', 'appointment setter', 'booker'],
@@ -102,7 +136,37 @@ export const TRACKER_COLUMNS: readonly TrackerColumn[] = [
     field: 'ad_external_id',
     headers: ['ad id', 'ad', 'ad external id'],
   },
+  {
+    /*
+     * Column N. tracker_appointments has had amount_spent_cents since 0001 and
+     * nothing has ever filled it.
+     *
+     * Read, and deliberately not used as the spend figure anywhere: reported
+     * spend comes from Windsor at ad-and-day grain and reconciles against Meta
+     * day for day. This is a per-appointment number typed into a spreadsheet,
+     * worth storing so the two can be compared and not worth trusting over the
+     * source that can be checked.
+     */
+    field: 'amount_spent',
+    headers: ['amount spent', 'spend', 'cost'],
+  },
 ];
+
+/**
+ * Columns the tracker has that the Hub deliberately does not import.
+ *
+ * Month Created and Month Booked are the month labels of Date Created and Date
+ * Booked, derived in the sheet for pivoting. Importing them would store the
+ * same fact twice in two formats, and the second copy is the one that goes
+ * stale — every month question the Hub asks is answered by date_trunc on the
+ * date it already has.
+ *
+ * The point of naming them is the unrecognised-headers report. That report is
+ * how a new column gets noticed, and a report that lists the same two known
+ * headings after every single run is one nobody reads by the third week.
+ * Listed here they stop being noise, and anything genuinely new stands out.
+ */
+export const IGNORED_HEADERS: readonly string[] = ['month created', 'month booked'];
 
 /** Normalised for comparison: case, surrounding space and inner runs of space. */
 export function normaliseHeader(header: string): string {
