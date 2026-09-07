@@ -219,6 +219,31 @@ export async function TrackerTab({
   const totals = derive(result.totals);
 
   /*
+   * The window's call figures, which are shown at BOTH breakdowns.
+   *
+   * The six call columns in the table are blank whenever the breakdown is by
+   * campaign — correctly, because a call carries no campaign reference and
+   * deal_id is null on all 7,139 of them, so splitting them between campaigns
+   * would be an invention. But campaign is the default breakdown, so the first
+   * thing anybody saw on this tab was an empty stretch under a heading reading
+   * "2. CALL DATA", and the reasonable conclusion was that the Hub holds no
+   * call data at all.
+   *
+   * It holds plenty. Summed over the window it is a different question from
+   * "which campaign made this call", and one with a real answer, so these four
+   * cards answer it wherever you are standing.
+   *
+   * Ratios come from the summed counters, never from averaging a rate across
+   * days — the same rule the table's columns follow.
+   */
+  const calls = result.callTotals;
+  const callRatio = (top: number, bottom: number): number | null =>
+    bottom === 0 ? null : top / bottom;
+  const pickupPct = callRatio(calls.connectedOutbound, calls.dialed);
+  const conversationPct = callRatio(calls.calls2min, calls.dialed);
+  const speedToLead = callRatio(calls.speedToLeadSum, calls.speedToLeadN);
+
+  /*
    * The banner exists for one specific failure, not as general hedging: ad
    * spend arrives daily while three feeds have stopped, so a short window shows
    * real money against zero everything and every appointment-derived figure
@@ -316,6 +341,55 @@ export async function TrackerTab({
               value={formatCount(result.totals.closes)}
               note={`${formatPercent(totals.closePct, 1)} of shows`}
             />
+
+            {/*
+              Call figures, shown at either breakdown — see the note where
+              these are derived. No colour bands: Joshua's sheet carries a
+              Convo Threshold of 90 and an Answer Threshold of 35, but those
+              are per-agent daily targets from the Call Center Agent
+              Dashboard, not thresholds for a whole practice over 30 days.
+              Painting them here would be inventing a judgement nobody made.
+            */}
+            <Kpi
+              label="Dialed calls"
+              value={formatCount(calls.dialed)}
+              note={
+                calls.dialed === 0
+                  ? 'no calls in this window'
+                  : `${formatCount(calls.calls2min)} ran past 2 minutes`
+              }
+              tone={calls.dialed === 0 ? 'warning' : 'neutral'}
+            />
+            <Kpi
+              label="Pickup %"
+              value={formatPercent(pickupPct, 1)}
+              note="connected ÷ dialed, outbound only"
+            />
+            <Kpi
+              label="Conversation %"
+              value={formatPercent(conversationPct, 1)}
+              note="calls past 2 minutes ÷ dialed"
+            />
+            {/*
+              Reported in minutes, and only over the calls that have a lead
+              timestamp to measure from — 1,997 of 7,139. Saying so matters:
+              an average over a quarter of the calls is not the same claim as
+              an average over all of them.
+            */}
+            <Kpi
+              label="Speed to lead"
+              value={
+                speedToLead === null
+                  ? '—'
+                  : `${Math.round(speedToLead)} min`
+              }
+              note={
+                calls.speedToLeadN === 0
+                  ? 'no call has a lead time to measure from'
+                  : `measured on ${formatCount(calls.speedToLeadN)} of ${formatCount(calls.dialed)} · ${formatCount(calls.speedToLeadOver24h)} over 24h`
+              }
+              noteTone={calls.speedToLeadOver24h > 0 ? 'warning' : 'neutral'}
+            />
           </div>
 
           <StatsDashboard
@@ -325,6 +399,7 @@ export async function TrackerTab({
             sort={sort}
             direction={direction}
             sortHrefs={COLUMNS.map((_column, index) => hrefForSort(index))}
+            clientViewHref={href({ bd: 'client' })}
           />
 
         </>

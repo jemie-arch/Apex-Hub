@@ -35,6 +35,7 @@ export function StatsDashboard({
   sort,
   direction,
   sortHrefs,
+  clientViewHref,
 }: {
   rows: DashboardRow[];
   totals: DashboardRow;
@@ -42,6 +43,8 @@ export function StatsDashboard({
   sort: number | null;
   direction: 'asc' | 'desc';
   sortHrefs: string[];
+  /** Where "Client" on the breakdown pills points, for the blocked-section note. */
+  clientViewHref: string;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = rows.find((row) => row.key === selectedKey) ?? null;
@@ -69,6 +72,7 @@ export function StatsDashboard({
             sort={sort}
             direction={direction}
             sortHrefs={sortHrefs}
+            clientViewHref={clientViewHref}
             selectedKey={selectedKey}
             onSelect={setSelectedKey}
           />

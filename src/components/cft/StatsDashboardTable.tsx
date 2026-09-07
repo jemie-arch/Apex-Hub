@@ -49,6 +49,7 @@ export function StatsDashboardTable({
   sort,
   direction,
   sortHrefs,
+  clientViewHref,
   selectedKey,
   onSelect,
 }: {
@@ -64,10 +65,46 @@ export function StatsDashboardTable({
    * FilterPillLinks records the render-time error that taught the codebase so.
    */
   sortHrefs: string[];
+  /*
+   * Where the "Client" breakdown pill points. Used only by the section band
+   * below, to turn an empty stretch of table into something a reader can act
+   * on. A string, not a builder — this is a client component.
+   */
+  clientViewHref: string;
   selectedKey: string | null;
   onSelect: (key: string) => void;
 }) {
   const frozen = FROZEN_WIDTHS.length;
+
+  /*
+   * Which section bands sit over columns that are entirely blocked.
+   *
+   * Derived from the columns themselves rather than flagged on the section, so
+   * it cannot drift: a section is "blocked" exactly when every column beneath
+   * it is. Today that is only CALL DATA at campaign grain, and the point is
+   * that nobody has to remember to update this if that changes.
+   *
+   * Worth the arithmetic because of what it fixes. The six call columns are
+   * blocked whenever the breakdown is by campaign, which is the default, so
+   * the first thing anybody sees on this tab is a wide empty stretch under a
+   * heading that reads "2. CALL DATA" — and the reasonable conclusion is that
+   * the Hub has no call data. It has 7,139 calls. They cannot be split by
+   * campaign because the calls table carries no campaign reference and
+   * deal_id is null on every row, so the honest thing is to say so, next to
+   * the switch that shows them.
+   */
+  const sectionBlocked: boolean[] = [];
+  {
+    let start = 0;
+    for (const section of SECTIONS) {
+      const span = COLUMNS.slice(start, start + section.span);
+      sectionBlocked.push(
+        span.length > 0 &&
+          span.every((column) => column.blockedAt?.(breakdown) ?? false),
+      );
+      start += section.span;
+    }
+  }
   // Once, not once per column: this was being recomputed 33 times a render.
   const totalsDerived = derive(totals);
 
@@ -100,7 +137,19 @@ export function StatsDashboardTable({
                 index > 0 && 'border-l border-line',
               )}
             >
-              {section.label}
+              {sectionBlocked[index] ? (
+                <span className="flex items-baseline gap-2">
+                  <span>{section.label}</span>
+                  <Link
+                    href={clientViewHref}
+                    className="font-normal normal-case tracking-normal text-accent hover:underline"
+                  >
+                    by client only — show it
+                  </Link>
+                </span>
+              ) : (
+                section.label
+              )}
             </th>
           ))}
         </tr>

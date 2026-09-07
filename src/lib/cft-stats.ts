@@ -209,6 +209,18 @@ export interface DashboardResult {
   totals: DashboardRow;
   /** Every client in either feed, for the client filter. */
   clients: { id: string; name: string }[];
+  /*
+   * Every call in the window, whatever the breakdown.
+   *
+   * totals.calls is deliberately absent at campaign grain, because a call
+   * cannot be split between campaigns and a per-campaign call count would be
+   * an invention. Summing the same calls once over the whole window is a
+   * different question with a real answer, and it is the answer somebody is
+   * after when they ask whether the Hub has call data at all.
+   *
+   * Respects the client filter, so picking one practice narrows this too.
+   */
+  callTotals: CallCounters;
   from: string;
   to: string;
 }
@@ -450,12 +462,28 @@ export function aggregate(
     }
   }
 
+  /*
+   * The window's call figures, summed across clients rather than divided
+   * among campaigns. Built from callsByClient, which already honours the
+   * client filter, so this is correct at either breakdown.
+   */
+  const callTotals = emptyCalls();
+  for (const counters of callsByClient.values()) {
+    callTotals.dialed += counters.dialed;
+    callTotals.calls2min += counters.calls2min;
+    callTotals.connectedOutbound += counters.connectedOutbound;
+    callTotals.speedToLeadSum += counters.speedToLeadSum;
+    callTotals.speedToLeadN += counters.speedToLeadN;
+    callTotals.speedToLeadOver24h += counters.speedToLeadOver24h;
+  }
+
   return {
     rows,
     totals,
     clients: [...clientNames.entries()]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    callTotals,
   };
 }
 

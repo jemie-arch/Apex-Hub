@@ -168,6 +168,87 @@ check(
   [null, null],
 );
 
+section('But the window total is answerable at either breakdown');
+
+/*
+ * The distinction this section defends.
+ *
+ * "How many calls did this campaign make" has no answer — that is the section
+ * above. "How many calls happened in this window" has one, and it is the same
+ * number whichever way the table is broken down, because the calls are summed
+ * once rather than divided.
+ *
+ * Worth pinning because the campaign breakdown is the DEFAULT. Six blank
+ * columns under a heading reading "2. CALL DATA" was being read as "the Hub has
+ * no call data", when there are 7,139 calls in it.
+ */
+const callsAtCampaign = aggregate(
+  [stat({ campaign_id_external: '111' }), stat({ campaign_id_external: '222' })],
+  [call({ dialed_calls: 80, calls_2min: 8, connected_outbound: 79 })],
+  campaign,
+);
+const callsAtClient = aggregate(
+  [stat({ campaign_id_external: '111' }), stat({ campaign_id_external: '222' })],
+  [call({ dialed_calls: 80, calls_2min: 8, connected_outbound: 79 })],
+  client,
+);
+
+check('the window total survives campaign grain', callsAtCampaign.callTotals.dialed, 80);
+check('and is identical at client grain', callsAtClient.callTotals.dialed, 80);
+// Counted once, not once per campaign row — the mistake the row-level
+// blocking exists to prevent, reappearing one level up.
+check(
+  'two campaign rows do not double it',
+  callsAtCampaign.callTotals.dialed,
+  callsAtClient.callTotals.dialed,
+);
+check('2-minute calls come through too', callsAtCampaign.callTotals.calls2min, 8);
+check(
+  'and connected, for pickup %',
+  callsAtCampaign.callTotals.connectedOutbound,
+  79,
+);
+
+// Summed across clients, so several practices add up.
+const twoClients = aggregate(
+  [],
+  [
+    call({ client_id: 'c1', dialed_calls: 30 }),
+    call({ client_id: 'c2', client_name: 'Harbour Dental', dialed_calls: 12 }),
+  ],
+  campaign,
+);
+check('clients sum', twoClients.callTotals.dialed, 42);
+
+// Same day, two rows: the view is daily, so a 30-day window has 30 of them.
+const twoDays = aggregate(
+  [],
+  [call({ dialed_calls: 5 }), call({ dialed_calls: 7 })],
+  campaign,
+);
+check('days sum', twoDays.callTotals.dialed, 12);
+
+// The client filter has to narrow this too, or picking one practice would
+// show its campaigns beside everybody's calls.
+const filteredCalls = aggregate(
+  [],
+  [
+    call({ client_id: 'c1', dialed_calls: 30 }),
+    call({ client_id: 'c2', client_name: 'Harbour Dental', dialed_calls: 12 }),
+  ],
+  { breakdown: 'campaign' as const, clientId: 'c2' },
+);
+check('the client filter narrows it', filteredCalls.callTotals.dialed, 12);
+
+// No calls at all is zero, not a crash — and zero is a real answer here,
+// unlike at row level where absent was the honest one.
+check('no calls is zero', aggregate([stat()], [], campaign).callTotals.dialed, 0);
+check(
+  'and its speed-to-lead denominator is zero, so the ratio is blank not zero',
+  aggregate([stat()], [], campaign).callTotals.speedToLeadN,
+  0,
+);
+
 const byClient = aggregate(
   [
     stat({ campaign_id_external: '111', spend_cents: 1000, leads_best: 10 }),
