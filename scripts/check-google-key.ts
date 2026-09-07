@@ -74,6 +74,35 @@ check(
   signable(`"${pem.replace(/\n/g, '')}"`),
 );
 
+console.log('\nThe whole JSON file, pasted into the field');
+
+/*
+ * The obvious thing to do with a downloaded key file is paste it, and the field
+ * is called GOOGLE_SERVICE_ACCOUNT_KEY. Both shapes of that file are covered:
+ * the valid one, where private_key carries escaped \n, and the one a text
+ * editor leaves behind, where the newlines are real and the file is therefore
+ * no longer valid JSON — which is exactly why this is not done with JSON.parse.
+ */
+const serviceAccountJson = JSON.stringify(
+  {
+    type: 'service_account',
+    project_id: 'apex-hub-sheets',
+    private_key_id: 'abc123',
+    private_key: pem,
+    client_email: 'apex-hub-tracker-reader@apex-hub-sheets.iam.gserviceaccount.com',
+    token_uri: 'https://oauth2.googleapis.com/token',
+  },
+  null,
+  2,
+);
+
+check('the entire service-account JSON, valid and escaped', signable(serviceAccountJson));
+check(
+  'the entire JSON with real newlines, which is not valid JSON at all',
+  signable(serviceAccountJson.replace(/\\n/g, '\n')),
+);
+check('a key with stray text before and after it', signable(`note\n${pem}\nnote`));
+
 console.log('\nAnd what it must not do');
 
 // A rebuilt key must be byte-identical to the original, not merely signable.

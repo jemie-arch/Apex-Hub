@@ -72,7 +72,28 @@ function base64url(input: Buffer | string): string {
 function privateKey(raw: string): string {
   let key = raw.trim();
 
-  // A value copied straight out of the JSON file keeps its quotes.
+  /*
+   * THE WHOLE JSON FILE, pasted into the field.
+   *
+   * The obvious thing to do with a downloaded service-account key is paste it,
+   * and the field is called GOOGLE_SERVICE_ACCOUNT_KEY. So the second real
+   * attempt arrived as 2,356 characters with 40 line breaks and both PEM
+   * markers somewhere in the middle: the entire file, private_key and all.
+   *
+   * Not parsed as JSON, deliberately. A service-account file whose private_key
+   * still holds real newlines is not valid JSON — the newlines are unescaped
+   * inside a string — so JSON.parse fails on exactly the input this needs to
+   * handle. Cutting from the first BEGIN to the last END works whether the key
+   * arrived alone, inside its JSON, or with anything else around it.
+   */
+  const begin = key.indexOf('-----BEGIN');
+  const end = key.lastIndexOf('-----END');
+  if (begin > 0 && end > begin) {
+    const tail = key.indexOf('-----', end + 8);
+    key = key.slice(begin, tail === -1 ? undefined : tail + 5).trim();
+  }
+
+  // A value copied straight out of the JSON field keeps its quotes.
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))
