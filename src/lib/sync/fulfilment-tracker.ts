@@ -99,7 +99,41 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
     return;
   }
 
-  const [headerRow, ...dataRows] = rows;
+  /*
+   * FIND the header row. Do not assume it is the first.
+   *
+   * The first run read row 1 and found a single cell: "APPOINTMENT DATA". It is
+   * a title, spanning the tab the way STATS DASHBOARD puts its section names on
+   * row 4 and its column headings on row 5. Assuming row 1 meant the import
+   * stopped with "missing required column(s): patient_name, booked_for" while
+   * sitting on a sheet that has both.
+   *
+   * So the header row is the one that recognises the most columns, chosen from
+   * the first several rows. That is stronger than hardcoding row 2 as well: it
+   * survives somebody adding a note above the table, and it cannot silently
+   * pick a data row, because a data row maps nothing.
+   */
+  const HEADER_SEARCH_ROWS = 8;
+
+  let headerIndex = 0;
+  let bestMatches = -1;
+
+  rows.slice(0, HEADER_SEARCH_ROWS).forEach((candidate, index) => {
+    const matches = candidate.filter(
+      (cell) => HEADER_TO_FIELD.get(normaliseHeader(cell)) !== undefined,
+    ).length;
+    if (matches > bestMatches) {
+      bestMatches = matches;
+      headerIndex = index;
+    }
+  });
+
+  const headerRow = rows[headerIndex];
+  const dataRows = rows.slice(headerIndex + 1);
+
+  // Worth recording: if this is ever not 1, the sheet grew a banner and the
+  // next person should not have to rediscover why the rows are offset.
+  ctx.note('header_row_in_sheet', headerIndex + 1);
 
   /*
    * The header map, and everything it could not place.
@@ -168,7 +202,13 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
       // Row 1 is the header, and offset is zero-based, so the sheet's own row
       // number is offset + 2. Keeping the sheet's numbering means a row here
       // can be found by eye in the tracker without arithmetic.
-      source_row: offset + 2,
+      /*
+       * The sheet's own row number, counted from the header wherever it turned
+       * out to be. This is the key the ledger joins on and the number somebody
+       * uses to find the row by eye, so an offset here silently points every
+       * reconciliation at the wrong line.
+       */
+      source_row: headerIndex + 2 + offset,
       patient_name: patient,
       booked_for: bookedFor,
       location_name: text(cell(row, 'location_name')),
