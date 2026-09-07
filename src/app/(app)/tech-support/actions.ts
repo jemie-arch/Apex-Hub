@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * Tech-call bookings.
+ * Tech-call bookings and tech tickets.
  *
  * A request arrives with a preferred time at best; confirming it is what turns
  * it into an appointment, and confirming is deliberately an explicit act rather
@@ -11,7 +11,7 @@ import { revalidatePath } from 'next/cache';
 
 import { ASSIGNABLE_ROLES } from '@/config/roles';
 import { notifyUsers } from '@/lib/notify/inbox';
-import { requireAdmin, requirePermission } from '@/lib/supabase/server';
+import { requirePermission } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
 
@@ -39,7 +39,7 @@ function clean(value: FormDataEntryValue | null): string | null {
 export async function createTechCall(
   formData: FormData,
 ): Promise<TechCallResult> {
-  await requireAdmin();
+  await requirePermission('tech_support');
 
   const topic = clean(formData.get('topic'));
   if (topic === null) return { ok: false, message: 'Say what the call is about.' };
@@ -72,7 +72,7 @@ export async function setTechCallStatus(input: {
   scheduledAt?: string | null;
   resolution?: string | null;
 }): Promise<TechCallResult> {
-  const caller = await requireAdmin();
+  const caller = await requirePermission('tech_support');
 
   if (!(STATUSES as readonly string[]).includes(input.status)) {
     return { ok: false, message: `"${input.status}" is not a status.` };
