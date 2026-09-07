@@ -49,15 +49,59 @@ function base64url(input: Buffer | string): string {
 }
 
 /**
- * The private key as Google issues it, whatever the host did to the newlines.
+ * The private key as Google issues it, whatever the paste did to it.
  *
- * A PEM key pasted into an environment variable arrives with its line breaks
- * either intact or escaped as the two characters backslash-n, depending on the
- * platform and on whether somebody pasted it through a shell. Both are normal
- * and neither is an error worth failing a sync over.
+ * A PEM key reaches an environment variable through a text field, a shell, or a
+ * clipboard, and each of them damages it differently. The first version handled
+ * two shapes — real line breaks, or the two characters backslash-n — and the
+ * first real paste produced a third: Vercel's single-line Value input accepted
+ * the key and dropped every newline, leaving one long string. Node's answer to
+ * that is "error:1E08010C:DECODER routines::unsupported", which says nothing
+ * about newlines to anybody who has not met it before.
+ *
+ * So this repairs rather than assumes. All four shapes end in the same PEM:
+ *   - real line breaks: passed through
+ *   - escaped \n: unescaped
+ *   - wrapped in quotes, because the JSON field was copied with them: unwrapped
+ *   - no line breaks at all: rebuilt, base64 re-wrapped at 64 characters
+ *
+ * The rebuild is safe because PEM is a strict format: a header line, base64 in
+ * 64-character lines, a footer line. Nothing is guessed — the body is the
+ * characters between the markers with whitespace removed.
  */
 function privateKey(raw: string): string {
-  return raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+  let key = raw.trim();
+
+  // A value copied straight out of the JSON file keeps its quotes.
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+
+  if (key.includes('\\n')) key = key.replace(/\\n/g, '\n');
+
+  // Already has line breaks: nothing more to do.
+  if (key.includes('\n')) return key;
+
+  const match = key.match(
+    /-----BEGIN ([A-Z ]+)-----(.*)-----END ([A-Z ]+)-----/,
+  );
+  if (!match) return key;
+
+  const [, label, body] = match;
+  const base64 = (body ?? '').replace(/\s+/g, '');
+  const lines = base64.match(/.{1,64}/g) ?? [];
+
+  return [`-----BEGIN ${label}-----`, ...lines, `-----END ${label}-----`, ''].join(
+    '\n',
+  );
+}
+
+/** The same repair, exposed for check:googlekey. Not used at runtime. */
+export function normalisePrivateKeyForTests(raw: string): string {
+  return privateKey(raw);
 }
 
 export interface GoogleCredentials {
@@ -118,9 +162,38 @@ async function accessToken(): Promise<string> {
     `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.` +
     `${base64url(JSON.stringify(claims))}`;
 
-  const signer = createSign('RSA-SHA256');
-  signer.update(unsigned);
-  const assertion = `${unsigned}.${base64url(signer.sign(key))}`;
+  /*
+   * Signing is where a damaged key surfaces, and it surfaces uselessly.
+   * OpenSSL's answer to a malformed PEM is "error:1E08010C:DECODER
+   * routines::unsupported", which names neither the key nor what is wrong with
+   * it. This says what shape arrived — and only the shape. Never the key, never
+   * a fragment of it: the whole point of the variable being a secret is that it
+   * does not turn up in a log because a sync failed.
+   */
+  let assertion: string;
+  try {
+    const signer = createSign('RSA-SHA256');
+    signer.update(unsigned);
+    assertion = `${unsigned}.${base64url(signer.sign(key))}`;
+  } catch (error) {
+    const shape = [
+      `${key.length} characters`,
+      key.includes('-----BEGIN') ? 'has a BEGIN marker' : 'NO BEGIN marker',
+      key.includes('-----END') ? 'has an END marker' : 'NO END marker',
+      `${key.split('\n').length - 1} line break(s)`,
+    ].join(', ');
+
+    throw new Error(
+      'GOOGLE_SERVICE_ACCOUNT_KEY could not be read as a private key. ' +
+        `What arrived: ${shape}. ` +
+        'Copy the private_key field out of the service account JSON, from ' +
+        '-----BEGIN PRIVATE KEY----- to -----END PRIVATE KEY-----, without the ' +
+        'surrounding quotes. Escaped \\n, real line breaks and no line breaks ' +
+        `at all are all handled. Underlying error: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+    );
+  }
 
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
