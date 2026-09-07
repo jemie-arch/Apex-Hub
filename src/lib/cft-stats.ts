@@ -70,7 +70,24 @@ export interface DashboardRow {
 export interface CallCounters {
   dialed: number;
   calls2min: number;
+  /*
+   * GoHighLevel's word, kept because the tracker's Pickup % column mirrors
+   * Joshua's sheet and nobody has confirmed which definition his uses.
+   *
+   * It overstates pickups badly: GoHighLevel says 'completed' when a call
+   * attempt finishes, not when a person answers, so over the 30 days to
+   * 7 September this counted 2,233 of 2,270 dials as connected — a 98.4%
+   * pickup rate on outbound. 1,299 of those had no talk time at all.
+   */
   connectedOutbound: number;
+  /*
+   * Outbound calls that had talk time, which is the weakest claim that is
+   * still true: somebody was on the line. 934 of the same 2,270, so 41.1%.
+   * Use this for anything a person will act on.
+   */
+  answeredOutbound: number;
+  /** connectedOutbound minus answeredOutbound. Zero would mean they agree. */
+  connectedButSilent: number;
   speedToLeadSum: number;
   speedToLeadN: number;
   speedToLeadOver24h: number;
@@ -186,6 +203,8 @@ export interface CallViewRow {
   dialed_calls: number | null;
   calls_2min: number | null;
   connected_outbound: number | null;
+  answered_outbound: number | null;
+  connected_but_silent: number | null;
   speed_to_lead_min_sum: number | null;
   speed_to_lead_n: number | null;
   speed_to_lead_over_24h: number | null;
@@ -198,6 +217,8 @@ function emptyCalls(): CallCounters {
     dialed: 0,
     calls2min: 0,
     connectedOutbound: 0,
+    answeredOutbound: 0,
+    connectedButSilent: 0,
     speedToLeadSum: 0,
     speedToLeadN: 0,
     speedToLeadOver24h: 0,
@@ -266,7 +287,7 @@ export async function loadStatsDashboard(
       db
         .from('v_cft_call_daily')
         .select(
-          'client_id, group_id, client_name, dialed_calls, calls_2min, connected_outbound, speed_to_lead_min_sum, speed_to_lead_n, speed_to_lead_over_24h',
+          'client_id, group_id, client_name, dialed_calls, calls_2min, connected_outbound, answered_outbound, connected_but_silent, speed_to_lead_min_sum, speed_to_lead_n, speed_to_lead_over_24h',
         )
         .gte('day', from)
         .lte('day', to)
@@ -313,6 +334,8 @@ export function aggregate(
     held.dialed += n(row.dialed_calls);
     held.calls2min += n(row.calls_2min);
     held.connectedOutbound += n(row.connected_outbound);
+    held.answeredOutbound += n(row.answered_outbound);
+    held.connectedButSilent += n(row.connected_but_silent);
     held.speedToLeadSum += n(row.speed_to_lead_min_sum);
     held.speedToLeadN += n(row.speed_to_lead_n);
     held.speedToLeadOver24h += n(row.speed_to_lead_over_24h);
@@ -456,6 +479,8 @@ export function aggregate(
       totals.calls.dialed += row.calls.dialed;
       totals.calls.calls2min += row.calls.calls2min;
       totals.calls.connectedOutbound += row.calls.connectedOutbound;
+      totals.calls.answeredOutbound += row.calls.answeredOutbound;
+      totals.calls.connectedButSilent += row.calls.connectedButSilent;
       totals.calls.speedToLeadSum += row.calls.speedToLeadSum;
       totals.calls.speedToLeadN += row.calls.speedToLeadN;
       totals.calls.speedToLeadOver24h += row.calls.speedToLeadOver24h;
@@ -472,6 +497,8 @@ export function aggregate(
     callTotals.dialed += counters.dialed;
     callTotals.calls2min += counters.calls2min;
     callTotals.connectedOutbound += counters.connectedOutbound;
+    callTotals.answeredOutbound += counters.answeredOutbound;
+    callTotals.connectedButSilent += counters.connectedButSilent;
     callTotals.speedToLeadSum += counters.speedToLeadSum;
     callTotals.speedToLeadN += counters.speedToLeadN;
     callTotals.speedToLeadOver24h += counters.speedToLeadOver24h;

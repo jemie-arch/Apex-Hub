@@ -3756,11 +3756,13 @@ export type Database = {
     Views: {
       v_cft_call_daily: {
         Row: {
+          answered_outbound: number | null
           calls_2min: number | null
           calls_total: number | null
           client_id: string | null
           client_name: string | null
           connected_any: number | null
+          connected_but_silent: number | null
           connected_outbound: number | null
           day: string | null
           dialed_calls: number | null

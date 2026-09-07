@@ -75,6 +75,8 @@ function call(over: Partial<CallViewRow> = {}): CallViewRow {
     dialed_calls: 0,
     calls_2min: 0,
     connected_outbound: 0,
+    answered_outbound: 0,
+    connected_but_silent: 0,
     speed_to_lead_min_sum: 0,
     speed_to_lead_n: 0,
     speed_to_lead_over_24h: 0,
@@ -243,6 +245,46 @@ check('the client filter narrows it', filteredCalls.callTotals.dialed, 12);
 // No calls at all is zero, not a crash — and zero is a real answer here,
 // unlike at row level where absent was the honest one.
 check('no calls is zero', aggregate([stat()], [], campaign).callTotals.dialed, 0);
+
+/*
+ * A zero-second call is not a pickup.
+ *
+ * GoHighLevel says 'completed' when a call attempt finishes, not when somebody
+ * answers, and sync/crm-calls maps that to 'connected'. Over the 30 days to
+ * 7 September it made 2,233 of 2,270 outbound dials look connected — 98.4% —
+ * while 1,299 of them had no talk time. These numbers are that shape, scaled
+ * down, so the two definitions cannot quietly converge again.
+ */
+const silentDials = aggregate(
+  [],
+  [
+    call({
+      dialed_calls: 100,
+      connected_outbound: 98,
+      answered_outbound: 41,
+      connected_but_silent: 57,
+    }),
+  ],
+  campaign,
+);
+check(
+  'the status word still reports its inflated figure',
+  silentDials.callTotals.connectedOutbound,
+  98,
+);
+check('talk time reports the real one', silentDials.callTotals.answeredOutbound, 41);
+check('and the gap is carried, not hidden', silentDials.callTotals.connectedButSilent, 57);
+// The card divides by dialed, so this is the number a reader sees.
+check(
+  'answered % is the one worth showing',
+  Math.round((silentDials.callTotals.answeredOutbound / silentDials.callTotals.dialed) * 1000) / 10,
+  41,
+);
+check(
+  'and it is not what the status word would have shown',
+  silentDials.callTotals.connectedOutbound === silentDials.callTotals.answeredOutbound,
+  false,
+);
 check(
   'and its speed-to-lead denominator is zero, so the ratio is blank not zero',
   aggregate([stat()], [], campaign).callTotals.speedToLeadN,

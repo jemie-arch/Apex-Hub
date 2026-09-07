@@ -239,7 +239,21 @@ export async function TrackerTab({
   const calls = result.callTotals;
   const callRatio = (top: number, bottom: number): number | null =>
     bottom === 0 ? null : top / bottom;
-  const pickupPct = callRatio(calls.connectedOutbound, calls.dialed);
+  /*
+   * Answered, not "connected" — and the difference is not small.
+   *
+   * connectedOutbound counts GoHighLevel's status word, which says 'completed'
+   * when a call attempt finishes rather than when a person answers. Over the
+   * 30 days to 7 September that made 2,233 of 2,270 dials look connected: a
+   * 98.4% pickup rate on outbound cold calls, which nobody would believe and
+   * anybody might act on. 1,299 of them had no talk time at all.
+   *
+   * answeredOutbound requires talk time, and gives 41.1%. The tracker's own
+   * Pickup % column still mirrors the sheet's definition — see migration 0043
+   * for why that is deliberately left alone — so this card is named for what
+   * it measures rather than borrowing that column's label.
+   */
+  const answeredPct = callRatio(calls.answeredOutbound, calls.dialed);
   const conversationPct = callRatio(calls.calls2min, calls.dialed);
   const speedToLead = callRatio(calls.speedToLeadSum, calls.speedToLeadN);
 
@@ -361,9 +375,14 @@ export async function TrackerTab({
               tone={calls.dialed === 0 ? 'warning' : 'neutral'}
             />
             <Kpi
-              label="Pickup %"
-              value={formatPercent(pickupPct, 1)}
-              note="connected ÷ dialed, outbound only"
+              label="Answered %"
+              value={formatPercent(answeredPct, 1)}
+              note={
+                calls.connectedButSilent > 0
+                  ? `${formatCount(calls.answeredOutbound)} of ${formatCount(calls.dialed)} had talk time · ${formatCount(calls.connectedButSilent)} more are logged connected with none`
+                  : `${formatCount(calls.answeredOutbound)} of ${formatCount(calls.dialed)} had talk time`
+              }
+              noteTone={calls.connectedButSilent > 0 ? 'warning' : 'neutral'}
             />
             <Kpi
               label="Conversation %"
