@@ -28,6 +28,7 @@ import {
 } from '@/config/booking-sheet';
 import { serverEnv } from '@/lib/env';
 import { parseSheetDate } from '@/lib/sheet-dates';
+import { findHeaderRow } from '@/lib/sheet-headers';
 import { listSheetTitles, readSheet } from '@/lib/integrations/google-sheets';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
@@ -101,9 +102,25 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
     return;
   }
 
-  const [bookingHeader, ...bookingRows] = bookings;
+  /*
+   * Find the header row rather than taking the first.
+   *
+   * This tab has never been read, so its shape is unverified — and the one tab
+   * in this family that HAS been read opens with a merged banner and puts its
+   * headings on row 4. Assuming row 1 there cost two runs. Cheaper to look.
+   */
+  const bookingHead = findHeaderRow(bookings, (cell) =>
+    Object.prototype.hasOwnProperty.call(
+      BOOKING_SHEET_COLUMNS,
+      normaliseSheetHeader(cell),
+    ),
+  );
+
+  const bookingHeader = bookings[bookingHead.index];
+  const bookingRows = bookings.slice(bookingHead.index + 1);
   const booking = mapHeaders(bookingHeader, BOOKING_SHEET_COLUMNS);
 
+  ctx.note('booking_header_row_in_sheet', bookingHead.sheetRow);
   ctx.note('booking_headers_mapped', [...booking.columnOf.keys()].sort());
   if (booking.unmatched.length > 0) {
     ctx.note('booking_headers_unrecognised', booking.unmatched);
@@ -159,7 +176,15 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
     }
 
     records.push({
-      source_row: offset + 2,
+      /*
+       * The sheet's own row number, counted from wherever the header turned
+       * out to be — not from row 1.
+       *
+       * This is both the upsert key and the number somebody uses to find the
+       * row by eye, so an offset here points every reconciliation at the wrong
+       * line while looking entirely plausible.
+       */
+      source_row: bookingHead.index + 2 + offset,
       booked_on: parsed.date,
       agent,
       patient_name: text(bookingCell(row, 'patient_name')),
@@ -265,9 +290,19 @@ async function importInvalidBookings(
     return;
   }
 
-  const [header, ...dataRows] = rows;
+  // Same treatment as BOOKING SHEET above, and for the same reason.
+  const invalidHead = findHeaderRow(rows, (cell) =>
+    Object.prototype.hasOwnProperty.call(
+      INVALID_BOOKINGS_COLUMNS,
+      normaliseSheetHeader(cell),
+    ),
+  );
+
+  const header = rows[invalidHead.index];
+  const dataRows = rows.slice(invalidHead.index + 1);
   const { columnOf, unmatched } = mapHeaders(header, INVALID_BOOKINGS_COLUMNS);
 
+  ctx.note('invalid_header_row_in_sheet', invalidHead.sheetRow);
   if (unmatched.length > 0) ctx.note('invalid_headers_unrecognised', unmatched);
 
   if (!columnOf.has('agent')) {
@@ -297,7 +332,8 @@ async function importInvalidBookings(
     const reportedAt = stamp === null ? null : new Date(stamp);
 
     records.push({
-      source_row: offset + 2,
+      // Counted from the discovered header, as above.
+      source_row: invalidHead.index + 2 + offset,
       // The form's timestamp, kept apart from the date the booking was made —
       // the tally matches on the latter.
       reported_at:

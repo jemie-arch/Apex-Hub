@@ -23,6 +23,7 @@ import {
   TRACKER_COLUMNS,
   normaliseHeader,
 } from '../src/config/fulfilment-tracker';
+import { findHeaderRow } from '../src/lib/sheet-headers';
 import {
   parseTrackerDateForTests as asDate,
   parseTrackerMoneyForTests as asCents,
@@ -59,6 +60,76 @@ section('Headers match however they are typed');
   // A sheet worked in by hand collects double spaces nobody can see.
   check('a doubled inner space', lookup('Booked  By'), 'booked_by');
   check('an unknown header maps to nothing', lookup('Notes For Later'), undefined);
+}
+
+section('Finding the header row, which is not row 1');
+{
+  const recognises = (cell: string) =>
+    HEADER_TO_FIELD.has(normaliseHeader(cell));
+
+  /*
+   * The exact shape that cost two runs: a merged banner spanning rows 1-3 comes
+   * back as one cell, then the headings on row 4.
+   */
+  const trackerShape = [
+    ['APPOINTMENT DATA'],
+    [],
+    [],
+    ['Month Created', 'Month Booked', 'Date Created', 'Date Booked', 'Name'],
+    ['September', 'September', '9/1/2026', '9/4/2026', 'A Patient'],
+  ];
+  const found = findHeaderRow(trackerShape, recognises);
+  check('the banner is skipped', found.index, 3);
+  check('and reported as the sheet numbers it', found.sheetRow, 4);
+
+  // The ordinary case must not be broken by supporting the odd one.
+  const plain = [
+    ['Name', 'Date Booked', 'Location Name'],
+    ['A Patient', '9/4/2026', 'Somewhere Dental'],
+  ];
+  check('a header already on row 1 is left alone', findHeaderRow(plain, recognises).sheetRow, 1);
+
+  /*
+   * A data row must never outscore the headings. Patient names and dates match
+   * no column heading, which is what makes the scoring safe.
+   */
+  const dataHeavy = [
+    ['Name', 'Date Booked'],
+    ['A Patient', '9/4/2026'],
+    ['Another Patient', '9/5/2026'],
+    ['A Third', '9/6/2026'],
+  ];
+  check('data rows score nothing', findHeaderRow(dataHeavy, recognises).sheetRow, 1);
+
+  // Ties go to the earliest, so the answer stays stable as the sheet grows.
+  const duplicated = [
+    ['Name', 'Date Booked'],
+    ['Name', 'Date Booked'],
+  ];
+  check('a tie picks the first', findHeaderRow(duplicated, recognises).sheetRow, 1);
+
+  /*
+   * Nothing recognisable anywhere returns row 1 with no matches, which leaves
+   * the caller to report "missing required columns" and print what it saw —
+   * the same outcome as before this existed, and the useful one.
+   */
+  const unrecognisable = [['Notes'], ['More notes']];
+  const none = findHeaderRow(unrecognisable, recognises);
+  check('an unreadable tab falls back to row 1', none.sheetRow, 1);
+  check('and admits it matched nothing', none.matches, 0);
+
+  check('an empty tab does not throw', findHeaderRow([], recognises).sheetRow, 1);
+
+  // Bounded, so a large tab cannot be searched into.
+  const deep = [
+    [], [], [], [], [], [], [], [],
+    ['Name', 'Date Booked'],
+  ];
+  check(
+    'a header below the search window is not found',
+    findHeaderRow(deep, recognises).matches,
+    0,
+  );
 }
 
 section('The tracker as it actually is — row 4, columns A to N');

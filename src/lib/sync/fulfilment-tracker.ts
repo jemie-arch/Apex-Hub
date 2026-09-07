@@ -31,6 +31,7 @@ import {
 } from '@/config/fulfilment-tracker';
 import { serverEnv } from '@/lib/env';
 import { readSheet } from '@/lib/integrations/google-sheets';
+import { findHeaderRow } from '@/lib/sheet-headers';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
@@ -141,38 +142,21 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
   /*
    * FIND the header row. Do not assume it is the first.
    *
-   * The first run read row 1 and found a single cell: "APPOINTMENT DATA". It is
-   * a title, spanning the tab the way STATS DASHBOARD puts its section names on
-   * row 4 and its column headings on row 5. Assuming row 1 meant the import
-   * stopped with "missing required column(s): patient_name, booked_for" while
-   * sitting on a sheet that has both.
-   *
-   * So the header row is the one that recognises the most columns, chosen from
-   * the first several rows. That is stronger than hardcoding row 2 as well: it
-   * survives somebody adding a note above the table, and it cannot silently
-   * pick a data row, because a data row maps nothing.
+   * This tab opens with a merged banner reading "APPOINTMENT DATA" and puts its
+   * real headings on row 4, which is why the first two runs read one
+   * unrecognised cell and stopped. Shared with booking-sheet, which reads tabs
+   * from the same family of workbook.
    */
-  const HEADER_SEARCH_ROWS = 8;
-
-  let headerIndex = 0;
-  let bestMatches = -1;
-
-  rows.slice(0, HEADER_SEARCH_ROWS).forEach((candidate, index) => {
-    const matches = candidate.filter(
-      (cell) => HEADER_TO_FIELD.get(normaliseHeader(cell)) !== undefined,
-    ).length;
-    if (matches > bestMatches) {
-      bestMatches = matches;
-      headerIndex = index;
-    }
-  });
+  const { index: headerIndex, sheetRow } = findHeaderRow(rows, (cell) =>
+    HEADER_TO_FIELD.has(normaliseHeader(cell)),
+  );
 
   const headerRow = rows[headerIndex];
   const dataRows = rows.slice(headerIndex + 1);
 
   // Worth recording: if this is ever not 1, the sheet grew a banner and the
   // next person should not have to rediscover why the rows are offset.
-  ctx.note('header_row_in_sheet', headerIndex + 1);
+  ctx.note('header_row_in_sheet', sheetRow);
 
   /*
    * The header map, and everything it could not place.
