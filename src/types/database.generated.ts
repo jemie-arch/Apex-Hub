@@ -4313,6 +4313,7 @@ export type Database = {
     }
     Functions: {
       apply_tracker_aliases: { Args: never; Returns: number }
+      apply_tracker_lead_aliases: { Args: never; Returns: number }
       attribute_billing_charges: { Args: never; Returns: Json }
       attribute_ledger_charges: { Args: never; Returns: number }
       auth_group_id: { Args: never; Returns: string }

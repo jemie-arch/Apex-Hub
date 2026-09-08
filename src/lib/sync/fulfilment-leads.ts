@@ -310,6 +310,50 @@ export async function syncFulfilmentLeads(ctx: SyncContext): Promise<void> {
   );
 
   await importHistoricalTabs(ctx, db, sheetId, tabs);
+
+  /*
+   * Attach the rows to their practices, or none of this counts.
+   *
+   * Every lead count filters on client_id, because a lead belonging to no
+   * practice belongs to nobody. This sync used to leave it null with a comment
+   * saying tracker_practice_aliases owned the matching — true of the alias
+   * table, false of anything applying it to these rows. Nothing did.
+   *
+   * The result was a re-import that made the numbers worse: 634 of 1,121 rows
+   * unattached, and the week of 31 August read 17 leads at $520 each when it
+   * had 260 at $34. The leads were in the table the whole time, attached to
+   * nobody.
+   *
+   * Runs after the historical pass so both tabs are covered by one call, and
+   * fills nulls only — so it can never undo a correction made by hand.
+   */
+  const attached = await db.rpc('apply_tracker_lead_aliases');
+
+  if (attached.error) {
+    ctx.recordError(
+      'Leads were imported but could not be attached to their practices: ' +
+        `${attached.error.message}. Every lead count filters on the practice, ` +
+        'so until this succeeds the imported rows count for nobody.',
+    );
+    return;
+  }
+
+  ctx.note('rows_attached_to_a_practice', attached.data ?? 0);
+
+  /*
+   * What is still attached to nobody, which is the number that decides whether
+   * a cost per lead is right. Reported every run rather than left for somebody
+   * to query, because it is invisible in the figures it distorts: an
+   * unattached lead does not show up as an error, it shows up as a higher CPL.
+   */
+  const orphaned = await db
+    .from('tracker_leads')
+    .select('id', { count: 'exact', head: true })
+    .is('client_id', null);
+
+  if (!orphaned.error) {
+    ctx.note('rows_still_attached_to_no_practice', orphaned.count ?? 0);
+  }
 }
 
 /**
