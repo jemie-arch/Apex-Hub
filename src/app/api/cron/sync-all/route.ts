@@ -133,6 +133,21 @@ const ORDER = [
   'appointment-ledger',
   'crm-calls',
   /*
+   * The CRM lead feed, and why it is last.
+   *
+   * It is the reference count for every lead figure the Hub shows, so it
+   * matters — but it spends one or two HTTP requests per practice against a
+   * rate-limited API and nothing else in this cycle reads what it writes. The
+   * tail is where a slow sync costs least, and if the 240s budget runs out
+   * this is the right thing to lose: a lead's dateAdded never changes, so
+   * tomorrow's run picks up whatever tonight's missed.
+   *
+   * First scheduled run is 8 September 2026. It has credentials — crm-calls
+   * uses the same tokens — but /contacts/ has never been read, so expect the
+   * key-name report in its notes to correct the field mapping.
+   */
+  'crm-leads',
+  /*
    * 'fulfilment-tracker' moved up, above appointment-ledger. It used to sit
    * here with a note explaining that the Google credentials were unset and
    * what to do when they arrived. They arrived; that was done. Left as a

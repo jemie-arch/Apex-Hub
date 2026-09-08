@@ -10,6 +10,7 @@ import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
 import { syncBookingSheet } from '@/lib/sync/booking-sheet';
 import { syncCommissionInputs } from '@/lib/sync/commission-inputs';
+import { syncCrmLeads } from '@/lib/sync/crm-leads';
 import { syncFulfilmentLeads } from '@/lib/sync/fulfilment-leads';
 import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
@@ -56,6 +57,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'The Client Fulfilment Tracker sheet into tracker_appointments — needs a ' +
       'Google service account and FULFILMENT_TRACKER_SHEET_ID',
     run: syncFulfilmentTracker,
+  },
+  'crm-leads': {
+    name: 'crm-leads',
+    description:
+      'GoHighLevel contacts into crm_leads — the lead feed the Hub never had, ' +
+      'and the only source that records a lead when it arrives',
+    run: syncCrmLeads,
   },
   'fulfilment-leads': {
     name: 'fulfilment-leads',

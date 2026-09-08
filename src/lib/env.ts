@@ -105,6 +105,15 @@ const serverSchema = z.object({
    */
   COMMISSION_INPUTS_SHEET_ID: z.string().min(1).optional(),
 
+  /**
+   * How many days of contacts crm-leads reads each night.
+   *
+   * Optional, and small by default: a contact's dateAdded never changes, so a
+   * wide window only rewrites rows that cannot have moved while spending pages
+   * against a rate-limited API. Widen it once, deliberately, to backfill.
+   */
+  CRM_LEADS_WINDOW_DAYS: z.string().min(1).optional(),
+
   HUBSTAFF_TOKEN: z.string().min(1).optional(),
   HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),
   /** The organisation whose members and time are read. */

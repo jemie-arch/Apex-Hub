@@ -869,6 +869,14 @@ export async function listConversationCalls(
 
 export interface GhlContact {
   id: string;
+  /**
+   * dateAdded as an ISO instant, or null when the payload had no readable one.
+   *
+   * Null rather than "now": a lead dated by when the sync happened to run
+   * would land every historical contact on today and make the reconciliation
+   * against the sheet meaningless in exactly the direction that flatters us.
+   */
+  createdAtUtc: string | null;
   name: string | null;
   email: string | null;
   phone: string | null;
@@ -908,23 +916,203 @@ export interface ContactShape {
   topLevelKeys: string[];
 }
 
-/** One contact, for the name and the attribution on a booking. */
-export async function getContact(
+/**
+ * Every contact a location gained in a window — the lead feed the Hub has
+ * never had.
+ *
+ * WHY THIS EXISTS
+ *
+ * Joshua reports that the Hub's lead numbers do not agree with GoHighLevel.
+ * They cannot: nothing has ever read leads from GoHighLevel. The Hub's lead
+ * count is leads_best = greatest(Windsor, the tracker sheet), and Meta reports
+ * nothing for 35 of the 39 accounts that spent money last month. So the
+ * disagreement is a missing feed, not a miscount — and it stays unprovable
+ * either way until the two can be put side by side.
+ *
+ * A LEAD IS A CONTACT CREATED IN THE WINDOW.
+ *
+ * dateAdded, not a tag and not a pipeline stage. Both of those are decided by
+ * whoever set the automation up and differ between sub-accounts, so counting
+ * them would compare practices by how their CRM was configured rather than by
+ * how many people enquired.
+ *
+ * WHAT IT REPORTS BACK
+ *
+ * The response shape, deliberately. This endpoint has not been read before, so
+ * the field names below are from GoHighLevel's documentation rather than from a
+ * live payload — the same position the tracker import was in when it demanded
+ * "booked for" from a sheet that says "Date Booked" and failed twice. `shape`
+ * carries key names and counts only, never a value, so a wrong guess is
+ * visible in one run instead of three.
+ */
+export interface GhlContactPage {
+  contacts: GhlContact[];
+  /** Key names seen, and how many contacts arrived. Never any value. */
+  shape: {
+    pages: number;
+    received: number;
+    /** Contacts the parser could not place, usually a missing id or date. */
+    unusable: number;
+    metaKeys: string[];
+    contactKeys: string[];
+    dateKeysSeen: string[];
+    /** True when the endpoint kept offering more than the cap allows. */
+    truncated: boolean;
+  };
+}
+
+/** Contacts requested per page. GoHighLevel caps this at 100. */
+const CONTACTS_PER_PAGE = 100;
+
+/**
+ * Pages per location, so one busy sub-account cannot spend the whole run.
+ * 40 pages is 4,000 contacts, well past a month for any practice here.
+ */
+const MAX_CONTACT_PAGES = 40;
+
+export async function listContacts(
   clientId: string,
-  contactId: string,
-): Promise<GhlContact | null> {
+  locationId: string,
+  from: Date,
+  to: Date,
+): Promise<GhlContactPage> {
   const { accessToken } = await getToken(clientId);
 
-  const payload = await request<{ contact?: unknown }>(
-    accessToken,
-    `/contacts/${contactId}`,
-  );
+  const contacts: GhlContact[] = [];
+  const metaKeys = new Set<string>();
+  const contactKeys = new Set<string>();
+  const dateKeysSeen = new Set<string>();
 
-  if (typeof payload.contact !== 'object' || payload.contact === null) {
-    return null;
+  let received = 0;
+  let unusable = 0;
+  let pages = 0;
+  let truncated = false;
+
+  // Cursor pagination: GoHighLevel returns the pair to send back, and offset
+  // paging on a list that is being written to would skip and repeat rows.
+  let startAfter: string | null = null;
+  let startAfterId: string | null = null;
+
+  for (;;) {
+    if (pages >= MAX_CONTACT_PAGES) {
+      truncated = true;
+      break;
+    }
+
+    const params: Record<string, string> = {
+      locationId,
+      limit: String(CONTACTS_PER_PAGE),
+    };
+    if (startAfter !== null) params['startAfter'] = startAfter;
+    if (startAfterId !== null) params['startAfterId'] = startAfterId;
+
+    const payload = await request<{
+      contacts?: unknown[];
+      meta?: Record<string, unknown>;
+    }>(accessToken, '/contacts/', params);
+
+    pages += 1;
+
+    if (payload.meta && typeof payload.meta === 'object') {
+      for (const key of Object.keys(payload.meta)) metaKeys.add(key);
+    }
+
+    const rows = Array.isArray(payload.contacts) ? payload.contacts : [];
+    if (rows.length === 0) break;
+
+    let oldestOnPage: number | null = null;
+
+    for (const row of rows) {
+      received += 1;
+
+      if (typeof row !== 'object' || row === null) {
+        unusable += 1;
+        continue;
+      }
+      const record = row as Record<string, unknown>;
+      for (const key of Object.keys(record)) contactKeys.add(key);
+
+      const id = asString(record['id']);
+
+      /*
+       * dateAdded is the documented field; the others are recorded when
+       * present so a rename shows up as a key name rather than as every lead
+       * silently falling outside the window.
+       */
+      const addedRaw =
+        asString(record['dateAdded']) ??
+        asString(record['createdAt']) ??
+        asString(record['date_added']);
+      for (const key of ['dateAdded', 'createdAt', 'date_added']) {
+        if (record[key] !== undefined) dateKeysSeen.add(key);
+      }
+
+      if (!id || !addedRaw) {
+        unusable += 1;
+        continue;
+      }
+
+      const added = new Date(addedRaw);
+      if (Number.isNaN(added.getTime())) {
+        unusable += 1;
+        continue;
+      }
+
+      if (oldestOnPage === null || added.getTime() < oldestOnPage) {
+        oldestOnPage = added.getTime();
+      }
+
+      // Filtered here rather than by the API, because this endpoint's date
+      // filtering is not dependable across versions and a silently ignored
+      // filter would return everything as though it were this month's.
+      if (added < from || added > to) continue;
+
+      contacts.push(parseContact(id, record));
+    }
+
+    const meta = payload.meta ?? {};
+    const nextAfter = asString(meta['startAfter']);
+    const nextAfterId = asString(meta['startAfterId']);
+
+    // No cursor means no more pages, whatever the count said.
+    if (!nextAfter && !nextAfterId) break;
+
+    /*
+     * Contacts come back newest first, so once a whole page predates the
+     * window there is nothing older worth paging into. Without this the sync
+     * would walk a practice's entire history every night to find a fortnight.
+     */
+    if (oldestOnPage !== null && oldestOnPage < from.getTime()) break;
+
+    startAfter = nextAfter;
+    startAfterId = nextAfterId;
   }
 
-  const record = payload.contact as Record<string, unknown>;
+  return {
+    contacts,
+    shape: {
+      pages,
+      received,
+      unusable,
+      metaKeys: [...metaKeys].sort(),
+      contactKeys: [...contactKeys].sort(),
+      dateKeysSeen: [...dateKeysSeen].sort(),
+      truncated,
+    },
+  };
+}
+
+/**
+ * One contact payload, as a GhlContact.
+ *
+ * Extracted so the single-contact read and the bulk lead read cannot drift
+ * apart: two copies of attribution parsing is how one of them quietly stops
+ * finding an ad id that the other still reads.
+ */
+function parseContact(
+  contactId: string,
+  record: Record<string, unknown>,
+): GhlContact {
   const attributions = Array.isArray(record['attributions'])
     ? (record['attributions'] as unknown[])
     : [];
@@ -941,8 +1129,16 @@ export async function getContact(
 
   const name = asString(record['contactName']) ?? (fullName === '' ? null : fullName);
 
+  const addedRaw =
+    asString(record['dateAdded']) ??
+    asString(record['createdAt']) ??
+    asString(record['date_added']);
+  const added = addedRaw === null ? null : new Date(addedRaw);
+
   return {
     id: contactId,
+    createdAtUtc:
+      added && !Number.isNaN(added.getTime()) ? added.toISOString() : null,
     name,
     email: asString(record['email']),
     phone: asString(record['phone']),
@@ -970,4 +1166,23 @@ export async function getContact(
       campaignId: asString(first['campaignId']),
     },
   };
+}
+
+/** One contact, for the name and the attribution on a booking. */
+export async function getContact(
+  clientId: string,
+  contactId: string,
+): Promise<GhlContact | null> {
+  const { accessToken } = await getToken(clientId);
+
+  const payload = await request<{ contact?: unknown }>(
+    accessToken,
+    `/contacts/${contactId}`,
+  );
+
+  if (typeof payload.contact !== 'object' || payload.contact === null) {
+    return null;
+  }
+
+  return parseContact(contactId, payload.contact as Record<string, unknown>);
 }

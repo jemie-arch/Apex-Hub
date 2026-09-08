@@ -3627,6 +3627,71 @@ export type Database = {
           },
         ]
       }
+      crm_leads: {
+        Row: {
+          ad_external_id: string | null
+          campaign_external_id: string | null
+          client_id: string
+          created_at_utc: string
+          created_on: string
+          crm_contact_id: string
+          id: string
+          lead_email: string | null
+          lead_name: string | null
+          lead_phone: string | null
+          source: string | null
+          synced_at: string
+          tags: string[]
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          ad_external_id?: string | null
+          campaign_external_id?: string | null
+          client_id: string
+          created_at_utc: string
+          created_on: string
+          crm_contact_id: string
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          source?: string | null
+          synced_at?: string
+          tags?: string[]
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          ad_external_id?: string | null
+          campaign_external_id?: string | null
+          client_id?: string
+          created_at_utc?: string
+          created_on?: string
+          crm_contact_id?: string
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          source?: string | null
+          synced_at?: string
+          tags?: string[]
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slack_watch_messages: {
         Row: {
           answered_at: string | null
@@ -3802,6 +3867,20 @@ export type Database = {
       }
     }
     Views: {
+      v_lead_reconciliation: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          crm_leads: number | null
+          day: string | null
+          group_id: string | null
+          leads_best_reported: number | null
+          reported_minus_crm: number | null
+          sheet_leads: number | null
+          windsor_leads: number | null
+        }
+        Relationships: []
+      }
       v_cft_call_daily: {
         Row: {
           answered_outbound: number | null
