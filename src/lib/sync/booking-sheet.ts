@@ -121,6 +121,18 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
   const booking = mapHeaders(bookingHeader, BOOKING_SHEET_COLUMNS);
 
   ctx.note('booking_header_row_in_sheet', bookingHead.sheetRow);
+  /*
+   * The header row as the sheet actually spells it, always — not only on
+   * failure.
+   *
+   * The first successful run read 383 bookings and dated none of them, while
+   * reporting booked_on as mapped. A mapped column that yields nothing on every
+   * row means the header matched something that is not the date column, and
+   * without the raw headings there is no way to tell which. Printing them costs
+   * one line and is the difference between diagnosing that in one run and in
+   * three.
+   */
+  ctx.note('booking_headers_in_sheet', (bookingHeader ?? []).map((h) => h.trim()));
   ctx.note('booking_headers_mapped', [...booking.columnOf.keys()].sort());
   if (booking.unmatched.length > 0) {
     ctx.note('booking_headers_unrecognised', booking.unmatched);
@@ -152,9 +164,42 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
   let ambiguousDates = 0;
   const dispositions = new Map<string, number>();
 
+  /*
+   * Empty and unparseable are different faults with different fixes.
+   *
+   * A blank cell means the mapping points at the wrong column, or the sheet
+   * genuinely has no date there. A non-blank cell that will not parse means
+   * the format is one parseSheetDate has not seen — a serial number, a
+   * timestamp, a locale spelling. Counting them apart says which without
+   * anybody opening the sheet, and neither count is a patient detail.
+   */
+  let dateCellEmpty = 0;
+  let dateCellUnparseable = 0;
+  const unparseableShapes = new Set<string>();
+
   bookingRows.forEach((row, offset) => {
     const agent = text(bookingCell(row, 'agent'));
-    const parsed = parseSheetDate(bookingCell(row, 'date'), 'month-first');
+    const rawDate = bookingCell(row, 'date');
+    const parsed = parseSheetDate(rawDate, 'month-first');
+
+    if (parsed.date === null) {
+      const trimmed = (rawDate ?? '').trim();
+      if (trimmed === '') {
+        dateCellEmpty += 1;
+      } else {
+        dateCellUnparseable += 1;
+        /*
+         * The SHAPE, never the value. Digits become 9 and letters X, so
+         * "9/3/2026" is reported as "9/9/9999" and "Sept 3" as "XXXX 9" —
+         * enough to recognise a format, and nothing that identifies anybody.
+         */
+        if (unparseableShapes.size < 5) {
+          unparseableShapes.add(
+            trimmed.slice(0, 24).replace(/[0-9]/g, '9').replace(/[A-Za-z]/g, 'X'),
+          );
+        }
+      }
+    }
     const disposition = text(bookingCell(row, 'disposition'));
 
     // An entirely empty row is spreadsheet padding, not a booking.
@@ -239,6 +284,11 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
     );
   }
   if (blankDate > 0) ctx.note('bookings_without_a_date', blankDate);
+  if (dateCellEmpty > 0) ctx.note('date_cell_was_empty', dateCellEmpty);
+  if (dateCellUnparseable > 0) {
+    ctx.note('date_cell_unparseable', dateCellUnparseable);
+    ctx.note('date_shapes_seen', [...unparseableShapes]);
+  }
   if (ambiguousDates > 0) {
     ctx.note(
       'dates_read_month_first_but_ambiguous',
