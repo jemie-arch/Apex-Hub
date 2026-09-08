@@ -3627,6 +3627,54 @@ export type Database = {
           },
         ]
       }
+      slack_watch_messages: {
+        Row: {
+          answered_at: string | null
+          author_name: string | null
+          author_slack_id: string | null
+          channel_id: string
+          channel_name: string | null
+          detected_at: string
+          id: string
+          message_ts: string
+          replied_at: string | null
+          reply_text: string | null
+          skip_reason: string | null
+          state: string
+          thread_ts: string
+        }
+        Insert: {
+          answered_at?: string | null
+          author_name?: string | null
+          author_slack_id?: string | null
+          channel_id: string
+          channel_name?: string | null
+          detected_at?: string
+          id?: string
+          message_ts: string
+          replied_at?: string | null
+          reply_text?: string | null
+          skip_reason?: string | null
+          state?: string
+          thread_ts: string
+        }
+        Update: {
+          answered_at?: string | null
+          author_name?: string | null
+          author_slack_id?: string | null
+          channel_id?: string
+          channel_name?: string | null
+          detected_at?: string
+          id?: string
+          message_ts?: string
+          replied_at?: string | null
+          reply_text?: string | null
+          skip_reason?: string | null
+          state?: string
+          thread_ts?: string
+        }
+        Relationships: []
+      }
       tracker_practice_aliases: {
         Row: {
           client_id: string

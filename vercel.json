@@ -8,6 +8,10 @@
     {
       "path": "/api/sync/crm-appointments",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/slack-autoreply",
+      "schedule": "* * * * *"
     }
   ],
   "functions": {

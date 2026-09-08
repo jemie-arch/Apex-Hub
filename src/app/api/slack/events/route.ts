@@ -61,6 +61,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { hubUrl } from '@/lib/app-url';
+import {
+  AUTOREPLY_SETTING_KEY,
+  parseAutoReplyConfig,
+  shouldWatch,
+} from '@/config/slack-autoreply';
 import { serverEnv, slackSigningSecret } from '@/lib/env';
 import { notifyUsers } from '@/lib/notify/inbox';
 import {
@@ -274,6 +279,109 @@ async function resolveRaiser(email: string | null): Promise<string | null> {
   return found.error ? null : (found.data?.id ?? null);
 }
 
+interface MessageEvent {
+  type: string;
+  channel?: string;
+  user?: string;
+  ts?: string;
+  thread_ts?: string;
+  subtype?: string;
+  bot_id?: string;
+}
+
+/**
+ * Record a watched message so the sweeper can acknowledge it if nobody else
+ * does.
+ *
+ * Nothing is posted here. The whole point is the delay — a reply sent on
+ * receipt would beat the notification to the person who should answer, which is
+ * the opposite of what this is for. This writes a row and returns; the sweeper
+ * decides two minutes later.
+ *
+ * The message text is not read and not stored. See migration 0046: the reply is
+ * an acknowledgement, so the content is Slack's to keep.
+ */
+async function captureForAutoReply(
+  event: MessageEvent,
+  body: Record<string, unknown>,
+): Promise<NextResponse> {
+  const channelId = event.channel;
+  const messageTs = event.ts;
+  if (!channelId || !messageTs) {
+    return NextResponse.json({ ok: true, ignored: 'message without ids' });
+  }
+
+  const db = serviceClient();
+
+  const setting = await db
+    .from('app_settings')
+    .select('value')
+    .eq('key', AUTOREPLY_SETTING_KEY)
+    .maybeSingle();
+
+  // A missing row is not an error: the feature is simply not configured.
+  const config = parseAutoReplyConfig(setting.data?.value);
+
+  const botUserId =
+    typeof body.authorizations === 'object' && Array.isArray(body.authorizations)
+      ? ((body.authorizations[0] as { user_id?: string } | undefined)?.user_id ??
+        null)
+      : null;
+
+  const verdict = shouldWatch(
+    {
+      channelId,
+      authorSlackId: event.user ?? null,
+      isBot: Boolean(event.bot_id),
+      subtype: event.subtype ?? null,
+      threadTs: event.thread_ts ?? messageTs,
+      messageTs,
+    },
+    config,
+    botUserId,
+  );
+
+  if (!verdict.watch) {
+    return NextResponse.json({ ok: true, ignored: verdict.reason });
+  }
+
+  const author = event.user ? await lookupUser(event.user) : null;
+
+  /*
+   * A second safety net over shouldWatch: users.info is the only thing that
+   * knows an app is a bot when Slack has not set bot_id — which happens for
+   * some integrations posting as a user.
+   */
+  if (author?.isBot) {
+    return NextResponse.json({ ok: true, ignored: 'author is a bot' });
+  }
+
+  const channelName = await lookupChannelName(channelId);
+
+  /*
+   * Ignore a duplicate rather than failing on it. Slack retries an event it
+   * thinks was not acknowledged, and a retry must not reset detected_at — that
+   * would restart the delay and could hold a message in 'waiting' forever.
+   */
+  const written = await db.from('slack_watch_messages').insert({
+    channel_id: channelId,
+    channel_name: channelName,
+    thread_ts: event.thread_ts ?? messageTs,
+    message_ts: messageTs,
+    author_slack_id: event.user ?? null,
+    author_name: author?.name ?? event.user ?? null,
+  } as never);
+
+  if (written.error && !written.error.message.includes('duplicate key')) {
+    console.error('[slack] could not record a watched message:', written.error.message);
+    // Acknowledged anyway. Slack disables an endpoint that keeps erroring, and
+    // a missed acknowledgement is not worth losing the ticket bot over.
+    return NextResponse.json({ ok: true, recorded: false });
+  }
+
+  return NextResponse.json({ ok: true, recorded: true });
+}
+
 export async function POST(request: NextRequest) {
   // Text, not json(). The signature covers the exact bytes Slack sent, and
   // re-serialising a parsed object produces different ones.
@@ -340,6 +448,18 @@ export async function POST(request: NextRequest) {
    */
   if (event.type === 'reaction_added') {
     return promoteCandidate(event as unknown as ReactionAddedEvent);
+  }
+
+  /*
+   * An ordinary message in a watched channel, for the auto-acknowledgement.
+   *
+   * Checked before the app_mention gate and returning immediately, because a
+   * plain message is not a ticket and must not fall through into the
+   * classifier. A message that ALSO tags the bot arrives as app_mention rather
+   * than message, so the two do not both fire on one message.
+   */
+  if (event.type === 'message') {
+    return captureForAutoReply(event as unknown as MessageEvent, body);
   }
 
   if (event.type !== 'app_mention') {

@@ -158,6 +158,47 @@ export async function messagePermalink(
 }
 
 /**
+ * Has a person already replied in this thread?
+ *
+ * The last guard before the auto-acknowledgement speaks, and the one that
+ * makes the delay mean something: two minutes exists so a human can win the
+ * race, and this is how the bot notices that they did.
+ *
+ * Bot replies do not count, including its own — otherwise a single
+ * acknowledgement would make every later message in that thread look answered.
+ * The thread root is not a reply, so it is excluded by ts rather than by
+ * position.
+ *
+ * Returns null when Slack could not be asked. The caller must treat that as
+ * "do not reply": an unknown thread state is the one case where staying quiet
+ * costs nothing and speaking might duplicate a person.
+ */
+export async function humanRepliedInThread(
+  channelId: string,
+  threadTs: string,
+): Promise<boolean | null> {
+  const payload = await call('conversations.replies', {
+    channel: channelId,
+    ts: threadTs,
+    limit: 50,
+  });
+  if (!payload) return null;
+
+  const messages = payload.messages as
+    | { ts?: string; user?: string; bot_id?: string; subtype?: string }[]
+    | undefined;
+  if (!Array.isArray(messages)) return null;
+
+  return messages.some(
+    (message) =>
+      message.ts !== threadTs &&
+      !message.bot_id &&
+      message.subtype === undefined &&
+      typeof message.user === 'string',
+  );
+}
+
+/**
  * Replies in the thread of the message that tagged the bot.
  *
  * `thread_ts` is always the mention's own ts when the mention was a top-level

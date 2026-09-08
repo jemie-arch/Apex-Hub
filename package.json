@@ -23,7 +23,8 @@
     "check:pay": "tsx scripts/check-agent-pay.ts",
     "check:cft": "tsx scripts/check-cft-stats.ts",
     "check:googlekey": "tsx scripts/check-google-key.ts",
-    "check:leads": "tsx scripts/check-lead-columns.ts"
+    "check:leads": "tsx scripts/check-lead-columns.ts",
+    "check:autoreply": "tsx scripts/check-autoreply.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
