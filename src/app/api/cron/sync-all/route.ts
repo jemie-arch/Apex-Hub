@@ -85,6 +85,22 @@ const ORDER = [
    * crm-calls, takes 45s.
    */
   'fulfilment-tracker',
+  /*
+   * The leads tab, and why it matters more than its size suggests.
+   *
+   * tracker_leads was loaded once, on 22 August 2026, and nothing has ever
+   * written it — only the freshness alert in appointment-ledger, reporting it
+   * stale to nobody. The tracker takes leads_best as
+   * greatest(leads_windsor, leads_tracker), and Windsor sees nothing for 30 of
+   * 35 accounts, so the sheet IS the lead count.
+   *
+   * When it went stale the count collapsed and every figure divided by it went
+   * with it: 383 leads and a $35 CPL for the week of 10 August, 1 lead and an
+   * $8,844 CPL for the week of 31 August, on unchanged spend.
+   *
+   * Ahead of appointment-ledger for the same reason as the tab above.
+   */
+  'fulfilment-leads',
   'booking-sheet',
   'commission-inputs',
   /*

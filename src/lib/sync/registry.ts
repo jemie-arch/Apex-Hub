@@ -10,6 +10,7 @@ import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
 import { syncBookingSheet } from '@/lib/sync/booking-sheet';
 import { syncCommissionInputs } from '@/lib/sync/commission-inputs';
+import { syncFulfilmentLeads } from '@/lib/sync/fulfilment-leads';
 import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
@@ -55,6 +56,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'The Client Fulfilment Tracker sheet into tracker_appointments — needs a ' +
       'Google service account and FULFILMENT_TRACKER_SHEET_ID',
     run: syncFulfilmentTracker,
+  },
+  'fulfilment-leads': {
+    name: 'fulfilment-leads',
+    description:
+      'The Client Fulfilment Tracker leads tab into tracker_leads — the lead ' +
+      'count CPL is divided by, and the one table nothing has ever synced',
+    run: syncFulfilmentLeads,
   },
   'booking-sheet': {
     name: 'booking-sheet',
