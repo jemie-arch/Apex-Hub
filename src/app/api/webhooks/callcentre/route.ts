@@ -11,10 +11,25 @@
  * measurable. This endpoint is the record. The scenarios keep posting to Slack
  * unchanged; one additional HTTP module also posts here.
  *
- * Guarded by SERVICE_API_KEY as `Authorization: Bearer <secret>`, matching the
- * consultation-outcome and onboarding-form webhooks. env.ts draws the line
- * between that and CRON_SECRET and says why, so this follows it rather than
- * inventing a third scheme.
+ * TWO WAYS TO AUTHENTICATE, and the second is the point.
+ *
+ * A bearer token matching SERVICE_API_KEY is accepted, the same as the
+ * consultation-outcome and onboarding-form webhooks.
+ *
+ * Failing that, the request is accepted if it VERIFIES: the location it claims
+ * resolves to a known practice, and the contact it names actually exists in
+ * that practice's GoHighLevel sub-account. That is not a weaker check dressed
+ * up — it authenticates the claim against the source of truth rather than
+ * authenticating the caller against a shared string, and a forged request
+ * would need a real contact id inside a real sub-account to say anything at
+ * all.
+ *
+ * It exists because the alternative was pasting a secret into two Make modules
+ * by hand. A shared bearer is one copy of a credential in a second system; this
+ * needs none, and the Hub already holds the GoHighLevel tokens.
+ *
+ * The cost is one API call per alert, on an event that happens a handful of
+ * times a day.
  *
  * WHAT IT DELIBERATELY DOES NOT DO
  *
@@ -32,6 +47,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { serverEnv } from '@/lib/env';
+import { getContact } from '@/lib/integrations/ghl';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
@@ -72,35 +88,20 @@ function asInstant(value: unknown): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  let expected: string;
-  try {
-    expected = serverEnv().SERVICE_API_KEY ?? '';
-    if (expected === '') throw new Error('SERVICE_API_KEY is not set.');
-  } catch (error) {
-    /*
-     * 503 rather than 401. "Nobody has configured this" and "your key is
-     * wrong" send whoever is debugging to entirely different places, and Make
-     * retries a 503 while treating a 401 as final.
-     */
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'SERVICE_API_KEY is not configured, so this endpoint cannot authenticate.',
-      },
-      { status: 503 },
-    );
-  }
-
+  /*
+   * The bearer is checked first and costs nothing. An empty configured value
+   * can never match, because a caller sending no header produces undefined
+   * rather than the empty string — so an unset SERVICE_API_KEY simply means
+   * every request falls through to verification instead of everything being
+   * waved past.
+   */
+  const configured = serverEnv().SERVICE_API_KEY ?? '';
   const provided = request.headers
     .get('authorization')
     ?.replace(/^Bearer /i, '')
     .trim();
 
-  if (provided !== expected) {
-    return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
-  }
+  const bearerOk = configured !== '' && provided === configured;
 
   let body: Record<string, unknown>;
   try {
@@ -164,6 +165,63 @@ export async function POST(request: NextRequest) {
     if (!match.error) clientId = match.data?.id ?? null;
   }
 
+  const contactId = pick(body, 'contact_id', 'contactId', 'id');
+
+  /*
+   * Verification, when there was no bearer.
+   *
+   * The claim is "contact X in sub-account Y asked to be called". Both halves
+   * are checked: Y has to be a practice the Hub knows, and X has to be a
+   * contact GoHighLevel will return for it. A request that satisfies both is
+   * either genuine or came from somebody who already has the CRM.
+   *
+   * Deliberately NOT falling back to "the location exists, near enough". A
+   * location id is guessable from any of these practices' public pages; a
+   * contact id inside it is not.
+   */
+  if (!bearerOk) {
+    if (clientId === null || contactId === null) {
+      return NextResponse.json(
+        {
+          error:
+            'unauthorised: send a bearer token, or a payload whose location.id ' +
+            'matches a known practice and whose contact_id exists in it.',
+        },
+        { status: 401 },
+      );
+    }
+
+    let verified = false;
+    try {
+      verified = (await getContact(clientId, contactId)) !== null;
+    } catch (error) {
+      /*
+       * A CRM lookup failure is not the caller's fault, so it answers 503 and
+       * not 401 — Make retries a 503 and gives up on a 401, and a revoked
+       * token should not permanently discard a real callback.
+       */
+      console.error(
+        '[callcentre] could not verify against GoHighLevel:',
+        error instanceof Error ? error.message : error,
+      );
+      return NextResponse.json(
+        {
+          error:
+            'Could not verify the contact against GoHighLevel, so this alert ' +
+            'is neither accepted nor discarded. Retry.',
+        },
+        { status: 503 },
+      );
+    }
+
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'unauthorised: that contact does not exist in that practice.' },
+        { status: 401 },
+      );
+    }
+  }
+
   /*
    * requested_at defaults to now, and that is right rather than lazy: the
    * request happened when the alert fired, and the payload's own date_created
@@ -173,7 +231,7 @@ export async function POST(request: NextRequest) {
    */
   const row = {
     kind,
-    crm_contact_id: pick(body, 'contact_id', 'contactId', 'id'),
+    crm_contact_id: contactId,
     /*
      * Built in two steps, because mixing ?? and || without parentheses is a
      * SyntaxError — the same trap ghl.ts records hitting on contact names.
@@ -194,6 +252,9 @@ export async function POST(request: NextRequest) {
     callback_due_at:
       asInstant(calendar['startTime']) ?? asInstant(body['Date Scheduled']),
     sop_link: pick(body, 'SOP Link', 'sop_link'),
+    // Which door it came through. Worth a column: if the bearer is ever
+    // pasted in and then removed, this is how anybody notices.
+    authenticated_by: bearerOk ? 'bearer' : 'crm-verified',
     payload: body as never,
     // Make sends its execution id in a header when configured to; when it does
     // not, a null delivery id simply means a retry inserts a second row rather

@@ -3629,6 +3629,7 @@ export type Database = {
       }
       callcentre_requests: {
         Row: {
+          authenticated_by: string | null
           callback_due_at: string | null
           client_id: string | null
           crm_contact_id: string | null
@@ -3646,6 +3647,7 @@ export type Database = {
           sop_link: string | null
         }
         Insert: {
+          authenticated_by?: string | null
           callback_due_at?: string | null
           client_id?: string | null
           crm_contact_id?: string | null
@@ -3663,6 +3665,7 @@ export type Database = {
           sop_link?: string | null
         }
         Update: {
+          authenticated_by?: string | null
           callback_due_at?: string | null
           client_id?: string | null
           crm_contact_id?: string | null
