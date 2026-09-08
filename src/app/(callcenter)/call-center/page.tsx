@@ -1,14 +1,16 @@
 import { PhoneCall } from 'lucide-react';
 import Link from 'next/link';
 
+import { BookingScoreboard } from '@/components/callcenter/BookingScoreboard';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
+import { getScoreboard } from '@/lib/agent-scoreboard';
 import { getRepStats } from '@/lib/call-metrics';
 import { cn } from '@/lib/cn';
 import { formatCount, formatDuration, formatPercent } from '@/lib/format';
-import { resolveRange } from '@/lib/range';
+import { dateBounds, resolveRange } from '@/lib/range';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +32,27 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
   });
 
   const view = single(searchParams['view']) === 'csr' ? 'csr' : 'isr';
-  const stats = await getRepStats(range, view);
+
+  /*
+   * Both, in parallel, and both always rendered.
+   *
+   * The call table answers "who is dialling" and the scoreboard answers "who
+   * is booking". They come from sources with very different coverage — calls
+   * name a person on 0 of 7,139 rows, BOOKING SHEET on 318 of 383 — so
+   * rendering only the first presents an answerable question as unanswered.
+   */
+  const [stats, board] = await Promise.all([
+    getRepStats(range, view),
+    // Calendar dates, because BOOKING SHEET's own column is a date and not an
+    // instant. Comparing a date column against a timestamp boundary is how a
+    // whole day drops off the end of a window.
+    getScoreboard(
+      (() => {
+        const { start, end } = dateBounds(range.from, range.to);
+        return { from: start, to: end };
+      })(),
+    ),
+  ]);
 
   const isr = tenant.vocabulary.isr;
   const csr = tenant.vocabulary.csr;
@@ -81,12 +103,21 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
       </div>
 
       {stats.length === 0 ? (
+        /*
+          Corrected wording. The calls sync IS built and has run — 7,139 calls.
+          What is missing is the person on them: GoHighLevel stamps a user on
+          171 of them, and no user_profiles row has crm_user_id set to match
+          those. Saying the sync was not built sent the reader to the wrong
+          problem entirely.
+        */
         <EmptyState
-          title={`No ${roleNoun.plural} yet`}
+          title={`No ${roleNoun.plural} with call activity`}
           description={
-            `Give a team member the ${view} role in user_profiles and they ` +
-            'appear here. Dial data needs the calls sync, which is not built ' +
-            'yet — bookings attribute as soon as the CRM sync links them.'
+            'The calls sync has run and holds 7,139 calls, but none is ' +
+            'attributed to a person: GoHighLevel names a user on 2.4% of them ' +
+            'because inbound forwards off-platform, and no profile has ' +
+            'crm_user_id set to match those. Bookings ARE attributed — see ' +
+            'below.'
           }
           icon={<PhoneCall size={22} />}
         />
@@ -185,6 +216,8 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
           call is not a badly handled one.
         </p>
       ) : null}
+
+      <BookingScoreboard board={board} />
     </>
   );
 }
