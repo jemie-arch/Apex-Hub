@@ -148,6 +148,21 @@ const ORDER = [
    */
   'crm-leads',
   /*
+   * The AI call summaries, last because they depend on nothing here and cost
+   * one sheet read.
+   *
+   * It imports what Make scenario 5560467 already produced — transcript,
+   * summary and sales coaching — and, more importantly, the caller name that
+   * finally attributes a call to a person. Nothing in this sync transcribes
+   * anything, so it costs no AI spend per call.
+   *
+   * Expect it to report the tab empty until that scenario is re-enabled: it
+   * ran on 28 August 2026, filled Make's organisation dead-letter queue, and
+   * was switched off. The empty tab is recorded as an error on purpose, so the
+   * cause stays visible rather than looking like a quiet day.
+   */
+  'call-summaries',
+  /*
    * 'fulfilment-tracker' moved up, above appointment-ledger. It used to sit
    * here with a note explaining that the Google credentials were unset and
    * what to do when they arrived. They arrived; that was done. Left as a

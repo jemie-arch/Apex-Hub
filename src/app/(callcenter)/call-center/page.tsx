@@ -2,11 +2,13 @@ import { PhoneCall } from 'lucide-react';
 import Link from 'next/link';
 
 import { BookingScoreboard } from '@/components/callcenter/BookingScoreboard';
+import { CallSummaries } from '@/components/callcenter/CallSummaries';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
 import { getScoreboard } from '@/lib/agent-scoreboard';
+import { getCallSummaries } from '@/lib/call-summaries';
 import { getRepStats } from '@/lib/call-metrics';
 import { cn } from '@/lib/cn';
 import { formatCount, formatDuration, formatPercent } from '@/lib/format';
@@ -41,12 +43,23 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
    * name a person on 0 of 7,139 rows, BOOKING SHEET on 318 of 383 — so
    * rendering only the first presents an answerable question as unanswered.
    */
-  const [stats, board] = await Promise.all([
+  const [stats, board, calls] = await Promise.all([
     getRepStats(range, view),
     // Calendar dates, because BOOKING SHEET's own column is a date and not an
     // instant. Comparing a date column against a timestamp boundary is how a
     // whole day drops off the end of a window.
     getScoreboard(
+      (() => {
+        const { start, end } = dateBounds(range.from, range.to);
+        return { from: start, to: end };
+      })(),
+    ),
+    /*
+     * The AI call summaries, which answer the question the table above
+     * cannot: who made each call. GoHighLevel names a user on 2.4% of calls;
+     * the transcription scenario names one on every row it writes.
+     */
+    getCallSummaries(
       (() => {
         const { start, end } = dateBounds(range.from, range.to);
         return { from: start, to: end };
@@ -216,6 +229,8 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
           call is not a badly handled one.
         </p>
       ) : null}
+
+      <CallSummaries data={calls} />
 
       <BookingScoreboard board={board} />
     </>

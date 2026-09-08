@@ -3627,6 +3627,68 @@ export type Database = {
           },
         ]
       }
+      call_summaries: {
+        Row: {
+          agent_name: string | null
+          agent_user_id: string | null
+          called_at: string | null
+          called_on: string | null
+          coaching: string | null
+          duration_seconds: number | null
+          id: string
+          imported_at: string
+          lead_crm_id: string | null
+          lead_name: string | null
+          recording_url: string | null
+          source_row: number
+          summary: string | null
+          to_number: string | null
+          transcript: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          agent_user_id?: string | null
+          called_at?: string | null
+          called_on?: string | null
+          coaching?: string | null
+          duration_seconds?: number | null
+          id?: string
+          imported_at?: string
+          lead_crm_id?: string | null
+          lead_name?: string | null
+          recording_url?: string | null
+          source_row: number
+          summary?: string | null
+          to_number?: string | null
+          transcript?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          agent_user_id?: string | null
+          called_at?: string | null
+          called_on?: string | null
+          coaching?: string | null
+          duration_seconds?: number | null
+          id?: string
+          imported_at?: string
+          lead_crm_id?: string | null
+          lead_name?: string | null
+          recording_url?: string | null
+          source_row?: number
+          summary?: string | null
+          to_number?: string | null
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_summaries_agent_user_id_fkey"
+            columns: ["agent_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_leads: {
         Row: {
           ad_external_id: string | null
@@ -3867,6 +3929,30 @@ export type Database = {
       }
     }
     Views: {
+      v_call_summary_agent_daily: {
+        Row: {
+          agent_name: string | null
+          agent_user_id: string | null
+          avg_talk_seconds: number | null
+          calls: number | null
+          calls_2min: number | null
+          calls_with_coaching: number | null
+          calls_with_transcript: number | null
+          day: string | null
+          talk_seconds: number | null
+          zero_length: number | null
+        }
+        Relationships: []
+      }
+      v_call_summary_unmatched_agents: {
+        Row: {
+          agent_name: string | null
+          calls: number | null
+          earliest: string | null
+          latest: string | null
+        }
+        Relationships: []
+      }
       v_lead_reconciliation: {
         Row: {
           client_id: string | null

@@ -114,6 +114,16 @@ const serverSchema = z.object({
    */
   CRM_LEADS_WINDOW_DAYS: z.string().min(1).optional(),
 
+  /**
+   * The AI call-summary spreadsheet, if it is ever moved.
+   *
+   * Optional because config/call-summaries carries the id Make writes to. A
+   * spreadsheet id is an identifier rather than a secret — access is decided
+   * by whether the sheet is shared with the service account — so the default
+   * means this sync needs no new configuration to run.
+   */
+  CALL_SUMMARIES_SHEET_ID: z.string().min(1).optional(),
+
   HUBSTAFF_TOKEN: z.string().min(1).optional(),
   HUBSTAFF_API_BASE: z.string().url().default('https://api.hubstaff.com/v2'),
   /** The organisation whose members and time are read. */
@@ -193,6 +203,9 @@ const serverSchema = z.object({
    * makes while also carrying the full reach of whoever installed it — every
    * private channel and DM they can see. Pasting one in fails the deploy
    * instead of quietly widening what a leaked value is worth.
+   *
+   * SLACK_USER_TOKEN below is the deliberate exception, and it is a separate
+   * variable precisely so that the rule above stays true for everything else.
    */
   SLACK_SIGNING_SECRET: z.string().min(1).optional(),
   SLACK_BOT_TOKEN: z
@@ -201,6 +214,47 @@ const serverSchema = z.object({
       'xoxb-',
       'must be a bot token (xoxb-…). User tokens (xoxp-…) carry the installing ' +
         "person's whole reach and are rejected on purpose",
+    )
+    .optional(),
+
+  /**
+   * A Slack USER token, for the one thing a bot token cannot do: see a direct
+   * message between two people.
+   *
+   * WHAT THIS IS AND WHAT IT COSTS
+   *
+   * Slack shows a DM to its two participants and to nobody else — there is no
+   * bot scope for it, and that is deliberate on Slack's part. The only way to
+   * watch Joshua's DMs to Jemie is to act as Jemie, which is what this token
+   * does. It was asked for explicitly after the alternatives were laid out.
+   *
+   * Be clear about the reach. This is not seven scopes on a bot. It is Jemie's
+   * account: every private channel he is in, every DM he can see, and the
+   * ability to post as him. If it leaks, the whole workspace leaks with it.
+   * Nothing else in this codebase holds a credential of that shape.
+   *
+   * Three rules follow, and they are enforced in code rather than trusted:
+   *
+   *   1. It is used ONLY for direct-message channels (ids starting with "D").
+   *      Everything else — every channel, every ticket reply — keeps using the
+   *      bot token. lib/slack/api picks by channel id, so widening this needs
+   *      an edit, not a config change.
+   *   2. It is optional. Absent, DM watching simply does not happen and the
+   *      rest of the app is unaffected.
+   *   3. Anything it posts says outright that it is automatic. A reply that
+   *      arrives from Jemie's own account is indistinguishable from Jemie
+   *      unless the text says otherwise, and letting the CEO believe he had a
+   *      human answer is the failure this whole feature exists to avoid.
+   *
+   * Rotate it by reinstalling the Slack app, the same as the bot token. It
+   * should be revoked the day the DM watch is switched off.
+   */
+  SLACK_USER_TOKEN: z
+    .string()
+    .startsWith(
+      'xoxp-',
+      'must be a user token (xoxp-…). A bot token cannot read a DM, so a ' +
+        'xoxb- value here would silently never work',
     )
     .optional(),
 
@@ -545,6 +599,27 @@ export function slackBotToken(): string {
   }
 
   return env.SLACK_BOT_TOKEN;
+}
+
+/**
+ * The user token, or a loud error naming what it is for.
+ *
+ * Separate from slackBotToken and never a fallback for it. If this is missing,
+ * DM watching does not happen; nothing else changes, and in particular nothing
+ * quietly downgrades to posting as a bot in a DM it cannot reach anyway.
+ */
+export function slackUserToken(): string {
+  const env = serverEnv();
+
+  if (!env.SLACK_USER_TOKEN) {
+    throw new Error(
+      'SLACK_USER_TOKEN is not set, so direct messages cannot be watched. ' +
+        'Everything else is unaffected. Copy the User OAuth Token (xoxp-…) ' +
+        'from the Slack app under OAuth & Permissions — not the bot token.',
+    );
+  }
+
+  return env.SLACK_USER_TOKEN;
 }
 
 /** The two values the browser is allowed to see. */

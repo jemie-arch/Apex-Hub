@@ -10,6 +10,7 @@ import { syncCrmClients } from '@/lib/sync/crm-clients';
 import { syncCrmDeals } from '@/lib/sync/crm-deals';
 import { syncBookingSheet } from '@/lib/sync/booking-sheet';
 import { syncCommissionInputs } from '@/lib/sync/commission-inputs';
+import { syncCallSummaries } from '@/lib/sync/call-summaries';
 import { syncCrmLeads } from '@/lib/sync/crm-leads';
 import { syncFulfilmentLeads } from '@/lib/sync/fulfilment-leads';
 import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
@@ -57,6 +58,14 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'The Client Fulfilment Tracker sheet into tracker_appointments — needs a ' +
       'Google service account and FULFILMENT_TRACKER_SHEET_ID',
     run: syncFulfilmentTracker,
+  },
+  'call-summaries': {
+    name: 'call-summaries',
+    description:
+      'AI call transcripts, summaries and sales coaching from the sheet Make ' +
+      'scenario 5560467 writes — and the caller name that finally attributes ' +
+      'a call to a person',
+    run: syncCallSummaries,
   },
   'crm-leads': {
     name: 'crm-leads',
