@@ -3627,6 +3627,68 @@ export type Database = {
           },
         ]
       }
+      callcentre_requests: {
+        Row: {
+          callback_due_at: string | null
+          client_id: string | null
+          crm_contact_id: string | null
+          delivery_id: string | null
+          id: string
+          kind: string
+          lead_name: string | null
+          lead_phone: string | null
+          location_crm_id: string | null
+          location_name: string | null
+          payload: Json | null
+          received_at: string
+          requested_at: string
+          requested_on: string
+          sop_link: string | null
+        }
+        Insert: {
+          callback_due_at?: string | null
+          client_id?: string | null
+          crm_contact_id?: string | null
+          delivery_id?: string | null
+          id?: string
+          kind: string
+          lead_name?: string | null
+          lead_phone?: string | null
+          location_crm_id?: string | null
+          location_name?: string | null
+          payload?: Json | null
+          received_at?: string
+          requested_at?: string
+          requested_on?: string
+          sop_link?: string | null
+        }
+        Update: {
+          callback_due_at?: string | null
+          client_id?: string | null
+          crm_contact_id?: string | null
+          delivery_id?: string | null
+          id?: string
+          kind?: string
+          lead_name?: string | null
+          lead_phone?: string | null
+          location_crm_id?: string | null
+          location_name?: string | null
+          payload?: Json | null
+          received_at?: string
+          requested_at?: string
+          requested_on?: string
+          sop_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_summaries: {
         Row: {
           agent_name: string | null
@@ -3929,6 +3991,22 @@ export type Database = {
       }
     }
     Views: {
+      v_callcentre_response: {
+        Row: {
+          answered: boolean | null
+          client_id: string | null
+          first_call_at: string | null
+          id: string | null
+          kind: string | null
+          lead_name: string | null
+          location_name: string | null
+          minutes_to_first_call: number | null
+          requested_at: string | null
+          requested_on: string | null
+          within_five_minutes: boolean | null
+        }
+        Relationships: []
+      }
       v_call_summary_agent_daily: {
         Row: {
           agent_name: string | null
