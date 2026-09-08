@@ -280,14 +280,23 @@ export async function syncFulfilmentLeads(ctx: SyncContext): Promise<void> {
    * a row can stand for several leads, and it is the sum that divides into
    * spend to make CPL.
    */
+  /*
+   * Notes, not ctx.log. Two runs sent these to console.log, which sync_runs
+   * never sees — so the one figure asked for each time was the one figure that
+   * could not be read.
+   *
+   * Both are reported because they differ: a row can stand for several leads,
+   * and it is the SUM that divides into spend to make CPL.
+   */
   const leads = records.reduce(
     (total, row) => total + (row['lead_count'] as number),
     0,
   );
 
-  ctx.log(
-    `${records.length} lead row(s) imported from "${tab}", ` +
-      `${leads} lead(s) in total. This is what leads_tracker reports, and ` +
-      'with Windsor blind on most accounts it is what CPL is divided by.',
+  ctx.note('lead_rows_imported', records.length);
+  ctx.note('leads_in_total', leads);
+  ctx.note(
+    'rows_standing_for_more_than_one_lead',
+    records.filter((row) => (row['lead_count'] as number) !== 1).length,
   );
 }

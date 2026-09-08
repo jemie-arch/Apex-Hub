@@ -35,6 +35,21 @@ import { serviceClient } from '@/lib/supabase/service';
 
 const BATCH = 200;
 
+/**
+ * The fields a BOOKING SHEET row is read by.
+ *
+ * Every distinct value in BOOKING_SHEET_COLUMNS, and check:booking asserts the
+ * two cannot drift apart. Its purpose is to stop a caller passing a header
+ * spelling where a field name belongs — see cellOf.
+ */
+export type BookingField =
+  | 'booked_on'
+  | 'agent'
+  | 'patient_name'
+  | 'patient_email'
+  | 'location_name'
+  | 'disposition';
+
 function text(value: string | undefined): string | null {
   const trimmed = (value ?? '').trim();
   return trimmed === '' ? null : trimmed;
@@ -148,9 +163,22 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
     return;
   }
 
+  /*
+   * Typed to the FIELD names, not to the sheet's header spellings.
+   *
+   * This is the whole bug. columnOf is keyed by field — booked_on, agent — and
+   * one caller asked for 'date', which is what the column is called in the
+   * sheet. columnOf.get('date') is undefined, so all 384 bookings came back
+   * with an empty date while nothing looked wrong anywhere else: agent read
+   * fine, disposition read fine, and booked_on was reported as mapped.
+   *
+   * It cost two runs to find, on the source the live pay calculation reads.
+   * The union below makes the same mistake a compile error instead of a
+   * silently empty column.
+   */
   const cellOf =
     (columnOf: Map<string, number>) =>
-    (row: string[], field: string): string | undefined => {
+    (row: string[], field: BookingField): string | undefined => {
       const index = columnOf.get(field);
       return index === undefined ? undefined : row[index];
     };
@@ -179,7 +207,9 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
 
   bookingRows.forEach((row, offset) => {
     const agent = text(bookingCell(row, 'agent'));
-    const rawDate = bookingCell(row, 'date');
+    // 'booked_on' is the field. 'date' is the sheet's heading, and asking
+    // for it is what emptied this column on every row.
+    const rawDate = bookingCell(row, 'booked_on');
     const parsed = parseSheetDate(rawDate, 'month-first');
 
     if (parsed.date === null) {
@@ -299,10 +329,13 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
 
   await importInvalidBookings(ctx, db, sheetId, importedAt);
 
-  ctx.log(
-    `${records.length} booking(s) imported from BOOKING SHEET, ` +
-      `${records.length - blankAgent} attributed to an agent.`,
-  );
+  /*
+   * Notes, not ctx.log. log() writes to console.log and nothing else — it
+   * never reaches sync_runs.meta — so the closing figures of this sync and of
+   * the leads import were reported twice to a place nobody can read them.
+   */
+  ctx.note("bookings_imported", records.length);
+  ctx.note("bookings_attributed_to_an_agent", records.length - blankAgent);
 }
 
 /**

@@ -305,13 +305,10 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
   const named = records.filter((row) => row['booked_by'] !== null).length;
   const priced = records.filter((row) => row['amount_spent_cents'] !== null).length;
 
-  ctx.log(
-    `${records.length} tracker row(s) imported from the sheet. ` +
-      `${priced} carry a spend figure. ` +
-      (named === 0
-        ? 'None name who booked them — the tracker has no such column, so ' +
-          'attribution comes from BOOKING SHEET.'
-        : `${named} name who booked them.`),
-  );
+  // Notes, not ctx.log: log() reaches console.log and nothing sync_runs
+  // records, so these were invisible on both runs that reported them.
+  ctx.note('rows_imported', records.length);
+  ctx.note('rows_carrying_a_spend_figure', priced);
+  ctx.note('rows_naming_who_booked', named);
 }
 

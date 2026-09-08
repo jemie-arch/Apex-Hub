@@ -170,7 +170,29 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
     }
   }
 
+  /*
+   * One row per contact before writing, or Postgres rejects the whole batch.
+   * "ON CONFLICT DO UPDATE command cannot affect row a second time" is what an
+   * upsert says when the same key appears twice in one statement, and it is
+   * why the first run read 7,966 contacts and wrote none of them.
+   *
+   * GoHighLevel's cursor paging overlaps: a contact updated while paging moves
+   * position and arrives again on the next page. So the same id legitimately
+   * appears more than once in one practice's read.
+   *
+   * The later copy wins. Pages come newest-first, so a repeat is the same
+   * contact seen again, and keeping the last one keeps whatever GoHighLevel
+   * most recently said about it.
+   */
+  const byContact = new Map<string, Record<string, unknown>>();
+  for (const record of records) {
+    byContact.set(record['crm_contact_id'] as string, record);
+  }
+  const unique = [...byContact.values()];
+  const duplicates = records.length - unique.length;
+
   ctx.counts.read = received;
+  if (duplicates > 0) ctx.note('duplicate_contact_ids_collapsed', duplicates);
 
   // Key names, never values. This is the report that corrects the mapping if
   // GoHighLevel does not call these fields what the documentation says.
@@ -191,7 +213,7 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
     );
   }
 
-  if (records.length === 0) {
+  if (unique.length === 0) {
     /*
      * Recorded as a problem, not logged. Zero leads across every practice in
      * a fortnight is not a plausible business outcome, so it means the read is
@@ -207,8 +229,8 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
     return;
   }
 
-  for (let start = 0; start < records.length; start += BATCH) {
-    const batch = records.slice(start, start + BATCH);
+  for (let start = 0; start < unique.length; start += BATCH) {
+    const batch = unique.slice(start, start + BATCH);
     const written = await db
       .from('crm_leads')
       .upsert(batch as never, { onConflict: 'crm_contact_id' });
@@ -228,13 +250,14 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
    * The comparison, stated in the log rather than left for somebody to run.
    * This is the number the whole sync exists to produce.
    */
-  const dated = new Set(records.map((row) => row['created_on'] as string));
+  /*
+   * Notes rather than ctx.log, which reaches console.log and nothing that
+   * sync_runs records. These are the figures the sync exists to produce, so
+   * they have to be readable from the run itself.
+   */
+  const dated = new Set(unique.map((row) => row['created_on'] as string));
 
-  ctx.log(
-    `${records.length} lead(s) from ${practicesRead} practice(s) over ` +
-      `${windowDays} days, across ${dated.size} day(s). ` +
-      'Compare against the sheet and Meta in v_lead_reconciliation — the CRM ' +
-      'is the reference, because it is the only one of the three that records ' +
-      'a lead when it arrives.',
-  );
+  ctx.note('leads_written', unique.length);
+  ctx.note('days_covered', dated.size);
+  ctx.note('compare_in', 'v_lead_reconciliation');
 }
