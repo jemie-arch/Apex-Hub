@@ -1041,13 +1041,20 @@ export async function listContacts(
    * truncated at a page and every other number was inflated by repeats.
    *
    * meta offers currentPage, nextPage and nextPageUrl alongside startAfter, so
-   * the API is paginating by page and the cursor was the wrong lever. The
-   * cursor is still sent, because it costs nothing and some tenants honour it,
-   * but the page is what advances and what the guard below checks.
+   * the API paginates by page and the cursor was the wrong lever.
+   *
+   * PAGE ONLY, AND NEVER BOTH. The cursor used to be sent alongside the page
+   * on the reasoning that it cost nothing and some tenants might honour it.
+   * It cost a practice. GoHighLevel rejects the pair outright:
+   *
+   *   400 "Please use page or startAfter and startAfterId only. Both will not
+   *   work."
+   *
+   * And it failed on the one sub-account with more than a page of contacts in
+   * a fortnight -- the only one paging was ever attempted on. So the guess was
+   * invisible everywhere except the single place it mattered.
    */
   let page = 1;
-  let startAfter: string | null = null;
-  let startAfterId: string | null = null;
 
   for (;;) {
     if (pages >= MAX_CONTACT_PAGES) {
@@ -1060,8 +1067,6 @@ export async function listContacts(
       limit: String(CONTACTS_PER_PAGE),
       page: String(page),
     };
-    if (startAfter !== null) params['startAfter'] = startAfter;
-    if (startAfterId !== null) params['startAfterId'] = startAfterId;
 
     const payload = await request<{
       contacts?: unknown[];
@@ -1173,8 +1178,6 @@ export async function listContacts(
       page += 1;
     }
 
-    startAfter = asString(meta['startAfter']);
-    startAfterId = asString(meta['startAfterId']);
   }
 
   return {

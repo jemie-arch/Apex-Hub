@@ -76,10 +76,26 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
    * sub-account to read, which is a mapping gap rather than a sync failure —
    * crm-clients is what fills it.
    */
+  /*
+   * Practices only. Internal sub-accounts are not practices and their
+   * contacts are not leads.
+   *
+   * The first run counted all sixty sub-accounts, and 105 of its 617 leads
+   * came from three of Apex own: ADM Team Management (100), ADM Sales
+   * Account (4) and ADM Client Onboarding (1) — team members, sales prospects
+   * and onboarding records. Seventeen per cent of the lead count, and not one
+   * a dental patient.
+   *
+   * is_internal is the column 0017 created for exactly this and is set
+   * explicitly rather than inferred, because a sub-account with no
+   * appointments and no charges looks identical to a clinic that signed last
+   * week.
+   */
   const clients = await db
     .from('clients')
     .select('id, name, crm_location_id')
     .not('crm_location_id', 'is', null)
+    .eq('is_internal', false)
     .order('name')
     .limit(MAX_CLIENTS);
 
