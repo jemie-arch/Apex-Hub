@@ -16,6 +16,7 @@
  * No database, no network, no sheet.
  */
 import {
+  HISTORICAL_LEADS_TABS,
   LEADS_TAB_CANDIDATES,
   LEAD_COLUMNS,
   LEAD_HEADER_TO_FIELD,
@@ -72,7 +73,36 @@ section('Finding the leads tab among seventeen');
   check('not a blank title', looksLikeLeadsTab('   '), false);
 
   // Candidates are tried in order, so the deliberate name beats a coincidence.
-  check('"Lead Data" is tried first', LEADS_TAB_CANDIDATES[0], 'Lead Data');
+  // "Leads Data" is first because that is what the workbook actually calls it.
+  check('the real tab name is tried first', LEADS_TAB_CANDIDATES[0], 'Leads Data');
+
+  /*
+   * The old tabs must never be chosen as the LIVE tab. They contain "lead" and
+   * so pass the loose rule on their face — but picking one would report months
+   * of history as this week and leave today unimported. They are read
+   * deliberately, by importHistoricalTabs, under their own source_tab.
+   */
+  check('NOT "Leads Data Old"', looksLikeLeadsTab('Leads Data Old'), false);
+  check('NOT "Lead Count Old"', looksLikeLeadsTab('Lead Count Old'), false);
+  check('case does not smuggle one through', looksLikeLeadsTab('leads data old'), false);
+  check(
+    'no historical tab is also a live candidate',
+    HISTORICAL_LEADS_TABS.filter((tab) =>
+      LEADS_TAB_CANDIDATES.some((live) => live.toLowerCase() === tab.toLowerCase()),
+    ),
+    [],
+  );
+
+  /*
+   * The live tab must still win when both are present, whatever the order. The
+   * workbook lists "Leads Data" before "Leads Data Old", and relying on that
+   * was luck until the exact name went in above.
+   */
+  const workbook = ['Appointment Data', 'Leads Data Old', 'Leads Data', 'Lead Count Old'];
+  const exact = LEADS_TAB_CANDIDATES.find((candidate) =>
+    workbook.some((tab) => tab.toLowerCase() === candidate.toLowerCase()),
+  );
+  check('the live tab is found by name, not by position', exact, 'Leads Data');
   check(
     'every candidate would also pass the loose rule',
     LEADS_TAB_CANDIDATES.filter((tab) => !looksLikeLeadsTab(tab)),

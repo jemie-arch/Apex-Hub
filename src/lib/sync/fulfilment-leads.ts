@@ -29,6 +29,7 @@
  * appointments import its first two runs.
  */
 import {
+  HISTORICAL_LEADS_TABS,
   LEADS_TAB_CANDIDATES,
   LEAD_HEADER_TO_FIELD,
   LEAD_REQUIRED_FIELDS,
@@ -239,6 +240,14 @@ export async function syncFulfilmentLeads(ctx: SyncContext): Promise<void> {
       // out to be. It is the upsert key, so an offset here makes a re-run
       // write a second copy of every row instead of updating the first.
       source_row: headerIndex + 2 + offset,
+      /*
+       * Which tab this row came from, and half of the key.
+       *
+       * Without it the workbook's two lead tabs share one row-number space, so
+       * importing the second silently overwrote the first — which is how
+       * pre-August history was lost once already.
+       */
+      source_tab: tab,
       company_name: company,
       received_on: receivedOn,
       lead_name: text(cell(row, 'lead_name')),
@@ -262,7 +271,7 @@ export async function syncFulfilmentLeads(ctx: SyncContext): Promise<void> {
     const batch = records.slice(start, start + BATCH);
     const written = await db
       .from('tracker_leads')
-      .upsert(batch as never, { onConflict: 'source_row' });
+      .upsert(batch as never, { onConflict: 'source_tab,source_row' });
 
     if (written.error) {
       ctx.recordError(
@@ -299,4 +308,144 @@ export async function syncFulfilmentLeads(ctx: SyncContext): Promise<void> {
     'rows_standing_for_more_than_one_lead',
     records.filter((row) => (row['lead_count'] as number) !== 1).length,
   );
+
+  await importHistoricalTabs(ctx, db, sheetId, tabs);
+}
+
+/**
+ * The older lead tabs, for the history the live one does not carry.
+ *
+ * "Leads Data" holds 33 rows earlier than 10 August, so the weeks before that
+ * read as almost no leads — the first week of August fell from 377 leads and a
+ * $34 cost per lead to 4 leads and $800. That history was in the workbook all
+ * along, on a tab nothing read.
+ *
+ * WHY THIS IS A SEPARATE PASS AND NOT PART OF THE LOOP ABOVE
+ *
+ * Because the live tab must not depend on it. If an old tab is renamed,
+ * deleted or malformed, that is a history problem and it should not stop
+ * today's leads from importing — so every failure here is a note, and the
+ * sync still reports success on the tab that matters.
+ *
+ * WHY IT CANNOT DOUBLE COUNT
+ *
+ * v_tracker_leads_effective decides what is counted: for any (practice, day)
+ * the live tab is the record if it has any row at all for that day, and these
+ * tabs are read only for days it is silent about. So an overlap between the
+ * tabs changes nothing about the totals — which is why importing them is safe
+ * without first working out where they overlap.
+ */
+async function importHistoricalTabs(
+  ctx: SyncContext,
+  db: ReturnType<typeof serviceClient>,
+  sheetId: string,
+  tabs: string[],
+): Promise<void> {
+  const present = HISTORICAL_LEADS_TABS.filter((wanted) =>
+    tabs.some((tab) => tab.trim().toLowerCase() === wanted.toLowerCase()),
+  );
+
+  if (present.length === 0) {
+    ctx.note('historical_tabs_found', 0);
+    return;
+  }
+
+  const imported: Record<string, number> = {};
+
+  for (const wanted of present) {
+    const tab = tabs.find(
+      (candidate) => candidate.trim().toLowerCase() === wanted.toLowerCase(),
+    );
+    if (tab === undefined) continue;
+
+    try {
+      const rows = await readSheet(sheetId, `${tab}!A:Z`);
+      if (rows.length < 2) {
+        imported[tab] = 0;
+        continue;
+      }
+
+      const { index: headerIndex } = findHeaderRow(rows, (cell) =>
+        LEAD_HEADER_TO_FIELD.has(normaliseLeadHeader(cell)),
+      );
+      const headerRow = rows[headerIndex] ?? [];
+
+      const columnOf = new Map<string, number>();
+      headerRow.forEach((header, index) => {
+        const key = normaliseLeadHeader(header);
+        if (key === '') return;
+        const field = LEAD_HEADER_TO_FIELD.get(key);
+        if (field !== undefined && !columnOf.has(field)) columnOf.set(field, index);
+      });
+
+      /*
+       * The same two columns the live tab cannot do without. An old tab that
+       * lacks them is reported and skipped rather than partly imported: a lead
+       * with no practice belongs to nobody and one with no date lands in no
+       * week, so neither would restore any history.
+       */
+      const missing = LEAD_REQUIRED_FIELDS.filter((field) => !columnOf.has(field));
+      if (missing.length > 0) {
+        ctx.note(`historical_${tab}_unusable`, {
+          missing,
+          headers: headerRow.map((header) => header.trim()),
+        });
+        continue;
+      }
+
+      const cell = (row: string[], field: string): string | undefined => {
+        const index = columnOf.get(field);
+        return index === undefined ? undefined : row[index];
+      };
+
+      const importedAt = new Date().toISOString();
+      const records: Record<string, unknown>[] = [];
+
+      rows.slice(headerIndex + 1).forEach((row, offset) => {
+        const company = text(cell(row, 'company_name'));
+        const receivedOn = asDate(cell(row, 'received_on'));
+        if (company === null || receivedOn === null) return;
+
+        records.push({
+          source_row: headerIndex + 2 + offset,
+          source_tab: tab,
+          company_name: company,
+          received_on: receivedOn,
+          lead_name: text(cell(row, 'lead_name')),
+          lead_count: asCount(cell(row, 'lead_count')),
+          campaign_external_id: text(cell(row, 'campaign_external_id')),
+          campaign_name: text(cell(row, 'campaign_name')),
+          adset_external_id: text(cell(row, 'adset_external_id')),
+          adset_name: text(cell(row, 'adset_name')),
+          ad_external_id: text(cell(row, 'ad_external_id')),
+          ad_name: text(cell(row, 'ad_name')),
+          imported_at: importedAt,
+        });
+      });
+
+      for (let start = 0; start < records.length; start += BATCH) {
+        const batch = records.slice(start, start + BATCH);
+        const written = await db
+          .from('tracker_leads')
+          .upsert(batch as never, { onConflict: 'source_tab,source_row' });
+        if (written.error) {
+          ctx.note(`historical_${tab}_write_failed`, written.error.message);
+          break;
+        }
+        ctx.counts.updated += batch.length;
+      }
+
+      imported[tab] = records.length;
+    } catch (error) {
+      // A note, not an error. See the doc comment: the live tab's success
+      // must not depend on an old one being readable.
+      ctx.note(
+        `historical_${tab}_unread`,
+        error instanceof Error ? error.message.slice(0, 200) : 'unknown',
+      );
+    }
+  }
+
+  ctx.note('historical_tabs_found', present.length);
+  ctx.note('historical_rows_imported', imported);
 }
