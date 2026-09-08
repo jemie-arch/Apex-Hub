@@ -951,6 +951,15 @@ export interface GhlContactPage {
   shape: {
     pages: number;
     received: number;
+    /*
+     * Seen but dated outside the window.
+     *
+     * Reported because without it the numbers do not add up and the gap looks
+     * like lost data: the first run read 7,966 contacts and wrote 717, and
+     * neither the duplicate count nor the written count explained the
+     * remainder. Most of it was simply older than fourteen days.
+     */
+    outsideWindow: number;
     /** Contacts the parser could not place, usually a missing id or date. */
     unusable: number;
     metaKeys: string[];
@@ -985,11 +994,27 @@ export async function listContacts(
 
   let received = 0;
   let unusable = 0;
+  let outsideWindow = 0;
   let pages = 0;
   let truncated = false;
 
   // Cursor pagination: GoHighLevel returns the pair to send back, and offset
   // paging on a list that is being written to would skip and repeat rows.
+  /*
+   * PAGE-based, not cursor-based.
+   *
+   * The first run proved the cursor does not advance this endpoint: one
+   * practice returned exactly 100 distinct contacts — one page — while the
+   * loop ran to its 40-page cap and produced 3,900 duplicate rows. Every
+   * iteration was re-reading page one, so that practice's real lead count was
+   * truncated at a page and every other number was inflated by repeats.
+   *
+   * meta offers currentPage, nextPage and nextPageUrl alongside startAfter, so
+   * the API is paginating by page and the cursor was the wrong lever. The
+   * cursor is still sent, because it costs nothing and some tenants honour it,
+   * but the page is what advances and what the guard below checks.
+   */
+  let page = 1;
   let startAfter: string | null = null;
   let startAfterId: string | null = null;
 
@@ -1002,6 +1027,7 @@ export async function listContacts(
     const params: Record<string, string> = {
       locationId,
       limit: String(CONTACTS_PER_PAGE),
+      page: String(page),
     };
     if (startAfter !== null) params['startAfter'] = startAfter;
     if (startAfterId !== null) params['startAfterId'] = startAfterId;
@@ -1065,27 +1091,48 @@ export async function listContacts(
       // Filtered here rather than by the API, because this endpoint's date
       // filtering is not dependable across versions and a silently ignored
       // filter would return everything as though it were this month's.
-      if (added < from || added > to) continue;
+      if (added < from || added > to) {
+        outsideWindow += 1;
+        continue;
+      }
 
       contacts.push(parseContact(id, record));
     }
 
     const meta = payload.meta ?? {};
-    const nextAfter = asString(meta['startAfter']);
-    const nextAfterId = asString(meta['startAfterId']);
-
-    // No cursor means no more pages, whatever the count said.
-    if (!nextAfter && !nextAfterId) break;
 
     /*
      * Contacts come back newest first, so once a whole page predates the
-     * window there is nothing older worth paging into. Without this the sync
-     * would walk a practice's entire history every night to find a fortnight.
+     * window there is nothing older worth paging into. Checked before the page
+     * arithmetic because it is the condition that should normally end the loop.
      */
     if (oldestOnPage !== null && oldestOnPage < from.getTime()) break;
 
-    startAfter = nextAfter;
-    startAfterId = nextAfterId;
+    // A short page is the last page, whatever meta says about a next one.
+    if (rows.length < CONTACTS_PER_PAGE) break;
+
+    /*
+     * THE GUARD. Advance only on a page number that actually moves forward.
+     *
+     * This is what the first run needed and did not have: re-reading a page
+     * forever looks like success — rows keep arriving, no error is raised —
+     * and the only visible symptom was a practice whose lead count stopped
+     * dead on a round 100. If nothing here advances, stop and say so rather
+     * than spend forty requests confirming it.
+     */
+    const nextPage = Number(asString(meta['nextPage']) ?? '');
+    if (Number.isFinite(nextPage) && nextPage > page) {
+      page = nextPage;
+    } else if (Number.isFinite(nextPage) && nextPage <= page) {
+      // The API says there is no page after this one.
+      break;
+    } else {
+      // No nextPage at all: step forward ourselves rather than stall.
+      page += 1;
+    }
+
+    startAfter = asString(meta['startAfter']);
+    startAfterId = asString(meta['startAfterId']);
   }
 
   return {
@@ -1094,6 +1141,7 @@ export async function listContacts(
       pages,
       received,
       unusable,
+      outsideWindow,
       metaKeys: [...metaKeys].sort(),
       contactKeys: [...contactKeys].sort(),
       dateKeysSeen: [...dateKeysSeen].sort(),

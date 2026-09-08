@@ -320,10 +320,63 @@ export async function syncBookingSheet(ctx: SyncContext): Promise<void> {
     ctx.note('date_shapes_seen', [...unparseableShapes]);
   }
   if (ambiguousDates > 0) {
+    /*
+     * Reported WITH the evidence, because the count on its own reads as a
+     * warning when it is not one.
+     *
+     * 146 of 384 rows have both parts 12 or under, so no single value proves
+     * the order. The COLUMN does: read month-first the tab runs 10 July to
+     * 7 September and every row's date is greater than or equal to the row
+     * above it — 384 rows, zero regressions. A wrong convention would decode
+     * those 146 to different days and scatter them through that sequence, so a
+     * perfectly ordered column is the proof no individual cell can give.
+     *
+     * Which is why the regression count sits beside it. It turns the
+     * convention from something documented into something checked every run:
+     * if the sheet is ever filled in day-first, the order breaks and this
+     * number stops being zero.
+     */
     ctx.note(
       'dates_read_month_first_but_ambiguous',
-      `${ambiguousDates} row(s) had both parts 12 or under, so the order could ` +
-        'not be settled from the value alone.',
+      `${ambiguousDates} of ${records.length} row(s) had both parts 12 or ` +
+        'under, so the order could not be settled from the value alone. See ' +
+        'dates_out_of_order_in_sheet_order for whether the column agrees.',
+    );
+  }
+
+  /*
+   * Does the column read in order?
+   *
+   * BOOKING SHEET is appended to as bookings are made, so its dates should
+   * never go backwards as row numbers increase. If they do, the convention
+   * used to parse them is probably wrong — and that is a pay problem, because
+   * the daily bonus is earned per day and a misread date moves a booking
+   * between days and so between pay periods.
+   *
+   * An error rather than a note when it happens: a silently wrong date is
+   * exactly the failure this sync's whole date-handling exists to avoid.
+   */
+  const inSheetOrder = [...records]
+    .sort((a, b) => (a['source_row'] as number) - (b['source_row'] as number))
+    .map((row) => row['booked_on'] as string | null)
+    .filter((day): day is string => day !== null);
+
+  let outOfOrder = 0;
+  for (let index = 1; index < inSheetOrder.length; index += 1) {
+    if (inSheetOrder[index]! < inSheetOrder[index - 1]!) outOfOrder += 1;
+  }
+
+  ctx.note('dates_out_of_order_in_sheet_order', outOfOrder);
+
+  if (outOfOrder > 0 && ambiguousDates > 0) {
+    ctx.recordError(
+      `${outOfOrder} booking date(s) go backwards as the sheet's rows go ` +
+        `forwards, and ${ambiguousDates} row(s) were ambiguous enough for the ` +
+        'declared month-first order to have decided them. That is what a ' +
+        'day-first sheet read month-first looks like. Confirm the convention ' +
+        'before anybody is paid from this: the dates drive which day, and so ' +
+        'which pay period, each booking counts in.',
+      { outOfOrder, ambiguousDates },
     );
   }
 

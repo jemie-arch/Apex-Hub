@@ -105,6 +105,8 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
 
   let received = 0;
   let unusable = 0;
+  let outsideWindow = 0;
+  let pagesRead = 0;
   let truncatedFor = 0;
   let practicesRead = 0;
   let practicesWithNone = 0;
@@ -133,6 +135,8 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
     practicesRead += 1;
     received += page.shape.received;
     unusable += page.shape.unusable;
+    outsideWindow += page.shape.outsideWindow;
+    pagesRead += page.shape.pages;
     if (page.shape.truncated) truncatedFor += 1;
     for (const key of page.shape.metaKeys) metaKeys.add(key);
     for (const key of page.shape.contactKeys) contactKeys.add(key);
@@ -201,6 +205,16 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
   ctx.note('date_keys_seen', [...dateKeys].sort());
   ctx.note('practices_read', practicesRead);
   ctx.note('practices_with_no_leads', practicesWithNone);
+  /*
+   * The arithmetic, closed.
+   *
+   * read minus outside-the-window minus duplicates should equal written, and
+   * the first run reported only two of those four numbers — so 7,966 read
+   * against 717 written looked like thousands of lost contacts when most were
+   * simply older than the window.
+   */
+  ctx.note('contacts_outside_the_window', outsideWindow);
+  ctx.note('pages_read', pagesRead);
   if (unusable > 0) ctx.note('contacts_unusable', unusable);
   if (truncatedFor > 0) ctx.note('practices_hitting_the_page_cap', truncatedFor);
 
