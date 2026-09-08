@@ -108,6 +108,7 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
   let outsideWindow = 0;
   let pagesRead = 0;
   let truncatedFor = 0;
+  let firstPageFullFor = 0;
   let practicesRead = 0;
   let practicesWithNone = 0;
 
@@ -138,6 +139,7 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
     outsideWindow += page.shape.outsideWindow;
     pagesRead += page.shape.pages;
     if (page.shape.truncated) truncatedFor += 1;
+    if (page.shape.firstPageFull) firstPageFullFor += 1;
     for (const key of page.shape.metaKeys) metaKeys.add(key);
     for (const key of page.shape.contactKeys) contactKeys.add(key);
     for (const key of page.shape.dateKeysSeen) dateKeys.add(key);
@@ -215,6 +217,17 @@ export async function syncCrmLeads(ctx: SyncContext): Promise<void> {
    */
   ctx.note('contacts_outside_the_window', outsideWindow);
   ctx.note('pages_read', pagesRead);
+  /*
+   * How many practices filled their first page without the window running
+   * out. Each of those had to be paged past, so this is the number that says
+   * whether paging is working: it should be small, and pages_read should
+   * exceed the practice count by roughly the leads those practices carry.
+   *
+   * When paging was broken this was where the truncation hid — one practice
+   * stopped dead on 100 leads with no error and nothing to distinguish it
+   * from a practice that simply had 100.
+   */
+  ctx.note('practices_whose_first_page_filled', firstPageFullFor);
   if (unusable > 0) ctx.note('contacts_unusable', unusable);
   if (truncatedFor > 0) ctx.note('practices_hitting_the_page_cap', truncatedFor);
 

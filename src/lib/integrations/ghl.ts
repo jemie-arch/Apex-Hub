@@ -431,6 +431,27 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+/**
+ * A number from JSON, whether it arrived as a number or as a string.
+ *
+ * Exists because asString returns null for a numeric value — correctly — and
+ * routing meta.nextPage through it produced Number(null ?? '') === 0. Zero is
+ * finite, so a guard reading "stop if the next page is not ahead of this one"
+ * stopped on every single page. Sixty practices, sixty pages, and one practice
+ * frozen at exactly 100 leads.
+ *
+ * Returns null for anything that is not a usable number, so the caller can
+ * tell "the API said nothing" apart from "the API said zero".
+ */
+function asNumber(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 /** Every sub-account under the agency. */
 export async function listLocations(): Promise<GhlLocation[]> {
   const { accessToken, companyId } = await getToken(null);
@@ -967,6 +988,15 @@ export interface GhlContactPage {
     dateKeysSeen: string[];
     /** True when the endpoint kept offering more than the cap allows. */
     truncated: boolean;
+    /*
+     * The window never ran out inside this practice's first page.
+     *
+     * Which means either it genuinely has a page's worth of recent leads, or
+     * paging stopped when it should not have. Reported because a truncated
+     * practice is otherwise indistinguishable from a busy one: both look like
+     * a round number of leads and no error at all.
+     */
+    firstPageFull: boolean;
   };
 }
 
@@ -997,6 +1027,7 @@ export async function listContacts(
   let outsideWindow = 0;
   let pages = 0;
   let truncated = false;
+  let firstPageFull = false;
 
   // Cursor pagination: GoHighLevel returns the pair to send back, and offset
   // paging on a list that is being written to would skip and repeat rows.
@@ -1111,6 +1142,9 @@ export async function listContacts(
     // A short page is the last page, whatever meta says about a next one.
     if (rows.length < CONTACTS_PER_PAGE) break;
 
+    // Recorded before the advance, so it describes the first page only.
+    if (pages === 1) firstPageFull = true;
+
     /*
      * THE GUARD. Advance only on a page number that actually moves forward.
      *
@@ -1120,14 +1154,22 @@ export async function listContacts(
      * dead on a round 100. If nothing here advances, stop and say so rather
      * than spend forty requests confirming it.
      */
-    const nextPage = Number(asString(meta['nextPage']) ?? '');
-    if (Number.isFinite(nextPage) && nextPage > page) {
+    const nextPage = asNumber(meta['nextPage']);
+
+    if (nextPage !== null && nextPage > page) {
       page = nextPage;
-    } else if (Number.isFinite(nextPage) && nextPage <= page) {
-      // The API says there is no page after this one.
+    } else if (nextPage !== null) {
+      // A next page at or behind this one means this was the last.
       break;
     } else {
-      // No nextPage at all: step forward ourselves rather than stall.
+      /*
+       * nextPage absent or unreadable: step forward rather than stall.
+       *
+       * Safe because the loop is bounded three other ways — a page older than
+       * the window, a short page, and the page cap — so guessing forward
+       * cannot run away. Stalling, by contrast, silently truncates a busy
+       * practice at one page, which is exactly what happened.
+       */
       page += 1;
     }
 
@@ -1146,6 +1188,7 @@ export async function listContacts(
       contactKeys: [...contactKeys].sort(),
       dateKeysSeen: [...dateKeysSeen].sort(),
       truncated,
+      firstPageFull,
     },
   };
 }
