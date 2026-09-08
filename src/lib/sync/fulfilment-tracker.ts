@@ -305,6 +305,48 @@ export async function syncFulfilmentTracker(ctx: SyncContext): Promise<void> {
   const named = records.filter((row) => row['booked_by'] !== null).length;
   const priced = records.filter((row) => row['amount_spent_cents'] !== null).length;
 
+  /*
+   * Attach the rows to their practices.
+   *
+   * This sync never did. It writes client_id nowhere and called nothing that
+   * would, so every genuinely new row arrived attached to no practice and
+   * stayed that way — and v_cft_stats_dashboard filters on client_id, so an
+   * unattached appointment silently leaves the dashboard rather than appearing
+   * as a problem.
+   *
+   * It looked healthy only because the upsert preserves the client_id the hand
+   * import of 22 August set: 1,273 of 1,285 attached, with the 12 exceptions
+   * being rows that import never saw. As the sheet grows, that gap grows with
+   * it.
+   *
+   * apply_tracker_aliases fills nulls only, so it is safe after every import
+   * and never undoes a correction made by hand. Same contract, and now the
+   * same call, as the leads import.
+   */
+  const attached = await db.rpc('apply_tracker_aliases');
+
+  if (attached.error) {
+    ctx.recordError(
+      'Appointments were imported but could not be attached to their ' +
+        `practices: ${attached.error.message}. The dashboard filters on the ` +
+        'practice, so unattached rows are missing from it rather than wrong ' +
+        'in it.',
+    );
+  } else {
+    ctx.note('rows_attached_to_a_practice', attached.data ?? 0);
+
+    const orphaned = await db
+      .from('tracker_appointments')
+      .select('id', { count: 'exact', head: true })
+      .is('client_id', null);
+
+    if (!orphaned.error) {
+      // Reported every run: an unattached appointment is invisible in the
+      // figures it distorts, exactly like an unattached lead.
+      ctx.note('rows_still_attached_to_no_practice', orphaned.count ?? 0);
+    }
+  }
+
   // Notes, not ctx.log: log() reaches console.log and nothing sync_runs
   // records, so these were invisible on both runs that reported them.
   ctx.note('rows_imported', records.length);

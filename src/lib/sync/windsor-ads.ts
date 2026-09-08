@@ -41,7 +41,34 @@ const WINDOW_DAYS = (() => {
 })();
 
 /** Accounts per request: one call for all 45 makes a timeout lose everything. */
-const BATCH_SIZE = 10;
+/*
+ * Every account in ONE request, because the filter is not honoured.
+ *
+ * This was 10, and the batching was pure waste. Windsor ignores the `accounts`
+ * parameter on the reporting endpoint and returns every connected account
+ * whatever is asked for — so each batch fetched the entire fleet and the sync
+ * threw away all but the first copy.
+ *
+ * The evidence is the arithmetic, which closes exactly on every run:
+ *
+ *   5-7 Sep   20 accounts mapped, 2 batches, each row arrived 2x
+ *             read 7,002 = created 2,383 + duplicates 2,383 + skipped 2,236
+ *   8 Sep     32 accounts mapped, 4 batches, each row arrived 4x
+ *             read 14,596 = created 3,489 + duplicates 10,467 + skipped 640
+ *
+ * Duplicates are always (batches - 1) x unique. Mapping twelve more accounts
+ * did not bring more data; it brought two more copies of the same data and
+ * quadrupled the request count.
+ *
+ * So one batch. Same rows, a quarter of the requests, and the duplicate
+ * counter drops to whatever Windsor genuinely repeats — which is the number
+ * that was worth watching in the first place.
+ *
+ * chunk() is kept rather than removed: the per-account salvage below depends
+ * on a batch being a list, and a future account cap can be restored by
+ * lowering this again.
+ */
+const BATCH_SIZE = 1000;
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
