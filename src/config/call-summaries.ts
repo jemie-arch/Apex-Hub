@@ -117,7 +117,18 @@ export const SUMMARY_COLUMNS: readonly SummaryColumn[] = [
   },
   {
     field: 'to_number',
-    headers: ['to number', 'to_number', 'number', 'phone', 'to', 'dialled', 'dialed'],
+    headers: [
+      // The live sheet's own spelling, from the first import's
+      // unrecognised-headers report.
+      'lead phone number',
+      'to number',
+      'to_number',
+      'number',
+      'phone',
+      'to',
+      'dialled',
+      'dialed',
+    ],
   },
   {
     field: 'transcript',
@@ -136,7 +147,14 @@ export const SUMMARY_COLUMNS: readonly SummaryColumn[] = [
   },
   {
     field: 'recording_url',
-    headers: ['audio url', 'audio_url', 'recording', 'recording url', 'audio'],
+    headers: [
+      'call recording url',
+      'audio url',
+      'audio_url',
+      'recording',
+      'recording url',
+      'audio',
+    ],
   },
   {
     field: 'summary',
@@ -151,13 +169,40 @@ export const SUMMARY_COLUMNS: readonly SummaryColumn[] = [
      */
     field: 'coaching',
     headers: [
+      // What the sheet calls it. The scenario's prompt writes coaching FROM a
+      // sales-audit grading, and the column took the audit's name.
+      'call sales audit',
       'coaching',
       'coach',
       'sales coaching',
       'feedback',
       'audit',
-      'grading',
       'sales audit',
+      // 'grading' deliberately NOT here: it belongs to the grading field
+      // below, and one spelling cannot mean two columns — the map builder
+      // throws at module load if it does, which is how this was caught.
+    ],
+  },
+  {
+    /*
+     * The audit's own score, which nobody said existed.
+     *
+     * Found in the first import's unrecognised-headers report — "Grading
+     * (1-10)" — alongside "Call Process Followed?". Both are the AI sales
+     * coach scoring itself, and both are more useful per agent than any
+     * counter this import was built for.
+     */
+    field: 'grading',
+    headers: ['grading (1-10)', 'grading', 'grade', 'score', 'call grading'],
+  },
+  {
+    field: 'process_followed',
+    headers: [
+      'call process followed?',
+      'call process followed',
+      'process followed?',
+      'process followed',
+      'sop followed',
     ],
   },
 ];
@@ -221,3 +266,14 @@ export const SUMMARY_POSITIONAL_ORDER: readonly (string | null)[] = [
   null, // column 10: the scenario writes coaching twice
   null, // column 11: a further completion, unmapped until somebody names it
 ];
+
+/*
+ * NOTE ON THE POSITIONAL FALLBACK, now that the live sheet has been read.
+ *
+ * Its headings are on row 1 and they matched, so the fallback above was never
+ * used — and it is now known to be incomplete: the real tab also carries
+ * "Grading (1-10)" and "Call Process Followed?", which the blueprint's write
+ * order does not account for. The fallback stays as a last resort for a tab
+ * with no headings at all, and its error message already says that reading by
+ * position is an assumption rather than a match.
+ */

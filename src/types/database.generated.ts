@@ -3700,10 +3700,12 @@ export type Database = {
           called_on: string | null
           coaching: string | null
           duration_seconds: number | null
+          grading: number | null
           id: string
           imported_at: string
           lead_crm_id: string | null
           lead_name: string | null
+          process_followed: string | null
           recording_url: string | null
           source_row: number
           summary: string | null
@@ -3717,10 +3719,12 @@ export type Database = {
           called_on?: string | null
           coaching?: string | null
           duration_seconds?: number | null
+          grading?: number | null
           id?: string
           imported_at?: string
           lead_crm_id?: string | null
           lead_name?: string | null
+          process_followed?: string | null
           recording_url?: string | null
           source_row: number
           summary?: string | null
@@ -3734,10 +3738,12 @@ export type Database = {
           called_on?: string | null
           coaching?: string | null
           duration_seconds?: number | null
+          grading?: number | null
           id?: string
           imported_at?: string
           lead_crm_id?: string | null
           lead_name?: string | null
+          process_followed?: string | null
           recording_url?: string | null
           source_row?: number
           summary?: string | null
@@ -4019,6 +4025,10 @@ export type Database = {
           calls_2min: number | null
           calls_with_coaching: number | null
           calls_with_transcript: number | null
+          calls_graded: number | null
+          avg_grading: number | null
+          process_followed_yes: number | null
+          process_answered: number | null
           day: string | null
           talk_seconds: number | null
           zero_length: number | null

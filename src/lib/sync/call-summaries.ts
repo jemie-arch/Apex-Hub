@@ -125,6 +125,26 @@ function asSeconds(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed) : null;
 }
 
+/**
+ * The audit's 1-10 score, as a number.
+ *
+ * Written by a language model, so it arrives as "8", "8/10", "8.5" or a
+ * sentence. Anything outside 0-10 is discarded rather than clamped: a value of
+ * 85 is a model that misunderstood the scale, and clamping it to 10 would put
+ * a fabricated perfect score into an agent's average.
+ */
+function asGrading(value: string | undefined): number | null {
+  const raw = text(value);
+  if (raw === null) return null;
+
+  const found = raw.match(/(\d{1,3}(?:\.\d+)?)/);
+  if (!found) return null;
+
+  const parsed = Number(found[1]);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed >= 0 && parsed <= 10 ? parsed : null;
+}
+
 export async function syncCallSummaries(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
 
@@ -308,6 +328,8 @@ export async function syncCallSummaries(ctx: SyncContext): Promise<void> {
       transcript,
       summary,
       coaching: text(cell(row, 'coaching')),
+      grading: asGrading(cell(row, 'grading')),
+      process_followed: text(cell(row, 'process_followed')),
       imported_at: importedAt,
     });
   });
@@ -384,4 +406,17 @@ export async function syncCallSummaries(ctx: SyncContext): Promise<void> {
   ctx.note('summaries_imported', records.length);
   ctx.note('with_transcript', records.filter((r) => r['transcript'] !== null).length);
   ctx.note('with_coaching', records.filter((r) => r['coaching'] !== null).length);
+  ctx.note('with_grading', records.filter((r) => r['grading'] !== null).length);
+  /*
+   * Reported because it is the figure that says whether the agents are in the
+   * Hub at all. The first import attached 0 of 215 calls — not a name-spelling
+   * problem: the call centre has no user_profiles rows, so there was nothing to
+   * match against. The scoreboard groups by name when that happens, so the
+   * figures still work; this number is how anybody knows why the rows say
+   * "no profile".
+   */
+  ctx.note(
+    'agents_named_in_the_sheet',
+    [...new Set(records.map((r) => r['agent_name']).filter(Boolean))].length,
+  );
 }
