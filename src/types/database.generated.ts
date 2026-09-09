@@ -76,6 +76,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ad_level_insights_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_stats_dashboard"
+            referencedColumns: ["campaign_uuid"]
+          },
+          {
             foreignKeyName: "ad_level_insights_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -243,6 +250,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_stats_dashboard"
+            referencedColumns: ["campaign_uuid"]
           },
           {
             foreignKeyName: "ads_client_id_fkey"
@@ -1198,38 +1212,69 @@ export type Database = {
         }
         Relationships: []
       }
-      invalid_booking_reports: {
+      call_agent_aliases: {
         Row: {
-          agent: string | null
-          id: string
-          imported_at: string
-          invalid_on: string | null
-          notes: string | null
-          reason: string | null
-          reported_at: string | null
-          source_row: number
+          agent_id: string
+          alias: string
+          created_at: string
+          note: string
         }
         Insert: {
-          agent?: string | null
-          id?: string
-          imported_at?: string
-          invalid_on?: string | null
-          notes?: string | null
-          reason?: string | null
-          reported_at?: string | null
-          source_row: number
+          agent_id: string
+          alias: string
+          created_at?: string
+          note: string
         }
         Update: {
-          agent?: string | null
-          id?: string
-          imported_at?: string
-          invalid_on?: string | null
-          notes?: string | null
-          reason?: string | null
-          reported_at?: string | null
-          source_row?: number
+          agent_id?: string
+          alias?: string
+          created_at?: string
+          note?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "call_agent_aliases_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "call_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_agents: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          note: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_agents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       call_recordings: {
         Row: {
@@ -1300,6 +1345,177 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "deals"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_summaries: {
+        Row: {
+          agent_id: string | null
+          agent_name: string | null
+          agent_user_id: string | null
+          called_at: string | null
+          called_on: string | null
+          coaching: string | null
+          duration_seconds: number | null
+          grading: number | null
+          id: string
+          imported_at: string
+          lead_crm_id: string | null
+          lead_name: string | null
+          process_followed: string | null
+          recording_url: string | null
+          source_row: number
+          summary: string | null
+          to_number: string | null
+          transcript: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          agent_name?: string | null
+          agent_user_id?: string | null
+          called_at?: string | null
+          called_on?: string | null
+          coaching?: string | null
+          duration_seconds?: number | null
+          grading?: number | null
+          id?: string
+          imported_at?: string
+          lead_crm_id?: string | null
+          lead_name?: string | null
+          process_followed?: string | null
+          recording_url?: string | null
+          source_row: number
+          summary?: string | null
+          to_number?: string | null
+          transcript?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          agent_name?: string | null
+          agent_user_id?: string | null
+          called_at?: string | null
+          called_on?: string | null
+          coaching?: string | null
+          duration_seconds?: number | null
+          grading?: number | null
+          id?: string
+          imported_at?: string
+          lead_crm_id?: string | null
+          lead_name?: string | null
+          process_followed?: string | null
+          recording_url?: string | null
+          source_row?: number
+          summary?: string | null
+          to_number?: string | null
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "call_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_user_id_fkey"
+            columns: ["agent_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      callcentre_requests: {
+        Row: {
+          authenticated_by: string | null
+          callback_due_at: string | null
+          client_id: string | null
+          crm_contact_id: string | null
+          delivery_id: string | null
+          id: string
+          kind: string
+          lead_name: string | null
+          lead_phone: string | null
+          location_crm_id: string | null
+          location_name: string | null
+          payload: Json | null
+          received_at: string
+          requested_at: string
+          requested_on: string
+          sop_link: string | null
+        }
+        Insert: {
+          authenticated_by?: string | null
+          callback_due_at?: string | null
+          client_id?: string | null
+          crm_contact_id?: string | null
+          delivery_id?: string | null
+          id?: string
+          kind: string
+          lead_name?: string | null
+          lead_phone?: string | null
+          location_crm_id?: string | null
+          location_name?: string | null
+          payload?: Json | null
+          received_at?: string
+          requested_at?: string
+          requested_on?: string
+          sop_link?: string | null
+        }
+        Update: {
+          authenticated_by?: string | null
+          callback_due_at?: string | null
+          client_id?: string | null
+          crm_contact_id?: string | null
+          delivery_id?: string | null
+          id?: string
+          kind?: string
+          lead_name?: string | null
+          lead_phone?: string | null
+          location_crm_id?: string | null
+          location_name?: string | null
+          payload?: Json | null
+          received_at?: string
+          requested_at?: string
+          requested_on?: string
+          sop_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1806,6 +2022,368 @@ export type Database = {
           },
         ]
       }
+      creative_assets: {
+        Row: {
+          client_group_id: string | null
+          client_id: string | null
+          created_at: string
+          credits_cents: number | null
+          duration_seconds: number | null
+          error: string | null
+          height: number | null
+          id: string
+          job_id: string
+          kind: string
+          model: string
+          parent_asset_id: string | null
+          prompt: string
+          provider_request_id: string | null
+          provider_url: string | null
+          published_to_portal: boolean
+          status: string
+          storage_path: string | null
+          stored_at: string | null
+          width: number | null
+        }
+        Insert: {
+          client_group_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          credits_cents?: number | null
+          duration_seconds?: number | null
+          error?: string | null
+          height?: number | null
+          id?: string
+          job_id: string
+          kind: string
+          model: string
+          parent_asset_id?: string | null
+          prompt: string
+          provider_request_id?: string | null
+          provider_url?: string | null
+          published_to_portal?: boolean
+          status?: string
+          storage_path?: string | null
+          stored_at?: string | null
+          width?: number | null
+        }
+        Update: {
+          client_group_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          credits_cents?: number | null
+          duration_seconds?: number | null
+          error?: string | null
+          height?: number | null
+          id?: string
+          job_id?: string
+          kind?: string
+          model?: string
+          parent_asset_id?: string | null
+          prompt?: string
+          provider_request_id?: string | null
+          provider_url?: string | null
+          published_to_portal?: boolean
+          status?: string
+          storage_path?: string | null
+          stored_at?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_assets_client_group_id_fkey"
+            columns: ["client_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_assets_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "creative_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_assets_parent_asset_id_fkey"
+            columns: ["parent_asset_id"]
+            isOneToOne: false
+            referencedRelation: "creative_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_jobs: {
+        Row: {
+          attempts: number
+          brief: Json
+          client_group_id: string | null
+          client_id: string | null
+          clinic_name: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          started_at: string | null
+          status: string
+          submission_id: string
+        }
+        Insert: {
+          attempts?: number
+          brief?: Json
+          client_group_id?: string | null
+          client_id?: string | null
+          clinic_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          started_at?: string | null
+          status?: string
+          submission_id: string
+        }
+        Update: {
+          attempts?: number
+          brief?: Json
+          client_group_id?: string | null
+          client_id?: string | null
+          clinic_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          started_at?: string | null
+          status?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_jobs_client_group_id_fkey"
+            columns: ["client_group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_prompt_templates: {
+        Row: {
+          created_at: string
+          is_active: boolean
+          kind: string
+          model: string
+          slot: number
+          style_key: string
+          template: string
+        }
+        Insert: {
+          created_at?: string
+          is_active?: boolean
+          kind: string
+          model: string
+          slot: number
+          style_key: string
+          template: string
+        }
+        Update: {
+          created_at?: string
+          is_active?: boolean
+          kind?: string
+          model?: string
+          slot?: number
+          style_key?: string
+          template?: string
+        }
+        Relationships: []
+      }
+      creative_style_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          style_key: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          style_key: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          style_key?: string
+        }
+        Relationships: []
+      }
+      crm_leads: {
+        Row: {
+          ad_external_id: string | null
+          campaign_external_id: string | null
+          client_id: string
+          created_at_utc: string
+          created_on: string
+          crm_contact_id: string
+          id: string
+          lead_email: string | null
+          lead_name: string | null
+          lead_phone: string | null
+          source: string | null
+          synced_at: string
+          tags: string[]
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          ad_external_id?: string | null
+          campaign_external_id?: string | null
+          client_id: string
+          created_at_utc: string
+          created_on: string
+          crm_contact_id: string
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          source?: string | null
+          synced_at?: string
+          tags?: string[]
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          ad_external_id?: string | null
+          campaign_external_id?: string | null
+          client_id?: string
+          created_at_utc?: string
+          created_on?: string
+          crm_contact_id?: string
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          source?: string | null
+          synced_at?: string
+          tags?: string[]
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       deals: {
         Row: {
           client_group_id: string | null
@@ -2224,6 +2802,39 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
         ]
+      }
+      invalid_booking_reports: {
+        Row: {
+          agent: string | null
+          id: string
+          imported_at: string
+          invalid_on: string | null
+          notes: string | null
+          reason: string | null
+          reported_at: string | null
+          source_row: number
+        }
+        Insert: {
+          agent?: string | null
+          id?: string
+          imported_at?: string
+          invalid_on?: string | null
+          notes?: string | null
+          reason?: string | null
+          reported_at?: string | null
+          source_row: number
+        }
+        Update: {
+          agent?: string | null
+          id?: string
+          imported_at?: string
+          invalid_on?: string | null
+          notes?: string | null
+          reason?: string | null
+          reported_at?: string | null
+          source_row?: number
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -2944,6 +3555,54 @@ export type Database = {
         }
         Relationships: []
       }
+      slack_watch_messages: {
+        Row: {
+          answered_at: string | null
+          author_name: string | null
+          author_slack_id: string | null
+          channel_id: string
+          channel_name: string | null
+          detected_at: string
+          id: string
+          message_ts: string
+          replied_at: string | null
+          reply_text: string | null
+          skip_reason: string | null
+          state: string
+          thread_ts: string
+        }
+        Insert: {
+          answered_at?: string | null
+          author_name?: string | null
+          author_slack_id?: string | null
+          channel_id: string
+          channel_name?: string | null
+          detected_at?: string
+          id?: string
+          message_ts: string
+          replied_at?: string | null
+          reply_text?: string | null
+          skip_reason?: string | null
+          state?: string
+          thread_ts: string
+        }
+        Update: {
+          answered_at?: string | null
+          author_name?: string | null
+          author_slack_id?: string | null
+          channel_id?: string
+          channel_name?: string | null
+          detected_at?: string
+          id?: string
+          message_ts?: string
+          replied_at?: string | null
+          reply_text?: string | null
+          skip_reason?: string | null
+          state?: string
+          thread_ts?: string
+        }
+        Relationships: []
+      }
       sync_runs: {
         Row: {
           client_id: string | null
@@ -3627,252 +4286,6 @@ export type Database = {
           },
         ]
       }
-      callcentre_requests: {
-        Row: {
-          authenticated_by: string | null
-          callback_due_at: string | null
-          client_id: string | null
-          crm_contact_id: string | null
-          delivery_id: string | null
-          id: string
-          kind: string
-          lead_name: string | null
-          lead_phone: string | null
-          location_crm_id: string | null
-          location_name: string | null
-          payload: Json | null
-          received_at: string
-          requested_at: string
-          requested_on: string
-          sop_link: string | null
-        }
-        Insert: {
-          authenticated_by?: string | null
-          callback_due_at?: string | null
-          client_id?: string | null
-          crm_contact_id?: string | null
-          delivery_id?: string | null
-          id?: string
-          kind: string
-          lead_name?: string | null
-          lead_phone?: string | null
-          location_crm_id?: string | null
-          location_name?: string | null
-          payload?: Json | null
-          received_at?: string
-          requested_at?: string
-          requested_on?: string
-          sop_link?: string | null
-        }
-        Update: {
-          authenticated_by?: string | null
-          callback_due_at?: string | null
-          client_id?: string | null
-          crm_contact_id?: string | null
-          delivery_id?: string | null
-          id?: string
-          kind?: string
-          lead_name?: string | null
-          lead_phone?: string | null
-          location_crm_id?: string | null
-          location_name?: string | null
-          payload?: Json | null
-          received_at?: string
-          requested_at?: string
-          requested_on?: string
-          sop_link?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "callcentre_requests_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      call_summaries: {
-        Row: {
-          agent_name: string | null
-          agent_user_id: string | null
-          called_at: string | null
-          called_on: string | null
-          coaching: string | null
-          duration_seconds: number | null
-          grading: number | null
-          id: string
-          imported_at: string
-          lead_crm_id: string | null
-          lead_name: string | null
-          process_followed: string | null
-          recording_url: string | null
-          source_row: number
-          summary: string | null
-          to_number: string | null
-          transcript: string | null
-        }
-        Insert: {
-          agent_name?: string | null
-          agent_user_id?: string | null
-          called_at?: string | null
-          called_on?: string | null
-          coaching?: string | null
-          duration_seconds?: number | null
-          grading?: number | null
-          id?: string
-          imported_at?: string
-          lead_crm_id?: string | null
-          lead_name?: string | null
-          process_followed?: string | null
-          recording_url?: string | null
-          source_row: number
-          summary?: string | null
-          to_number?: string | null
-          transcript?: string | null
-        }
-        Update: {
-          agent_name?: string | null
-          agent_user_id?: string | null
-          called_at?: string | null
-          called_on?: string | null
-          coaching?: string | null
-          duration_seconds?: number | null
-          grading?: number | null
-          id?: string
-          imported_at?: string
-          lead_crm_id?: string | null
-          lead_name?: string | null
-          process_followed?: string | null
-          recording_url?: string | null
-          source_row?: number
-          summary?: string | null
-          to_number?: string | null
-          transcript?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "call_summaries_agent_user_id_fkey"
-            columns: ["agent_user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      crm_leads: {
-        Row: {
-          ad_external_id: string | null
-          campaign_external_id: string | null
-          client_id: string
-          created_at_utc: string
-          created_on: string
-          crm_contact_id: string
-          id: string
-          lead_email: string | null
-          lead_name: string | null
-          lead_phone: string | null
-          source: string | null
-          synced_at: string
-          tags: string[]
-          utm_campaign: string | null
-          utm_medium: string | null
-          utm_source: string | null
-        }
-        Insert: {
-          ad_external_id?: string | null
-          campaign_external_id?: string | null
-          client_id: string
-          created_at_utc: string
-          created_on: string
-          crm_contact_id: string
-          id?: string
-          lead_email?: string | null
-          lead_name?: string | null
-          lead_phone?: string | null
-          source?: string | null
-          synced_at?: string
-          tags?: string[]
-          utm_campaign?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-        }
-        Update: {
-          ad_external_id?: string | null
-          campaign_external_id?: string | null
-          client_id?: string
-          created_at_utc?: string
-          created_on?: string
-          crm_contact_id?: string
-          id?: string
-          lead_email?: string | null
-          lead_name?: string | null
-          lead_phone?: string | null
-          source?: string | null
-          synced_at?: string
-          tags?: string[]
-          utm_campaign?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "crm_leads_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      slack_watch_messages: {
-        Row: {
-          answered_at: string | null
-          author_name: string | null
-          author_slack_id: string | null
-          channel_id: string
-          channel_name: string | null
-          detected_at: string
-          id: string
-          message_ts: string
-          replied_at: string | null
-          reply_text: string | null
-          skip_reason: string | null
-          state: string
-          thread_ts: string
-        }
-        Insert: {
-          answered_at?: string | null
-          author_name?: string | null
-          author_slack_id?: string | null
-          channel_id: string
-          channel_name?: string | null
-          detected_at?: string
-          id?: string
-          message_ts: string
-          replied_at?: string | null
-          reply_text?: string | null
-          skip_reason?: string | null
-          state?: string
-          thread_ts: string
-        }
-        Update: {
-          answered_at?: string | null
-          author_name?: string | null
-          author_slack_id?: string | null
-          channel_id?: string
-          channel_name?: string | null
-          detected_at?: string
-          id?: string
-          message_ts?: string
-          replied_at?: string | null
-          reply_text?: string | null
-          skip_reason?: string | null
-          state?: string
-          thread_ts?: string
-        }
-        Relationships: []
-      }
       tracker_practice_aliases: {
         Row: {
           client_id: string
@@ -4000,118 +4413,6 @@ export type Database = {
       }
     }
     Views: {
-      v_callcentre_response: {
-        Row: {
-          answered: boolean | null
-          client_id: string | null
-          first_call_at: string | null
-          id: string | null
-          kind: string | null
-          lead_name: string | null
-          location_name: string | null
-          minutes_to_first_call: number | null
-          requested_at: string | null
-          requested_on: string | null
-          within_five_minutes: boolean | null
-        }
-        Relationships: []
-      }
-      v_call_summary_agent_daily: {
-        Row: {
-          agent_name: string | null
-          agent_user_id: string | null
-          avg_talk_seconds: number | null
-          calls: number | null
-          calls_2min: number | null
-          calls_with_coaching: number | null
-          calls_with_transcript: number | null
-          calls_graded: number | null
-          avg_grading: number | null
-          process_followed_yes: number | null
-          process_answered: number | null
-          day: string | null
-          talk_seconds: number | null
-          zero_length: number | null
-        }
-        Relationships: []
-      }
-      v_call_summary_unmatched_agents: {
-        Row: {
-          agent_name: string | null
-          calls: number | null
-          earliest: string | null
-          latest: string | null
-        }
-        Relationships: []
-      }
-      v_lead_reconciliation: {
-        Row: {
-          client_id: string | null
-          client_name: string | null
-          crm_leads: number | null
-          day: string | null
-          group_id: string | null
-          leads_best_reported: number | null
-          reported_minus_crm: number | null
-          sheet_leads: number | null
-          windsor_leads: number | null
-        }
-        Relationships: []
-      }
-      v_cft_call_daily: {
-        Row: {
-          answered_outbound: number | null
-          calls_2min: number | null
-          calls_total: number | null
-          client_id: string | null
-          client_name: string | null
-          connected_any: number | null
-          connected_but_silent: number | null
-          connected_outbound: number | null
-          day: string | null
-          dialed_calls: number | null
-          group_id: string | null
-          inbound_calls: number | null
-          speed_to_lead_min_sum: number | null
-          speed_to_lead_n: number | null
-          speed_to_lead_over_24h: number | null
-        }
-        Relationships: []
-      }
-      v_cft_stats_dashboard: {
-        Row: {
-          appts_created: number | null
-          appts_not_in_ledger: number | null
-          appts_to_be_taken: number | null
-          campaign_id_external: string | null
-          campaign_name: string | null
-          campaign_status: string | null
-          campaign_uuid: string | null
-          cancels: number | null
-          clicks: number | null
-          client_id: string | null
-          client_name: string | null
-          closes: number | null
-          day: string | null
-          dqs: number | null
-          follow_ups: number | null
-          group_id: string | null
-          impressions: number | null
-          is_active: boolean | null
-          last_appt_date: string | null
-          leads_best: number | null
-          leads_tracker: number | null
-          leads_windsor: number | null
-          no_shows: number | null
-          notes: string | null
-          offer_name: string | null
-          revenue_cents: number | null
-          shows: number | null
-          spend_cents: number | null
-          status: string | null
-        }
-        Relationships: []
-      }
       appointment_exceptions: {
         Row: {
           amount_cents: number | null
@@ -4376,6 +4677,17 @@ export type Database = {
         }
         Relationships: []
       }
+      tracker_unmatched_lead_names: {
+        Row: {
+          a_client_of_that_name_exists: boolean | null
+          company_name: string | null
+          earliest: string | null
+          latest: string | null
+          rows: number | null
+          source_tab: string | null
+        }
+        Relationships: []
+      }
       tracker_unmatched_names: {
         Row: {
           a_client_of_that_name_exists: boolean | null
@@ -4487,6 +4799,343 @@ export type Database = {
           },
         ]
       }
+      v_call_summary_agent_daily: {
+        Row: {
+          agent_display_name: string | null
+          agent_id: string | null
+          agent_name: string | null
+          agent_user_id: string | null
+          avg_grading: number | null
+          avg_talk_seconds: number | null
+          calls: number | null
+          calls_2min: number | null
+          calls_graded: number | null
+          calls_with_coaching: number | null
+          calls_with_transcript: number | null
+          day: string | null
+          has_profile: boolean | null
+          process_answered: number | null
+          process_followed_yes: number | null
+          talk_seconds: number | null
+          zero_length: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "call_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_user_id_fkey"
+            columns: ["agent_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_call_summary_agent_resolution: {
+        Row: {
+          a_roster_entry_matches_this_spelling: boolean | null
+          agent_name: string | null
+          an_alias_covers_this_spelling: boolean | null
+          first_call: string | null
+          last_call: string | null
+          normalised: string | null
+          summaries: number | null
+        }
+        Relationships: []
+      }
+      v_call_summary_unmatched_agents: {
+        Row: {
+          agent_name: string | null
+          calls: number | null
+          earliest: string | null
+          latest: string | null
+        }
+        Relationships: []
+      }
+      v_callcentre_response: {
+        Row: {
+          answered: boolean | null
+          client_id: string | null
+          first_call_at: string | null
+          id: string | null
+          kind: string | null
+          lead_name: string | null
+          location_name: string | null
+          minutes_to_first_call: number | null
+          requested_at: string | null
+          requested_on: string | null
+          within_five_minutes: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      v_cft_call_daily: {
+        Row: {
+          answered_outbound: number | null
+          calls_2min: number | null
+          calls_total: number | null
+          client_id: string | null
+          client_name: string | null
+          connected_any: number | null
+          connected_but_silent: number | null
+          connected_outbound: number | null
+          day: string | null
+          dialed_calls: number | null
+          group_id: string | null
+          inbound_calls: number | null
+          speed_to_lead_min_sum: number | null
+          speed_to_lead_n: number | null
+          speed_to_lead_over_24h: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_cft_daily: {
+        Row: {
+          ad_account_id: string | null
+          agency_revenue_cents: number | null
+          agency_roi: number | null
+          appts_booked: number | null
+          appts_cancelled: number | null
+          appts_missing: number | null
+          appts_no_show: number | null
+          appts_showed: number | null
+          billable_cents: number | null
+          calls_booked: number | null
+          calls_connected: number | null
+          calls_inbound: number | null
+          calls_outbound: number | null
+          calls_total: number | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          consults_billed: number | null
+          cost_per_booking_usd: number | null
+          cost_per_lead_usd: number | null
+          cost_per_show_usd: number | null
+          cpm_usd: number | null
+          ctr: number | null
+          day: string | null
+          group_id: string | null
+          impressions: number | null
+          is_active: boolean | null
+          leads_best_available: number | null
+          spend_cents: number | null
+          tracker_leads: number | null
+          windsor_leads: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_cft_stats_dashboard: {
+        Row: {
+          appts_created: number | null
+          appts_not_in_ledger: number | null
+          appts_to_be_taken: number | null
+          campaign_id_external: string | null
+          campaign_name: string | null
+          campaign_status: string | null
+          campaign_uuid: string | null
+          cancels: number | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          closes: number | null
+          day: string | null
+          dqs: number | null
+          follow_ups: number | null
+          group_id: string | null
+          impressions: number | null
+          is_active: boolean | null
+          last_appt_date: string | null
+          leads_best: number | null
+          leads_tracker: number | null
+          leads_windsor: number | null
+          no_shows: number | null
+          notes: string | null
+          offer_name: string | null
+          revenue_cents: number | null
+          shows: number | null
+          spend_cents: number | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_lead_reconciliation: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          crm_leads: number | null
+          day: string | null
+          group_id: string | null
+          leads_best_reported: number | null
+          reported_minus_crm: number | null
+          sheet_leads: number | null
+          windsor_leads: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_tracker_leads_effective: {
+        Row: {
+          ad_external_id: string | null
+          ad_name: string | null
+          adset_external_id: string | null
+          adset_name: string | null
+          campaign_external_id: string | null
+          campaign_name: string | null
+          client_id: string | null
+          company_name: string | null
+          id: string | null
+          imported_at: string | null
+          lead_count: number | null
+          lead_name: string | null
+          received_on: string | null
+          source_row: number | null
+          source_tab: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_tracker_aliases: { Args: never; Returns: number }
@@ -4502,6 +5151,7 @@ export type Database = {
       ensure_payout_periods: { Args: { p_through?: string }; Returns: number }
       generate_portal_token: { Args: never; Returns: string }
       merge_superseded_tracker_ledger_rows: { Args: never; Returns: number }
+      normalise_person_name: { Args: { raw: string }; Returns: string }
       onboarding_status_for: {
         Args: { p_group: string }
         Returns: Database["public"]["Enums"]["onboarding_status"]
@@ -4517,6 +5167,7 @@ export type Database = {
         Args: { p_group: string }
         Returns: undefined
       }
+      resolve_call_summary_agents: { Args: never; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       squash_practice_name: { Args: { t: string }; Returns: string }
@@ -4643,12 +5294,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4672,11 +5323,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4697,11 +5348,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4722,11 +5373,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4739,11 +5390,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

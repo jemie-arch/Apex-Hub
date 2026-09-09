@@ -14,6 +14,18 @@
 import { serviceClient } from '@/lib/supabase/service';
 
 export interface AgentCallStats {
+  /*
+   * The roster entry. Null means the name on the sheet reached no agent at all,
+   * which is the only real attribution gap — see v_call_summary_agent_resolution.
+   */
+  agentId: string | null;
+  /*
+   * Whether that agent also has a Hub login. False is normal for the call
+   * centre and is NOT a defect: most of them are contractors who never sign in.
+   * Kept apart from agentId so the UI can flag the gap that matters and stay
+   * quiet about the one that does not.
+   */
+  hasProfile: boolean;
   agentUserId: string | null;
   agentName: string | null;
   calls: number;
@@ -60,7 +72,7 @@ export async function getCallSummaries(range: {
     db
       .from('v_call_summary_agent_daily')
       .select(
-        'agent_user_id, agent_name, day, calls, calls_2min, zero_length, talk_seconds, avg_talk_seconds, calls_with_transcript, calls_with_coaching',
+        'agent_user_id, agent_name, agent_id, agent_display_name, has_profile, day, calls, calls_2min, zero_length, talk_seconds, avg_talk_seconds, calls_with_transcript, calls_with_coaching',
       )
       .gte('day', range.from)
       .lte('day', range.to),
@@ -79,10 +91,15 @@ export async function getCallSummaries(range: {
       .order('called_at', { ascending: false, nullsFirst: false })
       .limit(RECENT_LIMIT),
     db.from('call_summaries').select('id', { count: 'exact', head: true }),
+    /*
+     * Counted on agent_id, not agent_user_id. The question this answers is
+     * "how many calls belong to nobody", and an agent without a Hub login
+     * still belongs to somebody.
+     */
     db
       .from('call_summaries')
       .select('id', { count: 'exact', head: true })
-      .is('agent_user_id', null),
+      .is('agent_id', null),
   ]);
 
   if (daily.error) throw daily.error;
@@ -99,12 +116,20 @@ export async function getCallSummaries(range: {
   const byAgent = new Map<string, AgentCallStats>();
 
   for (const row of daily.data ?? []) {
-    const key = row.agent_user_id ?? `name:${row.agent_name ?? 'unknown'}`;
+    /*
+     * Keyed on the roster id, so two spellings of one agent land on one row.
+     * Falls back to the raw name only for a call that reached no roster entry,
+     * which keeps it visible rather than silently merging every stranger
+     * together.
+     */
+    const key = row.agent_id ?? `name:${row.agent_name ?? 'unknown'}`;
     const held =
       byAgent.get(key) ??
       ({
+        agentId: row.agent_id,
+        hasProfile: row.has_profile ?? false,
         agentUserId: row.agent_user_id,
-        agentName: row.agent_name,
+        agentName: row.agent_display_name ?? row.agent_name,
         calls: 0,
         calls2min: 0,
         zeroLength: 0,

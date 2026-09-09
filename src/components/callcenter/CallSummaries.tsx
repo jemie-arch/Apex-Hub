@@ -47,12 +47,18 @@ function AgentRow({ agent }: { agent: AgentCallStats }) {
     <tr className="border-b border-line last:border-0 hover:bg-surface-hover">
       <td className="px-4 py-3 font-medium text-fg">
         {agent.agentName ?? 'Unnamed'}
-        {agent.agentUserId === null ? (
-          /* Named on the call but matching no Hub profile, so absent from
-             anything that groups by person. Flagged inline rather than in a
-             footnote, because it is a gap in that row specifically. */
+        {agent.agentId === null ? (
+          /* Named on the call but matching no agent on the roster, so these
+             calls belong to nobody and are missing from every per-person
+             figure. This is the gap worth flagging, and it is fixed by adding
+             the name to the roster or as an alias.
+
+             Deliberately NOT flagged when the agent merely has no Hub login:
+             most of the call centre are contractors who never sign in, and
+             badging them all as a problem trained everybody to ignore the
+             badge. */
           <span className="ml-2 rounded bg-warning-subtle px-1.5 py-0.5 text-[10px] font-normal text-warning">
-            no profile
+            not on the roster
           </span>
         ) : null}
       </td>

@@ -358,41 +358,33 @@ export async function syncCallSummaries(ctx: SyncContext): Promise<void> {
   /*
    * Attach each call to a person, which is the whole point.
    *
-   * Matched on name, because the sheet carries a name and not an id. Resolved
-   * here rather than in SQL so the match rule sits beside the import that
-   * needs it, and reported either way: an unattached call is missing from that
-   * person's figures and invisible in the figures it is missing from.
+   * Done in SQL by resolve_call_summary_agents rather than by a loop here,
+   * because the loop this replaced got three things wrong. It compared
+   * full_name to agent_name with case folding alone, so the "Joshua Jung" on
+   * the sheet never met the profile spelled "Joshua" — 9 calls that had a
+   * profile all along. It had nowhere to record that those two are the same
+   * person, so the answer could not be kept once somebody worked it out. And
+   * it issued one UPDATE per row: 215 round-trips to attach nothing.
+   *
+   * The function tries confirmed aliases first, then an exact match on
+   * normalised names, and refuses to match at all when two profiles normalise
+   * to the same name — crediting one agent with another's calls is worse than
+   * leaving the row unattributed, and an unattributed row is already badged in
+   * the scoreboard. It fills nulls only, so a correction made by hand outlives
+   * the next import.
    */
-  const staff = await db
-    .from('user_profiles')
-    .select('id, full_name, email')
-    .eq('is_active', true);
+  const attached = await db.rpc('resolve_call_summary_agents');
 
-  if (staff.error) throw staff.error;
-
-  const byName = new Map<string, string>();
-  for (const person of staff.data ?? []) {
-    const name = person.full_name?.trim().toLowerCase();
-    if (name) byName.set(name, person.id);
+  if (attached.error) {
+    ctx.recordError(
+      'Summaries were imported but could not be attached to people: ' +
+        `${attached.error.message}. Until this succeeds every per-agent figure ` +
+        'is grouped by the name on the sheet rather than by the person, so ' +
+        'nothing that joins on a profile sees the call centre at all.',
+    );
+  } else {
+    ctx.note('calls_attached_to_a_person', attached.data ?? 0);
   }
-
-  let attached = 0;
-  for (const record of records) {
-    const agent = (record['agent_name'] as string | null)?.trim().toLowerCase();
-    if (!agent) continue;
-    const id = byName.get(agent);
-    if (!id) continue;
-
-    const set = await db
-      .from('call_summaries')
-      .update({ agent_user_id: id } as never)
-      .eq('source_row', record['source_row'] as number)
-      .is('agent_user_id', null);
-
-    if (!set.error) attached += 1;
-  }
-
-  ctx.note('calls_attached_to_a_person', attached);
 
   const unattached = await db
     .from('call_summaries')
