@@ -17,6 +17,7 @@ import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
 import { syncProvisionPending } from '@/lib/sync/provision-pending';
+import { syncRawCallRows } from '@/lib/sync/raw-call-rows';
 import type { SyncFn } from '@/lib/sync/runner';
 import { syncRoutingExport } from '@/lib/sync/routing-export';
 import { syncScenarioAudit } from '@/lib/sync/scenario-audit';
@@ -66,6 +67,14 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'scenario 5560467 writes — and the caller name that finally attributes ' +
       'a call to a person',
     run: syncCallSummaries,
+  },
+  'raw-call-rows': {
+    name: 'raw-call-rows',
+    description:
+      'The RAW DATA tab of the call-centre workbook — the tab the pay ' +
+      "dashboard's J2 counts, and so the only source that reconciles with " +
+      'what agents are actually paid',
+    run: syncRawCallRows,
   },
   'crm-leads': {
     name: 'crm-leads',

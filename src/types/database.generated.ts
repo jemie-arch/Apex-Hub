@@ -3419,6 +3419,127 @@ export type Database = {
           },
         ]
       }
+      raw_call_rows: {
+        Row: {
+          agent_id: string | null
+          agent_name: string | null
+          called_at: string | null
+          called_on: string | null
+          client_id: string | null
+          country_code: string | null
+          direction: string | null
+          disposition: string | null
+          duration_seconds: number | null
+          from_number: string | null
+          group_crm_id: string | null
+          id: string
+          imported_at: string
+          lead_created_date: string | null
+          lead_crm_id: string | null
+          lead_source: string | null
+          location_name: string | null
+          member_crm_id: string | null
+          source_row: number
+          stage_entry_date: string | null
+          status: string | null
+          time_zone: string | null
+          to_number: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          agent_name?: string | null
+          called_at?: string | null
+          called_on?: string | null
+          client_id?: string | null
+          country_code?: string | null
+          direction?: string | null
+          disposition?: string | null
+          duration_seconds?: number | null
+          from_number?: string | null
+          group_crm_id?: string | null
+          id?: string
+          imported_at?: string
+          lead_created_date?: string | null
+          lead_crm_id?: string | null
+          lead_source?: string | null
+          location_name?: string | null
+          member_crm_id?: string | null
+          source_row: number
+          stage_entry_date?: string | null
+          status?: string | null
+          time_zone?: string | null
+          to_number?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          agent_name?: string | null
+          called_at?: string | null
+          called_on?: string | null
+          client_id?: string | null
+          country_code?: string | null
+          direction?: string | null
+          disposition?: string | null
+          duration_seconds?: number | null
+          from_number?: string | null
+          group_crm_id?: string | null
+          id?: string
+          imported_at?: string
+          lead_created_date?: string | null
+          lead_crm_id?: string | null
+          lead_source?: string | null
+          location_name?: string | null
+          member_crm_id?: string | null
+          source_row?: number
+          stage_entry_date?: string | null
+          status?: string | null
+          time_zone?: string | null
+          to_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "call_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       sales_calls: {
         Row: {
           closed_by_user_id: string | null
@@ -4972,6 +5093,24 @@ export type Database = {
           },
         ]
       }
+      v_cft_campaign_spend_coverage: {
+        Row: {
+          campaigns_in_hub: number | null
+          campaigns_missing: number | null
+          client_id: string | null
+          client_name: string | null
+          coverage: number | null
+          cpl_all_leads: number | null
+          cpl_covered_leads: number | null
+          first_lead_day: string | null
+          first_spend_day: string | null
+          leads: number | null
+          leads_covered: number | null
+          leads_uncovered: number | null
+          spend: number | null
+        }
+        Relationships: []
+      }
       v_cft_daily: {
         Row: {
           ad_account_id: string | null
@@ -5080,6 +5219,39 @@ export type Database = {
           },
         ]
       }
+      v_raw_booked_daily: {
+        Row: {
+          agent_id: string | null
+          agent_name: string | null
+          booked: number | null
+          calls: number | null
+          convos_90s: number | null
+          day: string | null
+          outbound: number | null
+          talk_seconds: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "call_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_raw_call_unattributed: {
+        Row: {
+          a_roster_entry_matches: boolean | null
+          agent_name: string | null
+          booked_rows: number | null
+          first_call: string | null
+          last_call: string | null
+          normalised: string | null
+          rows: number | null
+        }
+        Relationships: []
+      }
       v_tracker_leads_effective: {
         Row: {
           ad_external_id: string | null
@@ -5168,6 +5340,7 @@ export type Database = {
         Returns: undefined
       }
       resolve_call_summary_agents: { Args: never; Returns: number }
+      resolve_raw_call_attribution: { Args: never; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       squash_practice_name: { Args: { t: string }; Returns: string }

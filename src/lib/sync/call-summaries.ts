@@ -39,91 +39,20 @@ import {
 import { serverEnv } from '@/lib/env';
 import { listSheetTitles, readSheet } from '@/lib/integrations/google-sheets';
 import { findHeaderRow } from '@/lib/sheet-headers';
+import { asInstant, asSeconds, text } from '@/lib/sheet-values';
 import type { SyncContext } from '@/lib/sync/runner';
 import { serviceClient } from '@/lib/supabase/service';
 
 /** Smaller than the other sheet imports: each row carries a whole transcript. */
 const BATCH = 50;
 
-/**
- * How much transcript text to keep per call.
- *
- * A long consultation transcribes to tens of thousands of characters, and the
- * point of storing it is for a person to read the call — not to hold an
- * unbounded blob in a row that several pages select. Truncated with a marker
- * so nobody mistakes a clipped transcript for a short call.
+/*
+ * text, asInstant and asSeconds now live in @/lib/sheet-values, because the
+ * RAW DATA importer needs exactly the same coercion — same workbook, same Make
+ * scenario writing it, so the same shapes arrive in both. Two copies would
+ * eventually disagree about what "3:47" means, and one of the things that
+ * decides is what an agent gets paid.
  */
-const MAX_TEXT = 20_000;
-
-function text(value: string | undefined): string | null {
-  const trimmed = (value ?? '').trim();
-  if (trimmed === '') return null;
-  return trimmed.length > MAX_TEXT
-    ? `${trimmed.slice(0, MAX_TEXT)}\n\n[truncated by the Hub at ${MAX_TEXT} characters]`
-    : trimmed;
-}
-
-/**
- * The call's timestamp, however the sheet spells it.
- *
- * Deliberately permissive here, unlike the tracker's date parsing: this column
- * is written by an automation rather than typed, so it is an ISO instant or a
- * locale string rather than an ambiguous D/M vs M/D. Anything unreadable
- * becomes null rather than a guess, and the row still imports — a transcript
- * with no timestamp is still worth having, it just cannot appear in a daily
- * count.
- */
-function asInstant(value: string | undefined): string | null {
-  const raw = text(value);
-  if (raw === null) return null;
-
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-
-  // M/D/YYYY with an optional time, which is what Sheets renders for a US locale.
-  const slashed = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2}))?/);
-  if (slashed) {
-    const [, month, day, year, hour, minute] = slashed;
-    const built = new Date(
-      Date.UTC(
-        Number(year),
-        Number(month) - 1,
-        Number(day),
-        Number(hour ?? '0'),
-        Number(minute ?? '0'),
-      ),
-    );
-    if (!Number.isNaN(built.getTime())) return built.toISOString();
-  }
-
-  return null;
-}
-
-/**
- * A duration in seconds, from whatever the sheet holds.
- *
- * AssemblyAI reports seconds as a number, but the column has also been seen
- * rendered as "3:47". Both are read; anything else is null rather than zero,
- * because a call of unknown length and a call of no length are different and
- * the average in v_call_summary_agent_daily excludes only the second.
- */
-function asSeconds(value: string | undefined): number | null {
-  const raw = text(value);
-  if (raw === null) return null;
-
-  const clock = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (clock) {
-    const [, a, b, c] = clock;
-    return c === undefined
-      ? Number(a) * 60 + Number(b)
-      : Number(a) * 3600 + Number(b) * 60 + Number(c);
-  }
-
-  const digits = raw.replace(/[^0-9.]/g, '');
-  if (digits === '') return null;
-  const parsed = Number(digits);
-  return Number.isFinite(parsed) ? Math.round(parsed) : null;
-}
 
 /**
  * The audit's 1-10 score, as a number.

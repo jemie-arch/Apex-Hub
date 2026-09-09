@@ -163,6 +163,27 @@ const ORDER = [
    */
   'call-summaries',
   /*
+   * The RAW DATA tab, beside the summaries because it is the same workbook and
+   * the same Make scenario — but it earns its place for a different reason.
+   *
+   * This is the tab the pay dashboard's J2 counts:
+   *
+   *   COUNTIFS('RAW DATA'!C:C, <agent>, 'RAW DATA'!N:N, "*Booked*", <dates>)
+   *
+   * which is why agent pay would not reconcile against booking-sheet above.
+   * The Hub was counting the BOOKING SHEET tab and the dashboard counts this
+   * one; they disagreed in opposite directions because they were answering
+   * different questions, not because either was miscounting.
+   *
+   * AFTER call-summaries deliberately, so the roster resolution runs first and
+   * a name added there attributes these rows on the same cycle rather than the
+   * next one.
+   *
+   * Cheap: one sheet read, no AI, no per-call cost, and the widest column is a
+   * phone number.
+   */
+  'raw-call-rows',
+  /*
    * 'fulfilment-tracker' moved up, above appointment-ledger. It used to sit
    * here with a note explaining that the Google credentials were unset and
    * what to do when they arrived. They arrived; that was done. Left as a
