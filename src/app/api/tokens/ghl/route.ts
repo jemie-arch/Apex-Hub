@@ -10,6 +10,24 @@
  *   GET /api/tokens/ghl?location=<id>       that location's token
  *   GET /api/tokens/ghl?client=<uuid>       the same, by client id
  *
+ * TWO CONSUMERS IN MAKE, and the second is why this matters more than it looks.
+ *
+ * "GHL Token Bridge (app-owned)" calls it every six hours and caches the agency
+ * token in a Make data store.
+ *
+ * Scenario 5560467, the call transcription flow, used to mint its own location
+ * token by POSTing to GoHighLevel's oauth/location-token with a Make OAuth
+ * connection called "GHL OAuth App". That connection was authorised by somebody
+ * who has since left the company, GoHighLevel began answering "UnAuthorized!",
+ * and because Make deactivates an instant-trigger scenario on its first error
+ * the whole flow switched itself off — taking the RAW DATA tab that agent pay is
+ * calculated from with it.
+ *
+ * Pointing that module here removes the dependency rather than re-creating it
+ * under a new owner: this app holds the refresh token, is the only thing that
+ * rotates it, and belongs to no individual. That is the general fix for the 109
+ * Make connections whose author no longer exists.
+ *
  * Authorisation: Authorization: Bearer <SERVICE_API_KEY>.
  *
  * This route returns a live credential, so it is deliberately narrow: bearer
@@ -77,6 +95,22 @@ export async function GET(request: NextRequest) {
         expires_at: token.expiresAt,
         location_id: token.locationId,
         company_id: token.companyId,
+        /*
+         * camelCase duplicates, for Make.
+         *
+         * Scenario 5560467 replaces its own oauth/location-token call with this
+         * route, and the two modules downstream of it already read
+         * {{106.data.locationId}} and {{106.data.access_token}}. Emitting
+         * locationId alongside location_id means only ONE module in that live
+         * scenario has to change instead of three — and every module not
+         * touched is a mapping that cannot be broken by hand.
+         *
+         * Additive on purpose. The existing snake_case fields stay, so the GHL
+         * Token Bridge scenario, which reads {{1.data.access_token}}, is
+         * unaffected.
+         */
+        locationId: token.locationId,
+        companyId: token.companyId,
       },
       {
         status: 200,
