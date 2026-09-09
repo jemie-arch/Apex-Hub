@@ -118,20 +118,39 @@ export interface Derived {
 const ratio = (numerator: number, denominator: number): number | null =>
   denominator === 0 ? null : numerator / denominator;
 
+/**
+ * A cost per something, which is blank unless we actually know the cost.
+ *
+ * `ratio` guards the denominator, and for a rate that is the whole job: 0 shows
+ * out of 10 appointments is a true 0%, and printing it is correct.
+ *
+ * A cost is different. Spend of zero against 30 leads does not mean the leads
+ * were free — it means no spend has been recorded against that campaign, and
+ * "£0.00 per lead" is then the most flattering possible lie. Thirty-seven
+ * campaign ids in the tracker have no campaign record in the Hub and so no
+ * spend at all, carrying 626 leads between them; before this guard every one
+ * of those rows advertised a cost per lead of zero.
+ *
+ * So: no cost recorded, no cost shown. Same principle as the Derived comment
+ * above — a blank is the truth.
+ */
+const costRatio = (spend: number, denominator: number): number | null =>
+  spend === 0 ? null : ratio(spend, denominator);
+
 export function derive(row: DashboardRow): Derived {
   const pounds = row.spendCents / 100;
   const calls = row.calls;
 
   return {
-    cpl: ratio(pounds, row.leads),
+    cpl: costRatio(pounds, row.leads),
     schedulePct: ratio(row.apptsCreated, row.leads),
     dqPct: ratio(row.dqs, row.apptsCreated),
     cancelPct: ratio(row.cancels, row.apptsCreated),
     showPct: ratio(row.shows, row.apptsCreated),
     closePct: ratio(row.closes, row.shows),
-    costPerBooking: ratio(pounds, row.apptsCreated),
-    costPerShow: ratio(pounds, row.shows),
-    costPerClose: ratio(pounds, row.closes),
+    costPerBooking: costRatio(pounds, row.apptsCreated),
+    costPerShow: costRatio(pounds, row.shows),
+    costPerClose: costRatio(pounds, row.closes),
     speedToLead: calls ? ratio(calls.speedToLeadSum, calls.speedToLeadN) : null,
     pickupPct: calls ? ratio(calls.connectedOutbound, calls.dialed) : null,
     conversationPct: calls ? ratio(calls.calls2min, calls.dialed) : null,

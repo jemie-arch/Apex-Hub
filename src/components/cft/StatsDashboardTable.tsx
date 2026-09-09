@@ -81,8 +81,11 @@ export function StatsDashboardTable({
    *
    * Derived from the columns themselves rather than flagged on the section, so
    * it cannot drift: a section is "blocked" exactly when every column beneath
-   * it is. Today that is only CALL DATA at campaign grain, and the point is
-   * that nobody has to remember to update this if that changes.
+   * it is. Nobody has to remember to update this when the blocking changes —
+   * which has already paid for itself once. It started out covering CALL DATA
+   * alone; the appointment and cost-per-outcome sections joined it when the
+   * tracker sheet's campaign id turned out to be unreliable per row, and this
+   * arithmetic picked them up without an edit.
    *
    * Worth the arithmetic because of what it fixes. The six call columns are
    * blocked whenever the breakdown is by campaign, which is the default, so

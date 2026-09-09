@@ -63,6 +63,37 @@ export const LETTERS: string[] = [
 /** Columns J to O: client grain only. */
 const callsOnly = (breakdown: Breakdown): boolean => breakdown === 'campaign';
 
+/*
+ * Everything sourced from the tracker sheet, blocked at campaign grain.
+ *
+ * Same test as callsOnly and a completely different reason, which is why it is
+ * a separate name: call data simply is not collected per campaign, whereas this
+ * data exists per campaign and is wrong.
+ *
+ * The sheet's campaign id is not reliable row by row. Singleton Smile Dental
+ * has 97 lead rows citing 16 distinct campaign ids, fifteen of them other
+ * practices' campaigns, and 40 appointment rows citing 21. Fleet-wide every
+ * campaign id is cited by leads from 3 to 29 different practices out of about
+ * 35 — the campaign named "Apex | Singleton Smile Dental | $3789 for Invisalign
+ * All In" is cited by leads from 29 of them. The corruption is in
+ * tracker_leads and tracker_appointments themselves, so it arrives from the
+ * sheet rather than from anything here.
+ *
+ * The consequence is not imprecision. The leads on a campaign row mostly are
+ * not that campaign's leads, so a campaign-grain CPL, schedule rate or show
+ * rate is answering a question about a set of leads nobody chose. Hatched
+ * rather than shown: "this cannot be known here" is true, and a plausible wrong
+ * number is worse than an honest gap.
+ *
+ * Client grain is unaffected and correct — leads and spend both attach to the
+ * right practice, and only the campaign link between them is corrupt. See
+ * v_cft_campaign_spend_coverage for how far off each practice would have been.
+ *
+ * Unblock this when the sheet's campaign column is trustworthy, not before.
+ */
+const campaignIdUnreliable = (breakdown: Breakdown): boolean =>
+  breakdown === 'campaign';
+
 export const COLUMNS: Column[] = [
   // A — typed by hand in the sheet; no Hub store exists.
   {
@@ -117,12 +148,14 @@ export const COLUMNS: Column[] = [
     letter: 'H',
     heading: 'Leads',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.leads,
   },
   {
     letter: 'I',
     heading: 'CPL',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.cpl,
   },
 
@@ -181,66 +214,77 @@ export const COLUMNS: Column[] = [
     letter: 'P',
     heading: 'Appointments Created',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.apptsCreated,
   },
   {
     letter: 'Q',
     heading: 'Appointments To Be Taken',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.apptsToBeTaken,
   },
   {
     letter: 'R',
     heading: 'Last Appt Date',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.lastApptDate,
   },
   {
     letter: 'S',
     heading: 'Schedule %',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.schedulePct,
   },
   {
     letter: 'T',
     heading: 'Shows',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.shows,
   },
   {
     letter: 'U',
     heading: 'No Shows',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.noShows,
   },
   {
     letter: 'V',
     heading: 'Cancels',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.cancels,
   },
   {
     letter: 'W',
     heading: "DQ's",
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.dqs,
   },
   {
     letter: 'X',
     heading: 'DQ %',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.dqPct,
   },
   {
     letter: 'Y',
     heading: 'Cancel %',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.cancelPct,
   },
   {
     letter: 'Z',
     heading: 'Show %',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.showPct,
   },
 
@@ -249,12 +293,14 @@ export const COLUMNS: Column[] = [
     letter: 'AA',
     heading: 'Closes',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (row) => row.closes,
   },
   {
     letter: 'AB',
     heading: 'Close %',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.closePct,
   },
   /*
@@ -282,18 +328,21 @@ export const COLUMNS: Column[] = [
     letter: 'AE',
     heading: 'Cost Per Booking',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.costPerBooking,
   },
   {
     letter: 'AF',
     heading: 'Cost Per Show',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.costPerShow,
   },
   {
     letter: 'AG',
     heading: 'Cost Per Close',
     align: 'right',
+    blockedAt: campaignIdUnreliable,
     value: (_row, derived) => derived.costPerClose,
   },
 ];
