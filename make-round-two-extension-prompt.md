@@ -32,7 +32,9 @@ Two further things came out of costing your findings:
     backfills eleven days of the RAW DATA tab, which is about to become the
     Hub's live per-agent call feed.
 
-The owner has approved the plan below, including the deletion in Task 1.
+The owner has approved the SEQUENCE below. The deletion in Task 1 has NOT been
+explicitly authorised, so Task 1 stops and asks. Do not treat this brief as
+authorisation to delete anything.
 
 Scenario: 5560467 "Call Center Dashboard HP->SheetsAI->Transcript"
   https://us2.make.com/163072/scenarios/5560467
@@ -57,8 +59,12 @@ selected two independent ways:
 Both must read 37 and they must be the same items. If either count is not 37,
 STOP and report — do not delete.
 
-Then select those 37 and delete them. Report the "N selected" figure before you
-click Delete; it must read 37.
+Then STOP and ask before deleting anything.
+
+Report both counts, state that deletion is permanent and that retry is not
+available while the scenario is inactive, and wait for an explicit yes. When you
+get it, select those 37 and report the "N selected" figure before you click
+Delete; it must read 37. If it reads anything else, stop again.
 
 Do NOT delete the ~354 small items. They are ~2KB each, they total under a
 megabyte, they are not causing the problem, and some carry status "In progress"
@@ -171,7 +177,8 @@ DO NOT
 
 REPORT BACK
 
-  1. Task 1: both scope-gate counts, the selected count, and the remaining count.
+  1. Task 1: both scope-gate counts, that you stopped and asked, the selected
+     count once authorised, and the remaining count.
   2. Task 2: what you changed on #5's handler and any warning.
   3. Task 3: whether the save succeeded, and all six settings values after.
   4. Task 4: a–d, and confirmation you stopped.
