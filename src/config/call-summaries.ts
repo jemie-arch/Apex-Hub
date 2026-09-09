@@ -3,15 +3,46 @@
  *
  * Make scenario 5560467, "Call Center Dashboard HP->SheetsAI->Transcript",
  * transcribes each recording with AssemblyAI, has GPT label the speakers,
- * summarise the call and grade it as a sales audit, and appends a row here. It
- * ran on 28 August 2026, worked, then stopped on Make's organisation
- * dead-letter-queue limit and was switched off.
+ * summarise the call and grade it as a sales audit, and appends a row here.
  *
  * Nothing has ever read the output. This config is the Hub reading it.
  *
- * WHAT THE SCENARIO WRITES, from its own blueprint
+ * THE CHAIN THAT WRITES THIS TAB IS ORPHANED. Read this before trusting the
+ * tab to grow.
  *
- * Twelve values, in this order, appended to the CALL SUMMARIES tab:
+ * That blueprint holds two pipelines, and only one of them is connected to the
+ * webhook:
+ *
+ *   CONNECTED    webhook -> a 22-column row on the RAW DATA tab -> download the
+ *                recording -> openai-gpt-3:CreateTranscription -> PUT
+ *                /contacts/{id} in GoHighLevel -> Slack. This is the "AI
+ *                transcription -> contact notes" job. It writes RAW DATA and
+ *                the CRM. It does not touch this tab.
+ *
+ *   ORPHANED     HotProspector FetchLeadCallLogs -> assembly-ai:UploadFile ->
+ *                assembly-ai:TranscribeAudio -> six openai CreateCompletion
+ *                calls -> google-sheets:addRow to CALL SUMMARIES -> Slack.
+ *                Fourteen modules sitting in metadata.designer.orphans, which
+ *                is Make's word for detached from the trigger. Detached modules
+ *                do not run.
+ *
+ * So the 215 rows this config imports are from whenever that chain was last
+ * connected, and no amount of fixing the scenario's other problems will add a
+ * 216th. The scenario separately filled Make's organisation-wide 500MB
+ * incomplete-execution queue and was switched off for it, but that is a
+ * different fault: clearing the queue and reactivating restores RAW DATA and
+ * the CRM write, not this tab.
+ *
+ * If live per-agent call data matters more than the coaching text, RAW DATA is
+ * the tab to import — the connected chain writes it, and it carries agent_name,
+ * call_duration, call_disposition, call_direction, call_status and call_time,
+ * one row per call. What it does not carry is the transcript, the summary, the
+ * grading or the SOP answer, because those are produced by the six GPT modules
+ * that are no longer attached to anything.
+ *
+ * WHAT WRITES THIS TAB, from the blueprint of the orphaned chain
+ *
+ * Module #56, google-sheets:addRow. Twelve values, in this order:
  *
  *   0  call_time         when the call happened
  *   1  caller_name       THE AGENT — see below
@@ -30,6 +61,9 @@
  * user on 171 of 7,142 calls, 2.4%, because inbound forwards off-platform — so
  * per-agent call efficiency has been impossible. This names an agent on every
  * row.
+ *
+ * RAW DATA carries agent_name too, on the chain that is still connected, which
+ * is the reason the note above suggests it as the live alternative.
  *
  * COLUMN ORDER IS NOT ASSUMED
  *
