@@ -193,20 +193,49 @@ export async function syncRawCallRows(ctx: SyncContext): Promise<void> {
   let withoutAgent = 0;
   let withoutDate = 0;
   let booked = 0;
+  /*
+   * Rows the primary column cannot date but the other column can, and how many
+   * of those are bookings. This is the sheet defect, measured rather than
+   * papered over: each one is a call the pay formula cannot see.
+   */
+  let datedOnlyByTheOtherColumn = 0;
+  let bookingsLostToBlankDates = 0;
+  /*
+   * A date after today is impossible for a call that has already happened, and
+   * is the signature of a misparsed one. Counted and rejected rather than
+   * stored: 70 such rows reached this table once and quietly moved bookings
+   * between pay windows.
+   */
+  let impossibleDates = 0;
 
   dataRows.forEach((row, offset) => {
     const agent = text(cell(row, 'agent_name'));
     /*
-     * Whichever of the two call_time columns parses.
+     * The PRIMARY date column only. Deliberately not coalesced.
      *
-     * The scenario writes that value into column A and column G, and the two
-     * carry different headings in the live tab. The first import read one of
-     * them and 590 rows arrived with no date — among them 34 bookings, which
-     * is 34 rows of somebody's commission falling outside every window.
+     * An earlier version of this took whichever of the two call_time columns
+     * parsed, on the reasoning that 590 rows arriving with no date — 34 of them
+     * bookings — was 34 rows of somebody's commission falling outside every
+     * window. That reasoning was wrong twice over.
+     *
+     * It was wrong on the data: the second column follows a different date
+     * convention, so asInstant read day/month as month/day and produced 70
+     * rows dated in the FUTURE — 7 October 2026 and 7 February 2027. Those are
+     * merely the visible ones. A July call filed as October stands out; an
+     * August call filed as May does not, and there is no way to count those
+     * without the raw text, which was never stored.
+     *
+     * And it was wrong on the purpose. This table exists to reconcile with what
+     * agents are actually PAID, and the pay formula bounds on the primary
+     * column. Before the coalesce, the Hub and the dashboard agreed exactly —
+     * Karol Sanchez 54 and 54. The coalesce broke a correct answer to fix a
+     * problem that is not in the Hub at all.
+     *
+     * The blank cells are real and they do cost somebody money. But that is a
+     * defect in the sheet, to be reported and fixed there, not guessed at here.
+     * The counters below report it; see rows_dated_only_by_the_other_column.
      */
-    const calledAt =
-      asInstant(cell(row, 'called_at')) ??
-      asInstant(cell(row, 'called_at_secondary'));
+    const calledAt = asInstant(cell(row, 'called_at'));
     const disposition = text(cell(row, 'disposition'));
 
     // A row with none of the three columns the formula reads is spreadsheet
@@ -220,10 +249,27 @@ export async function syncRawCallRows(ctx: SyncContext): Promise<void> {
     if (calledAt === null) withoutDate += 1;
     if (disposition !== null && /booked/i.test(disposition)) booked += 1;
 
+    const isBooked = disposition !== null && /booked/i.test(disposition);
+
+    if (calledAt === null && asInstant(cell(row, 'called_at_secondary')) !== null) {
+      datedOnlyByTheOtherColumn += 1;
+      if (isBooked) bookingsLostToBlankDates += 1;
+    }
+
+    /*
+     * A call cannot have happened tomorrow. Anything dated ahead of now is a
+     * parse failure, so the row still imports but undated — an undated row is
+     * visible in the counters, whereas a row dated three months out silently
+     * joins or leaves a pay window.
+     */
+    const impossible = calledAt !== null && calledAt > importedAt;
+    if (impossible) impossibleDates += 1;
+    const usableAt = impossible ? null : calledAt;
+
     records.push({
       source_row: (positional ? 1 : headerIndex + 2) + offset,
-      called_at: calledAt,
-      called_on: calledAt === null ? null : calledAt.slice(0, 10),
+      called_at: usableAt,
+      called_on: usableAt === null ? null : usableAt.slice(0, 10),
       agent_name: agent,
       disposition,
       duration_seconds: asSeconds(cell(row, 'duration_seconds')),
@@ -254,6 +300,35 @@ export async function syncRawCallRows(ctx: SyncContext): Promise<void> {
   if (withoutAgent > 0) ctx.note('rows_naming_no_agent', withoutAgent);
   if (withoutDate > 0) ctx.note('rows_with_no_readable_date', withoutDate);
   ctx.note('rows_matching_booked', booked);
+  if (datedOnlyByTheOtherColumn > 0) {
+    ctx.note('rows_dated_only_by_the_other_column', datedOnlyByTheOtherColumn);
+    /*
+     * Raised as an error, not a note, when bookings are involved. Each one is a
+     * booking the pay formula cannot see because a cell in the sheet is blank,
+     * and it will stay invisible until somebody fills that column in.
+     */
+    if (bookingsLostToBlankDates > 0) {
+      ctx.recordError(
+        `${bookingsLostToBlankDates} booking(s) sit in rows whose primary date ` +
+          'cell is blank, so the pay dashboard cannot count them and the agent ' +
+          'is not paid for them. The other call_time column does hold a date ' +
+          'for those rows, but it follows a different convention and parsing it ' +
+          'produced dates in the future, so it is not trusted here. Fix is in ' +
+          'the sheet: fill the primary date column.',
+        { bookings: bookingsLostToBlankDates, rows: datedOnlyByTheOtherColumn },
+      );
+    }
+  }
+  if (impossibleDates > 0) {
+    ctx.recordError(
+      `${impossibleDates} row(s) carried a date later than now and were ` +
+        'imported undated rather than stored. A call cannot happen in the ' +
+        'future, so this is a parse failure — and a row dated months ahead ' +
+        'silently joins and leaves pay windows, which is worse than a row with ' +
+        'no date at all.',
+      { rows: impossibleDates },
+    );
+  }
 
   for (let start = 0; start < records.length; start += BATCH) {
     const batch = records.slice(start, start + BATCH);
