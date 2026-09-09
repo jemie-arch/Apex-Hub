@@ -8,8 +8,13 @@ From: Jemie
 The pay formula is solved — I can tell you exactly how the dashboard calculates
 commission and where it gets its numbers. The Make scenario that had been dead
 for twelve days is live again, and it no longer depends on anyone's personal
-login. But pay is not reconciled yet, and the reason is more interesting than a
-bug: the tab it counts may only ever have held a filtered subset of calls.
+login.
+
+Pay is not reconciled yet, and one question stands in the way: a backlog of
+2,507 calls drained into only 166 new rows. The good news is that the tab pay is
+counted from is NOT a filtered subset — I checked, and the only exclusions are
+four named test accounts. The bad news is that I cannot yet account for the
+difference.
 
 ## Live on the Hub
 
@@ -87,20 +92,41 @@ active-agent list, which names two people. So those 16 bookings are **never
 paid** — about $128 in the current window. Are they still on commission, or off
 the scheme deliberately?
 
-**2. What is the "Denoise Data" filter meant to discard?**
+**2. Where did 2,341 drained calls go?**
 
-This is the one that matters. The 2,507 drained calls produced only **166 new
-rows**. The router carries a filter called "Denoise Data", and most of those
-calls were discarded by it before the row-writing step — many executions used a
-single operation, meaning the webhook fired and nothing else ran.
+The 2,507-call backlog produced only **166 new rows**. I first thought a router
+filter called "Denoise Data" was discarding them, and I have since read it. It
+is not that:
 
-If that's working as designed, then **RAW DATA has only ever held a filtered
-subset of calls, and the pay dashboard has been counting that subset all
-along.** Pay would be internally consistent but measured on partial data. If
-it's not working as designed, calls are being thrown away that shouldn't be.
+    agent_name != Maricris Cofreros
+    email      != mainexchange110@gmail.com
+    agent_name != Joshua Jung
+    agent_name != Alejandro Crespin
+    agent_name != Megan Acapulco
 
-I can't tell which from the outside, and I'm not going to guess at something
-that decides what people are paid.
+Four named people and one email address — internal and test traffic. Nothing
+about duration, disposition or volume. So RAW DATA is **not** a filtered subset
+of real calls, and the pay dashboard is not counting a partial population. That
+is the reassuring half.
+
+The unexplained half: 166 rows from 2,507 records, with roughly 588 module-level
+errors absorbed by the error handlers along the way. The only filters that do
+gate anything sit on the transcription branch — a "> 2 minute call" test on the
+download step, a 25MB size cap, and an "extracted data exists" check. **The
+branch that writes the RAW DATA row has no filter at all**, so every non-test
+call should have produced one.
+
+Two possibilities, and I cannot separate them from outside Make: either those
+four excluded agents accounted for the bulk of the backlog — which is plausible
+if the window was mostly test traffic, and would mean nothing is wrong — or the
+588 errors were the row write failing, in which case real calls lost their rows.
+The execution history only retains the most recent runs, so the evidence has
+already aged out.
+
+What would settle it: whether anyone was deliberately generating test calls
+under those four names between 28 August and 9 September. If yes, this closes.
+If no, we have calls that vanished and I would want to know before trusting any
+pay figure.
 
 ## Flags
 
@@ -148,7 +174,9 @@ reports them instead, and raises an error when a booking is affected.
 ## Tomorrow
 
 - Confirm the revert restored the exact match on Karol.
-- Chase the Denoise filter — the biggest open question on pay.
+- Account for the 2,341 drained calls that produced no row. The Denoise filter
+  is ruled out; the remaining suspects are test traffic under the four excluded
+  names, or the row write failing 588 times.
 - Mark Ad Account 13 as internal hiring spend so it stops dragging fleet CPL.
 - PPS 0 Error System, due 11 September. The groundwork is there; it needs your
   authorisation to activate 5 consolidated scenarios and someone to verify 43
