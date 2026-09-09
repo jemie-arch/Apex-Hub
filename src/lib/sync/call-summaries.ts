@@ -315,10 +315,19 @@ export async function syncCallSummaries(ctx: SyncContext): Promise<void> {
     ctx.note('calls_attached_to_a_person', attached.data ?? 0);
   }
 
+  /*
+   * Counted on agent_id, not agent_user_id.
+   *
+   * It used to count agent_user_id, and once the roster arrived that made the
+   * note permanently alarming for no reason: it reported 206 of 215 "attached
+   * to nobody" when every one of them was attributed to a named agent who
+   * simply has no Hub login. Not having a login is normal for the call centre.
+   * The question worth asking is whether a call reached an agent at all.
+   */
   const unattached = await db
     .from('call_summaries')
     .select('id', { count: 'exact', head: true })
-    .is('agent_user_id', null);
+    .is('agent_id', null);
 
   if (!unattached.error) {
     ctx.note('calls_attached_to_nobody', unattached.count ?? 0);
