@@ -3,10 +3,12 @@ import Link from 'next/link';
 
 import { BookingScoreboard } from '@/components/callcenter/BookingScoreboard';
 import { CallSummaries } from '@/components/callcenter/CallSummaries';
+import { CommissionBoard } from '@/components/callcenter/CommissionBoard';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
+import { getAgentCommission } from '@/lib/agent-commission';
 import { getScoreboard } from '@/lib/agent-scoreboard';
 import { getCallSummaries } from '@/lib/call-summaries';
 import { getRepStats } from '@/lib/call-metrics';
@@ -43,7 +45,7 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
    * name a person on 0 of 7,139 rows, BOOKING SHEET on 318 of 383 — so
    * rendering only the first presents an answerable question as unanswered.
    */
-  const [stats, board, calls] = await Promise.all([
+  const [stats, board, calls, commission] = await Promise.all([
     getRepStats(range, view),
     // Calendar dates, because BOOKING SHEET's own column is a date and not an
     // instant. Comparing a date column against a timestamp boundary is how a
@@ -65,6 +67,16 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
         return { from: start, to: end };
       })(),
     ),
+    /*
+     * Commission, and deliberately NOT scoped to the range picker above.
+     *
+     * The pay dashboard pays on a rolling thirty days, fixed — its A7 selector
+     * offers today, yesterday, 3, 7 and 30 days and the commission cell reads
+     * the 30-day count regardless of what else is on screen. Letting this panel
+     * follow an arbitrary date range would produce a number that looks like pay
+     * and is not, which is worse than not showing it.
+     */
+    getAgentCommission(),
   ]);
 
   const isr = tenant.vocabulary.isr;
@@ -231,6 +243,8 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
       ) : null}
 
       <CallSummaries data={calls} />
+
+      <CommissionBoard agents={commission} />
 
       <BookingScoreboard board={board} />
     </>

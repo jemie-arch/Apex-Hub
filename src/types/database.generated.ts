@@ -1239,6 +1239,13 @@ export type Database = {
             referencedRelation: "call_agents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "call_agent_aliases_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
+          },
         ]
       }
       call_agents: {
@@ -1416,6 +1423,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "call_agents"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
           },
           {
             foreignKeyName: "call_summaries_agent_user_id_fkey"
@@ -3528,6 +3542,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
+          },
+          {
             foreignKeyName: "raw_call_rows_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -4944,6 +4965,33 @@ export type Database = {
           },
         ]
       }
+      v_agent_commission: {
+        Row: {
+          agent_id: string | null
+          band: string | null
+          booked_30d: number | null
+          booked_3d: number | null
+          booked_7d: number | null
+          booked_today: number | null
+          booked_yesterday: number | null
+          bookings_to_next_band: number | null
+          calls_30d: number | null
+          commission_cents: number | null
+          display_name: string | null
+          is_active: boolean | null
+          rate_cents: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_agents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_call_summary_agent_daily: {
         Row: {
           agent_display_name: string | null
@@ -4971,6 +5019,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "call_agents"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
           },
           {
             foreignKeyName: "call_summaries_agent_user_id_fkey"
@@ -5261,6 +5316,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "call_agents"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
           },
         ]
       }
