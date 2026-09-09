@@ -89,7 +89,9 @@ export const RAW_CALL_COLUMNS: readonly RawCallColumn[] = [
   {
     /* Column A. Required: a row with no date cannot be counted in any window. */
     field: 'called_at',
-    headers: ['call time', 'call_time', 'called at', 'date', 'timestamp', 'call date'],
+    // NOT 'timestamp': that spelling belongs to called_at_secondary below,
+    // and one spelling cannot mean two columns — the map builder throws on it.
+    headers: ['call time', 'call_time', 'called at', 'date', 'call date'],
     required: true,
   },
   {
@@ -122,6 +124,25 @@ export const RAW_CALL_COLUMNS: readonly RawCallColumn[] = [
     required: true,
   },
   {
+    /*
+     * The other call_time column.
+     *
+     * Module #5 writes call_time into BOTH column A and column G, and whoever
+     * typed the headings gave them different names — the first import mapped
+     * one of them and reported "Time Stamp" as unrecognised. That mattered:
+     * 590 rows came in with no readable date, including 16 of Karol Sanchez's
+     * bookings and 18 of Jennelyn Salazar's, and a row with no date falls
+     * outside every window the dashboard offers, including the one commission
+     * is paid on.
+     *
+     * So both columns are mapped and the sync takes whichever parses. Which of
+     * the two is populated is not something to assume — this way it does not
+     * have to be known.
+     */
+    field: 'called_at_secondary',
+    headers: ['time stamp', 'timestamp', 'time_stamp'],
+  },
+  {
     field: 'duration_seconds',
     headers: ['call duration', 'call_duration', 'duration', 'length', 'talk time'],
   },
@@ -152,7 +173,14 @@ export const RAW_CALL_COLUMNS: readonly RawCallColumn[] = [
   },
   {
     field: 'lead_created_date',
-    headers: ['lead_created_date', 'lead created date', 'lead created'],
+    headers: [
+      // The live sheet's spelling, from the first import's
+      // unrecognised-headers report.
+      'date contact created',
+      'lead_created_date',
+      'lead created date',
+      'lead created',
+    ],
   },
 ];
 
@@ -213,7 +241,7 @@ export const RAW_CALL_POSITIONAL_ORDER: readonly (string | null)[] = [
   'duration_seconds',
   null, // E last_name — PHI
   null, // F email — PHI
-  null, // G call_time again
+  'called_at_secondary', // G call_time again, mapped so a blank column A still dates the row
   'stage_entry_date',
   null, // I first_name — PHI
   'from_number',

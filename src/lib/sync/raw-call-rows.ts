@@ -196,7 +196,17 @@ export async function syncRawCallRows(ctx: SyncContext): Promise<void> {
 
   dataRows.forEach((row, offset) => {
     const agent = text(cell(row, 'agent_name'));
-    const calledAt = asInstant(cell(row, 'called_at'));
+    /*
+     * Whichever of the two call_time columns parses.
+     *
+     * The scenario writes that value into column A and column G, and the two
+     * carry different headings in the live tab. The first import read one of
+     * them and 590 rows arrived with no date — among them 34 bookings, which
+     * is 34 rows of somebody's commission falling outside every window.
+     */
+    const calledAt =
+      asInstant(cell(row, 'called_at')) ??
+      asInstant(cell(row, 'called_at_secondary'));
     const disposition = text(cell(row, 'disposition'));
 
     // A row with none of the three columns the formula reads is spreadsheet
