@@ -2384,6 +2384,30 @@ export type Database = {
           },
         ]
       }
+      crm_unmapped_locations: {
+        Row: {
+          first_seen_at: string
+          hits: number
+          last_seen_at: string
+          location_id: string
+          seen_via: string | null
+        }
+        Insert: {
+          first_seen_at?: string
+          hits?: number
+          last_seen_at?: string
+          location_id: string
+          seen_via?: string | null
+        }
+        Update: {
+          first_seen_at?: string
+          hits?: number
+          last_seen_at?: string
+          location_id?: string
+          seen_via?: string | null
+        }
+        Relationships: []
+      }
       deals: {
         Row: {
           client_group_id: string | null
@@ -5324,6 +5348,10 @@ export type Database = {
       generate_portal_token: { Args: never; Returns: string }
       merge_superseded_tracker_ledger_rows: { Args: never; Returns: number }
       normalise_person_name: { Args: { raw: string }; Returns: string }
+      note_unmapped_location: {
+        Args: { p_location_id: string; p_seen_via?: string }
+        Returns: undefined
+      }
       onboarding_status_for: {
         Args: { p_group: string }
         Returns: Database["public"]["Enums"]["onboarding_status"]

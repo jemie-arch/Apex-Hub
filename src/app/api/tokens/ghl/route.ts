@@ -77,6 +77,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: match.error.message }, { status: 500 });
     }
     if (!match.data) {
+      /*
+       * Record it, because nothing else will.
+       *
+       * Make scenario 5560467 calls this per call and its module #114 carries a
+       * builtin:Ignore handler, so a 404 drops that bundle quietly once the RAW
+       * DATA row is already written. That is correct for pay — one unmapped
+       * practice must not stop the whole drain — but it means the failure
+       * leaves no incomplete execution, no alert, and nothing but a "skipped"
+       * line in an execution log nobody reads.
+       *
+       * So the 404 path writes the location id down. Counted rather than
+       * duplicated, so a practice asking two thousand times is one row with a
+       * number on it.
+       *
+       * Failure to log is swallowed on purpose: this is a diagnostic, and it
+       * must never turn a clean 404 into a 500 for the caller.
+       */
+      try {
+        await serviceClient().rpc('note_unmapped_location', {
+          p_location_id: locationId,
+          p_seen_via: 'api/tokens/ghl',
+        });
+      } catch (logError) {
+        console.error(
+          '[tokens/ghl] could not record unmapped location:',
+          logError instanceof Error ? logError.message : logError,
+        );
+      }
+
       return NextResponse.json(
         { error: `no client is mapped to location ${locationId}` },
         { status: 404 },
