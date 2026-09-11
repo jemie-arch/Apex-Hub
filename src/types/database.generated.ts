@@ -69,6 +69,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ad_level_insights_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "v_ad_creative_daily"
+            referencedColumns: ["ad_id"]
+          },
+          {
             foreignKeyName: "ad_level_insights_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
@@ -5214,6 +5221,72 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      v_ad_creative_daily: {
+        Row: {
+          ad_id: string | null
+          ad_name: string | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          day: string | null
+          group_id: string | null
+          group_name: string | null
+          impressions: number | null
+          reach: number | null
+          spend_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
           },
         ]
       }

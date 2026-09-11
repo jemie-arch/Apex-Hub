@@ -33,6 +33,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   Megaphone,
+  Sparkles,
   Menu,
   MessagesSquare,
   Scale,
@@ -131,7 +132,14 @@ const SECTIONS: NavSection[] = [
           { href: '/compare', label: 'Results Tracker', icon: Scale },
         ],
       },
-      { href: '/ads', label: 'Ads Management', icon: Megaphone },
+      {
+        href: '/ads',
+        label: 'Ads Management',
+        icon: Megaphone,
+        children: [
+          { href: '/creative', label: 'Creative Performance', icon: Sparkles },
+        ],
+      },
       {
         href: '/fulfilment',
         label: 'Fulfilment',

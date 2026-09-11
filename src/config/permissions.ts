@@ -122,6 +122,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     ['/client-portal', 'client_management'],
     ['/ads', 'ads_management'],
     ['/ads-performance', 'ads_management'],
+    // The creative leaderboard. Same audience and the same accounts as ads
+    // management, so it shares the key rather than inventing one nobody has.
+    ['/creative', 'ads_management'],
     ['/compare', 'compare'],
     ['/fulfilment', 'fulfilment'],
     // Same audience and the same question as fulfilment: what was delivered,
