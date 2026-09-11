@@ -13,6 +13,7 @@
 import { CalendarCheck, CircleDollarSign, UserCheck, UserX } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
+import { CallActivity, type PortalCallActivity } from '@/components/portal/CallActivity';
 import { OutcomeRow, type PortalAppointment } from '@/components/portal/OutcomeRow';
 import { KPICard } from '@/components/ui/KPICard';
 import { tenant, titleCase } from '@/config/tenant.config';
@@ -157,6 +158,39 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
    * last of them has a dollar figure worth printing. Zero is reserved for the
    * case where somebody actually said no.
    */
+  /*
+   * What our call team did for this practice, in the same window as the rest of
+   * the page. Joshua asked for the portal to carry tracking from the call
+   * centre as well as marketing and ads; this is that third one, and until this
+   * week there was no per-call data to build it from.
+   *
+   * Failure here must not take the page down. A practice looking at its
+   * appointments should not get an error screen because a call panel could not
+   * load, so this degrades to "no panel" rather than throwing.
+   */
+  let callActivity: PortalCallActivity | null = null;
+  {
+    const { start, end } = dateBounds(range.from, range.to);
+    const activity = await db
+      .from('v_portal_call_activity')
+      .select('calls, conversations, appointments, talk_seconds')
+      .eq('group_id', group.id)
+      .gte('day', start)
+      .lte('day', end);
+
+    if (!activity.error && (activity.data?.length ?? 0) > 0) {
+      callActivity = (activity.data ?? []).reduce<PortalCallActivity>(
+        (sum, row) => ({
+          calls: sum.calls + Number(row.calls ?? 0),
+          conversations: sum.conversations + Number(row.conversations ?? 0),
+          appointments: sum.appointments + Number(row.appointments ?? 0),
+          talkSeconds: sum.talkSeconds + Number(row.talk_seconds ?? 0),
+        }),
+        { calls: 0, conversations: 0, appointments: 0, talkSeconds: 0 },
+      );
+    }
+  }
+
   const treatmentHint = (() => {
     if (answered === 0) return 'no outcomes recorded yet';
     if (won === 0) return `none of ${formatCount(answered)} recorded`;
@@ -218,6 +252,10 @@ export default async function PortalPage({ params, searchParams }: PageProps) {
           icon={<UserX size={16} />}
         />
       </section>
+
+      {callActivity ? (
+        <CallActivity activity={callActivity} rangeLabel={range.label} />
+      ) : null}
 
       <section className="mt-8 overflow-hidden rounded-lg border border-line bg-surface">
         <div className="border-b border-line px-4 py-3">

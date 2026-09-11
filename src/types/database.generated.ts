@@ -5619,6 +5619,25 @@ export type Database = {
           },
         ]
       }
+      v_portal_call_activity: {
+        Row: {
+          appointments: number | null
+          calls: number | null
+          conversations: number | null
+          day: string | null
+          group_id: string | null
+          talk_seconds: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_raw_booked_daily: {
         Row: {
           agent_id: string | null
