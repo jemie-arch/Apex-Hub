@@ -125,6 +125,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, PermissionKey]> 
     // The creative leaderboard. Same audience and the same accounts as ads
     // management, so it shares the key rather than inventing one nobody has.
     ['/creative', 'ads_management'],
+    // Hiring spend. Same ad accounts and the same reader as ads management,
+    // and 0068 already keeps it out of every client-facing figure.
+    ['/recruitment-ads', 'ads_management'],
     ['/compare', 'compare'],
     ['/fulfilment', 'fulfilment'],
     // Same audience and the same question as fulfilment: what was delivered,

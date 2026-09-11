@@ -34,6 +34,7 @@ import {
   LifeBuoy,
   Megaphone,
   Sparkles,
+  UserRoundSearch,
   Menu,
   MessagesSquare,
   Scale,
@@ -138,6 +139,7 @@ const SECTIONS: NavSection[] = [
         icon: Megaphone,
         children: [
           { href: '/creative', label: 'Creative Performance', icon: Sparkles },
+          { href: '/recruitment-ads', label: 'Recruitment Ads', icon: UserRoundSearch },
         ],
       },
       {
