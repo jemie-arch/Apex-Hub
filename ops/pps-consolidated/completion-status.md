@@ -116,17 +116,32 @@ Counting what is actually running today:
 **Type 07 is a completed cutover and the template for the rest**: every
 per-practice scenario off, one consolidated scenario on.
 
-**Type 01 is already running in parallel** — the consolidated one is live
-alongside all 56 per-practice scenarios, despite its name still reading
-"[CONSOLIDATED - inactive, for review]". That is safe, and worth saying why: it
-is shadow-running. The per-practice scenarios write to stat sheets and the
-consolidated writes to the Hub, so there is no double-write. Checked:
-appointments hold 1,443 rows against 1,443 distinct CRM ids, and
-tracker_appointments 1,285 against 1,285. No duplicates. The scenario's name is
-simply stale.
+**Type 01 is active but receiving nothing, and this is the finding that decides
+the whole cutover.**
 
-So the cutover per type is: activate the consolidated, then **deactivate 52 to
-56 per-practice scenarios**. Across types 02, 03, 04 and 06 that is roughly 216
+Its execution history ends on **1 September**, and those last runs were manual
+tests fired seconds after edits by the person building it — 5 and 6 operations,
+a couple of kilobytes of transfer. **Ten days, zero real traffic.**
+
+So it is not shadow-running alongside the per-practice scenarios. It is switched
+on and idle, because **no GoHighLevel workflow points at its webhook.** The
+1,443 appointments in the Hub arrive through the crm-appointments sync reading
+the GoHighLevel API, not through this scenario.
+
+That changes what "cut over" means, and it rules out the obvious plan.
+Deactivating the per-practice scenarios would not move traffic to the
+consolidated one — it would stop bookings reaching anything at all, because
+GoHighLevel would still be calling webhooks attached to disabled scenarios.
+
+**The remaining work is in GoHighLevel, not in Make.** Each practice's workflow
+has to be repointed from its own webhook to the consolidated scenario's, one at
+a time, and only then can its old scenario be retired. That is roughly 56
+workflow edits per type — and it is exactly why type 07, with only five
+practices, is the one that got finished.
+
+So the cutover per type is: repoint each practice's GoHighLevel workflow,
+confirm the consolidated scenario is receiving that practice's bookings, and
+only then **deactivate that practice's scenario** — 52 to 56 of them per type. Across types 02, 03, 04 and 06 that is roughly 216
 scenarios, and the consequence is that every per-practice stat sheet stops being
 written. That is a decision about who still reads those sheets, not a technical
 step — and it is the same cleanup Joshua described when he said there are a lot
