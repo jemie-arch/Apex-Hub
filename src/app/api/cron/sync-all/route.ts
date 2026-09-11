@@ -190,6 +190,31 @@ const ORDER = [
    * marker only so the instruction is not read as still outstanding.
    */
   /*
+   * 'routing-export' is deliberately NOT here, and its absence had never been
+   * written down — which is why it took a sweep to notice.
+   *
+   * It publishes verified clinic routing into a Make data store, and the
+   * consolidated PPS scenario reads that store keyed on the location id its
+   * webhook already carries. That is the half of the PPS work that removes the
+   * fault rather than reporting it: no scenario names a sheet, so no clone can
+   * name the wrong one.
+   *
+   * It needs MAKE_TOKEN, the same variable scenario-audit waits on, and also
+   * MAKE_ROUTING_DATA_STORE_ID. The store exists — id 137975, "PPS Clinic
+   * Routing", already read by scenario 6046761 — so only the token is missing.
+   *
+   * IT HAS NEVER RUN FROM HERE. sync_runs holds no row for it at all, while the
+   * store holds 43 records put there by some other route. The Hub now has 48
+   * verified rows, so the store is five practices behind and will stay behind
+   * until this runs. That is not a silent gap: an unpublished practice simply
+   * is not routed, which the consolidated scenario treats as "no sheet known"
+   * rather than guessing.
+   *
+   * Add it here once MAKE_TOKEN is set. Placement should be near the END of the
+   * cycle: it reads nothing this list writes, it makes an outbound write to a
+   * third party, and a failure there must not sit in front of the data syncs.
+   */
+  /*
    * 'scenario-audit' is deliberately NOT here yet, for the same reason as
    * payout-hours below: MAKE_TOKEN is not set, so including it would guarantee
    * a failed sync every night, and a cycle that always reports a failure is how

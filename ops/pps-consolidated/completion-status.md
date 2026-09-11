@@ -100,6 +100,62 @@ That is now resolved — the exclusion row is gone, `calendar_list_conflicts` is
 **empty**, and Kind Dental holds **11 appointments**. Done since the findings
 were written; recorded here so nobody chases it twice.
 
+## The cutover is bigger than "activate 5 scenarios", and one step is blocked
+
+Counting what is actually running today:
+
+| Type | Per-practice **active** | Consolidated active |
+|---|---|---|
+| 01 New Appointment Booked | 56 | **1** |
+| 02 CCM Show Tracker | 52 | 0 |
+| 03 CCM No Show Tracker | 55 | 0 |
+| 04 Appointment Update Form | 54 | 0 |
+| 06 Appointment Cancelled | 55 | 0 |
+| **07 Onboarding Form** | **0** | **1** |
+
+**Type 07 is a completed cutover and the template for the rest**: every
+per-practice scenario off, one consolidated scenario on.
+
+**Type 01 is already running in parallel** — the consolidated one is live
+alongside all 56 per-practice scenarios, despite its name still reading
+"[CONSOLIDATED - inactive, for review]". That is safe, and worth saying why: it
+is shadow-running. The per-practice scenarios write to stat sheets and the
+consolidated writes to the Hub, so there is no double-write. Checked:
+appointments hold 1,443 rows against 1,443 distinct CRM ids, and
+tracker_appointments 1,285 against 1,285. No duplicates. The scenario's name is
+simply stale.
+
+So the cutover per type is: activate the consolidated, then **deactivate 52 to
+56 per-practice scenarios**. Across types 02, 03, 04 and 06 that is roughly 216
+scenarios, and the consequence is that every per-practice stat sheet stops being
+written. That is a decision about who still reads those sheets, not a technical
+step — and it is the same cleanup Joshua described when he said there are a lot
+of Make scenarios we do not need.
+
+### The routing store is five practices behind, and cannot catch up
+
+The consolidated scenarios carry no per-practice configuration. They read a Make
+data store keyed on the GoHighLevel location id the webhook already carries —
+store **137975, "PPS Clinic Routing"**, already wired to scenario 6046761.
+
+It holds **43 records**. The Hub now has **48** verified rows. The five newly
+verified practices are not routed.
+
+**`routing-export` has never run from the Hub at all** — `sync_runs` holds no
+row for it. It needs `MAKE_TOKEN`, the same variable `scenario-audit` is
+waiting on, plus `MAKE_ROUTING_DATA_STORE_ID`, which is 137975. The store
+exists and is connected, so **only the token is missing.**
+
+Nothing is silently wrong while it waits: an unpublished practice is simply not
+routed, and the consolidated scenario treats that as "no sheet known" rather
+than guessing. But it does mean those five practices cannot be cut over until
+the token is set and the sync runs once.
+
+I have not written to the store by hand. The module that owns it states the rule
+plainly — nothing reaches it until a row is verified — and routing a real
+patient's booking into another practice's sheet is the exact failure the whole
+exercise exists to prevent. Publishing it belongs to the sync, once it can run.
+
 ## What actually remains
 
 1. **Activate the 5 consolidated scenarios.** Built, tested, still INACTIVE.
