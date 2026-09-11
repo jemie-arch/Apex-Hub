@@ -173,6 +173,17 @@ export default async function AdsPerformancePage({ searchParams }: PageProps) {
 
   const booking = tenant.vocabulary.booking;
 
+  /*
+   * Whether ANY appointment in range resolved to a creative.
+   *
+   * When this is zero the five outcome columns are all empty, and the reason
+   * is structural rather than a quiet week: nothing in the pipeline writes
+   * ad_external_id onto an appointment. Saying so is the difference between a
+   * reader concluding "our ads book nobody" and the truth, which is that the
+   * question cannot currently be answered.
+   */
+  const attributed = rows.reduce((sum, row) => sum + row.booked, 0);
+
   return (
     <>
       <PageHeader
@@ -180,6 +191,21 @@ export default async function AdsPerformancePage({ searchParams }: PageProps) {
         description={`Spend through to treatment value, per ad · ${range.label}`}
         actions={<DateRangePicker />}
       />
+
+      {rows.length > 0 && attributed === 0 ? (
+        <div className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 text-xs text-warning">
+          <strong>
+            No {booking.plural} can be traced to a creative.
+          </strong>{' '}
+          Every appointment in the Hub carries an empty ad id, so Booked, Cost
+          per {booking.singular}, Showed, Won, Revenue and ROAS are blank below
+          for a structural reason rather than a quiet period.
+          Spend and clicks are unaffected. Until an ad id is written onto
+          appointments, creative comparison lives on{' '}
+          <a className="underline" href="/creative">Creative performance</a>,
+          which ranks on delivery instead.
+        </div>
+      ) : null}
 
       {rows.length === 0 ? (
         <EmptyState
@@ -279,8 +305,9 @@ export default async function AdsPerformancePage({ searchParams }: PageProps) {
       ) : null}
 
       <p className="mt-2 text-xs text-fg-subtle">
-        Revenue counts only appointments marked won with a value recorded, so
-        ROAS understates until outcomes are entered in the portal.
+        Revenue counts only appointments marked won with a value recorded. That
+        makes ROAS understate once attribution exists; it is not why the column
+        is empty today.
       </p>
     </>
   );
