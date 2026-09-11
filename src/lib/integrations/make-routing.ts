@@ -19,11 +19,35 @@ export interface RoutingRecord {
   locationId: string;
   spreadsheetId: string;
   practice: string;
+
+  /*
+   * The rest of the store's data structure. All optional here, because the Hub
+   * does not own them — they are carried through a write so that overwriting a
+   * row does not silently discard what somebody put there by hand.
+   *
+   * That mattered more than it looks. The store's notes hold operational
+   * findings that exist nowhere in this database: that scenario 4167561 keeps a
+   * stored sample containing a patient SSN, that SMYLE East Meadows writes into
+   * its sibling's sheet, that Eagle Creek reads one file and writes another so
+   * its dedupe can never match. A reconcile that blanked those would destroy
+   * real work and nothing would report it.
+   */
+  sheetTab?: string;
+  treatment?: string | null;
+  active?: boolean;
+  note?: string | null;
 }
 
 interface RawRecord {
   key?: unknown;
-  data?: { spreadsheet_id?: unknown; practice?: unknown } | null;
+  data?: {
+    spreadsheet_id?: unknown;
+    practice_name?: unknown;
+    sheet_tab?: unknown;
+    treatment?: unknown;
+    active?: unknown;
+    note?: unknown;
+  } | null;
 }
 
 function text(value: unknown): string | null {
@@ -87,7 +111,21 @@ export async function currentRecords(): Promise<Map<string, RoutingRecord>> {
       out.set(key, {
         locationId: key,
         spreadsheetId: sheet,
-        practice: text(record.data?.practice) ?? '',
+        /*
+         * practice_name, not practice. Reading the wrong field here is what
+         * made the first live run try to rewrite all 48 clinics: every record
+         * parsed with an empty practice, so the sync's diff decided every row
+         * had changed. Then each write failed validation, so the run reported
+         * 48 errors and zero writes against a store that was already correct.
+         */
+        practice: text(record.data?.practice_name) ?? '',
+        sheetTab: text(record.data?.sheet_tab) ?? undefined,
+        treatment: text(record.data?.treatment),
+        active:
+          typeof record.data?.active === 'boolean'
+            ? record.data.active
+            : undefined,
+        note: text(record.data?.note),
       });
     }
 
@@ -105,16 +143,33 @@ export async function currentRecords(): Promise<Map<string, RoutingRecord>> {
  * source of truth, so a key that already exists should end up holding what the
  * Hub says rather than erroring.
  */
-export async function putRecord(record: RoutingRecord): Promise<void> {
+export async function putRecord(
+  record: RoutingRecord,
+  existing?: RoutingRecord,
+): Promise<void> {
   const storeId = makeRoutingStoreId();
+
+  /*
+   * Every required field, or Make rejects the whole row with a 400 naming each
+   * one it did not get. The structure requires practice_name, spreadsheet_id,
+   * sheet_tab and active; treatment and note are optional.
+   *
+   * Defaults match the structure's own: MASTER and true. They are only reached
+   * when creating a row — an existing row keeps whatever it already had, which
+   * is how the hand-written notes survive a reconcile.
+   */
   await call(
     `/data-stores/${encodeURIComponent(storeId)}/data`,
     'POST',
     {
       key: record.locationId,
       data: {
+        practice_name: record.practice,
         spreadsheet_id: record.spreadsheetId,
-        practice: record.practice,
+        sheet_tab: record.sheetTab ?? existing?.sheetTab ?? 'MASTER',
+        treatment: record.treatment ?? existing?.treatment ?? 'both',
+        active: record.active ?? existing?.active ?? true,
+        note: record.note ?? existing?.note ?? null,
       },
       overwrite: true,
     },

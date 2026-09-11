@@ -137,7 +137,12 @@ export async function syncRoutingExport(ctx: SyncContext): Promise<void> {
     }
 
     try {
-      await putRecord(row);
+      /*
+       * The existing row is passed so its sheet tab, treatment and note survive
+       * the overwrite. The Hub owns which sheet a clinic routes to; it does not
+       * own the operational notes somebody wrote against these rows.
+       */
+      await putRecord(row, before);
       written += 1;
     } catch (error) {
       /*
