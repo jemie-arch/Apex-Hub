@@ -117,6 +117,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ad_level_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ad_snapshots: {
@@ -193,6 +200,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -291,6 +305,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -494,6 +515,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
           {
@@ -708,6 +736,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -1092,6 +1127,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "billing_charges_stripe_customer_id_fkey"
             columns: ["stripe_customer_id"]
             isOneToOne: false
@@ -1165,6 +1207,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
           {
@@ -1244,6 +1293,20 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "call_agent_aliases_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_centre_agent_daily"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "call_agent_aliases_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_commission_by_period"
             referencedColumns: ["agent_id"]
           },
         ]
@@ -1432,6 +1495,20 @@ export type Database = {
             referencedColumns: ["agent_id"]
           },
           {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_centre_agent_daily"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_commission_by_period"
+            referencedColumns: ["agent_id"]
+          },
+          {
             foreignKeyName: "call_summaries_agent_user_id_fkey"
             columns: ["agent_user_id"]
             isOneToOne: false
@@ -1529,6 +1606,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -1631,6 +1715,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "calls_deal_id_fkey"
             columns: ["deal_id"]
             isOneToOne: false
@@ -1729,6 +1820,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2147,6 +2245,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "creative_assets_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
@@ -2246,6 +2351,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
           {
@@ -2394,6 +2506,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2597,6 +2716,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       finance_entries: {
@@ -2763,6 +2889,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "form_submissions_deal_id_fkey"
             columns: ["deal_id"]
             isOneToOne: false
@@ -2837,6 +2970,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2995,6 +3135,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -3162,6 +3309,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payout_lines_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "v_commission_by_period"
+            referencedColumns: ["period_id"]
+          },
+          {
             foreignKeyName: "payout_lines_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -3271,6 +3425,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
           {
@@ -3549,6 +3710,20 @@ export type Database = {
             referencedColumns: ["agent_id"]
           },
           {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_centre_agent_daily"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_commission_by_period"
+            referencedColumns: ["agent_id"]
+          },
+          {
             foreignKeyName: "raw_call_rows_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -3581,6 +3756,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -3857,6 +4039,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       tech_calls: {
@@ -3958,6 +4147,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tech_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
           {
@@ -4360,6 +4556,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       tracker_leads: {
@@ -4450,6 +4653,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       tracker_practice_aliases: {
@@ -4505,6 +4715,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -4636,6 +4853,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       calendar_list_conflicts: {
@@ -4698,6 +4922,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -4797,6 +5028,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
@@ -4915,6 +5153,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       unbilled_backlog_by_practice: {
@@ -4963,6 +5208,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       v_agent_commission: {
@@ -4991,6 +5243,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_call_centre_agent_daily: {
+        Row: {
+          agent_id: string | null
+          ans_20s: number | null
+          ans_30s: number | null
+          ans_any_duration: number | null
+          ans_dispositioned: number | null
+          ans_status_completed: number | null
+          appts: number | null
+          calls: number | null
+          convos: number | null
+          day: string | null
+          display_name: string | null
+          hang_ups: number | null
+          inbound: number | null
+          inbound_seconds: number | null
+          inbound_timed: number | null
+          outbound: number | null
+          outbound_seconds: number | null
+          outbound_timed: number | null
+          talk_seconds: number | null
+        }
+        Relationships: []
       }
       v_call_summary_agent_daily: {
         Row: {
@@ -5025,6 +5301,20 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "v_agent_commission"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_centre_agent_daily"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "call_summaries_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_commission_by_period"
             referencedColumns: ["agent_id"]
           },
           {
@@ -5107,6 +5397,13 @@ export type Database = {
             referencedRelation: "pps_routing_internal_excluded"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       v_cft_call_daily: {
@@ -5161,6 +5458,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
           {
@@ -5276,6 +5580,23 @@ export type Database = {
           },
         ]
       }
+      v_commission_by_period: {
+        Row: {
+          agent_id: string | null
+          amount_cents: number | null
+          booked: number | null
+          calls: number | null
+          display_name: string | null
+          ends_on: string | null
+          pay_date: string | null
+          period_id: string | null
+          quota_unreachable_in_period: boolean | null
+          rate_cents: number | null
+          starts_on: string | null
+          state: Database["public"]["Enums"]["payout_state"] | null
+        }
+        Relationships: []
+      }
       v_lead_reconciliation: {
         Row: {
           client_id: string | null
@@ -5324,6 +5645,20 @@ export type Database = {
             referencedRelation: "v_agent_commission"
             referencedColumns: ["agent_id"]
           },
+          {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_centre_agent_daily"
+            referencedColumns: ["agent_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "v_commission_by_period"
+            referencedColumns: ["agent_id"]
+          },
         ]
       }
       v_raw_call_unattributed: {
@@ -5335,6 +5670,23 @@ export type Database = {
           last_call: string | null
           normalised: string | null
           rows: number | null
+        }
+        Relationships: []
+      }
+      v_recruitment_ads: {
+        Row: {
+          account_name: string | null
+          ad_account_id: string | null
+          campaign_id: string | null
+          campaign_name: string | null
+          clicks: number | null
+          client_id: string | null
+          cost_per_lead: number | null
+          first_day: string | null
+          impressions: number | null
+          last_day: string | null
+          leads: number | null
+          spend: number | null
         }
         Relationships: []
       }
@@ -5390,6 +5742,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
         ]
