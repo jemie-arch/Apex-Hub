@@ -76,23 +76,24 @@ export async function resolvePortal(
  */
 export const PORTAL_PAGES: ReadonlyArray<{ href: string; label: string }> = [
   { href: '', label: 'Dashboard' },
+  { href: '/consultations', label: 'Upcoming' },
   { href: '/appointments', label: 'Post consultation' },
   { href: '/creatives', label: 'Ads Creative' },
   { href: '/onboarding', label: 'Onboarding' },
   { href: '/agency-appointments', label: 'Calls with us' },
+  { href: '/support', label: 'Support' },
   { href: '/account', label: 'Account' },
 ];
 
 /*
- * Not in the nav yet, because the pages do not exist:
+ * Upcoming sits before Post consultation because it is the one people open the
+ * link for, and the outcome form reads as a chore beside it. Support sits last
+ * but one: it is needed rarely and urgently, so it wants a fixed, findable
+ * place rather than a prominent one.
  *
- *   /consultations — upcoming appointments. Distinct from /appointments, which
- *                    is the outcome form for ones that have happened.
- *   /support       — tickets, a thread with images, and booking a call. Would
- *                    absorb "Calls with us", which is the booking half already.
- *
- * Listing them here as tabs before they exist would give a client two dead
- * links, which is worse than a shorter menu.
+ * "Calls with us" is kept separate from Support rather than absorbed into it.
+ * Booking a call with us and reporting that something is broken are different
+ * errands, and merging them would bury the booking link inside a ticket form.
  *
  * /update-info and /invite-request are gone from the nav but their pages still
  * work: /account supersedes both, and an old link somebody bookmarked should not

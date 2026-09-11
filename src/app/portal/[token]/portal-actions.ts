@@ -305,6 +305,126 @@ export async function requestPortalInvite(
 }
 
 /**
+ * A practice raising a support ticket from its portal.
+ *
+ * Lands in the same tech_tickets table the team already works from, so a
+ * client's problem appears in the existing queue rather than in a parallel
+ * inbox somebody has to remember to check. Marked source 'portal' — every
+ * ticket before this one came from Slack, and the team needs to know which
+ * ones have a practice waiting on the other end.
+ *
+ * The practice does NOT get to set priority. Triage is the team's job, and a
+ * field where the only person affected by the answer chooses it makes
+ * everything urgent within a month. They can say so in the body, where a human
+ * reads it.
+ */
+export async function raiseSupportTicket(
+  token: string,
+  formData: FormData,
+): Promise<PortalResult> {
+  const portal = await requireGroup(token);
+  if (!portal) return NO_ACCESS;
+
+  const title = clean(formData.get('title'));
+  const body = clean(formData.get('body'));
+  const raisedBy = clean(formData.get('raised_by_name'));
+
+  if (title === null || body === null) {
+    return {
+      ok: false,
+      message: 'We need a short summary and a description.',
+    };
+  }
+
+  const db = serviceClient();
+
+  const written = await db.from('tech_tickets').insert({
+    client_group_id: portal.group.id,
+    title,
+    body,
+    status: 'open' as const,
+    priority: 'normal' as const,
+    source: 'portal',
+    // raised_by is a Hub user id and a practice is not one; the name carries it.
+    raised_by_name: raisedBy ?? portal.group.name,
+  });
+
+  if (written.error) {
+    return { ok: false, message: 'Could not send that. Try again.' };
+  }
+
+  await notifyStaff(
+    `Support request — ${portal.group.name}`,
+    title,
+    '/tech-support',
+  );
+
+  revalidatePath(`/portal/${token}/support`);
+
+  return {
+    ok: true,
+    message: 'Sent. We will come back to you here.',
+  };
+}
+
+/**
+ * A reply on a ticket the practice raised.
+ *
+ * The ticket id arrives in a POST anybody could forge, so ownership is proved
+ * against the token's group before a single row is written. A ticket belonging
+ * to someone else returns the same message as one that does not exist — saying
+ * "not yours" would confirm it is real.
+ */
+export async function replyToSupportTicket(
+  token: string,
+  formData: FormData,
+): Promise<PortalResult> {
+  const portal = await requireGroup(token);
+  if (!portal) return NO_ACCESS;
+
+  const ticketId = clean(formData.get('ticket_id'));
+  const body = clean(formData.get('body'));
+  const authorName = clean(formData.get('author_name'));
+
+  if (ticketId === null || body === null) {
+    return { ok: false, message: 'Write a message first.' };
+  }
+
+  const db = serviceClient();
+
+  const ticket = await db
+    .from('tech_tickets')
+    .select('id, title, client_group_id')
+    .eq('id', ticketId)
+    .eq('client_group_id', portal.group.id)
+    .maybeSingle();
+
+  if (ticket.error || !ticket.data) {
+    return { ok: false, message: 'That conversation is no longer available.' };
+  }
+
+  const written = await db.from('tech_ticket_comments').insert({
+    ticket_id: ticket.data.id,
+    author_name: authorName ?? portal.group.name,
+    body,
+  });
+
+  if (written.error) {
+    return { ok: false, message: 'Could not send that. Try again.' };
+  }
+
+  await notifyStaff(
+    `Reply on support ticket — ${portal.group.name}`,
+    ticket.data.title,
+    '/tech-support',
+  );
+
+  revalidatePath(`/portal/${token}/support`);
+
+  return { ok: true, message: 'Sent.' };
+}
+
+/**
  * Tells the staff who can act on it.
  *
  * Best-effort by design: the clinic's submission is already saved, so a failure
