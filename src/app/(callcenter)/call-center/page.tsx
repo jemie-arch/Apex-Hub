@@ -1,26 +1,18 @@
 import { PhoneCall } from 'lucide-react';
 import Link from 'next/link';
 
-import { BookingScoreboard } from '@/components/callcenter/BookingScoreboard';
-import { CallCentreBoard } from '@/components/callcenter/CallCentreBoard';
-import { CallSummaries } from '@/components/callcenter/CallSummaries';
-import { CommissionBoard } from '@/components/callcenter/CommissionBoard';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { tenant, titleCase } from '@/config/tenant.config';
-import { getAgentCommission } from '@/lib/agent-commission';
-import { getCallCentreBoard } from '@/lib/call-centre-board';
-import { getScoreboard } from '@/lib/agent-scoreboard';
-import { getCallSummaries } from '@/lib/call-summaries';
 import { getRepStats } from '@/lib/call-metrics';
 import { cn } from '@/lib/cn';
 import { formatCount, formatDuration, formatPercent } from '@/lib/format';
-import { dateBounds, resolveRange } from '@/lib/range';
+import { resolveRange } from '@/lib/range';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Call centre' };
+export const metadata = { title: 'Role efficiency' };
 
 interface PageProps {
   searchParams: Record<string, string | string[] | undefined>;
@@ -30,6 +22,13 @@ function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/**
+ * Per-agent efficiency, by role.
+ *
+ * This page used to carry four more panels below it, each answering a different
+ * question for a different reader. They are sections in the menu now, which
+ * also means this page stops running five queries to render one table.
+ */
 export default async function CallCenterPage({ searchParams }: PageProps) {
   const range = resolveRange({
     preset: single(searchParams['preset']),
@@ -39,72 +38,25 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
 
   const view = single(searchParams['view']) === 'csr' ? 'csr' : 'isr';
 
-  /*
-   * Both, in parallel, and both always rendered.
-   *
-   * The call table answers "who is dialling" and the scoreboard answers "who
-   * is booking". They come from sources with very different coverage — calls
-   * name a person on 0 of 7,139 rows, BOOKING SHEET on 318 of 383 — so
-   * rendering only the first presents an answerable question as unanswered.
-   */
-  const [stats, board, calls, commission, centreBoard] = await Promise.all([
-    getRepStats(range, view),
-    // Calendar dates, because BOOKING SHEET's own column is a date and not an
-    // instant. Comparing a date column against a timestamp boundary is how a
-    // whole day drops off the end of a window.
-    getScoreboard(
-      (() => {
-        const { start, end } = dateBounds(range.from, range.to);
-        return { from: start, to: end };
-      })(),
-    ),
-    /*
-     * The AI call summaries, which answer the question the table above
-     * cannot: who made each call. GoHighLevel names a user on 2.4% of calls;
-     * the transcription scenario names one on every row it writes.
-     */
-    getCallSummaries(
-      (() => {
-        const { start, end } = dateBounds(range.from, range.to);
-        return { from: start, to: end };
-      })(),
-    ),
-    /*
-     * Commission, and deliberately NOT scoped to the range picker above.
-     *
-     * The pay dashboard pays on a rolling thirty days, fixed — its A7 selector
-     * offers today, yesterday, 3, 7 and 30 days and the commission cell reads
-     * the 30-day count regardless of what else is on screen. Letting this panel
-     * follow an arbitrary date range would produce a number that looks like pay
-     * and is not, which is worse than not showing it.
-     */
-    getAgentCommission(),
-    /*
-     * The HotProspector team board, rebuilt from our own feed. Scoped to the
-     * page's range picker, unlike commission — this one is a performance view
-     * and looking at an arbitrary window is the point of it.
-     */
-    getCallCentreBoard(
-      (() => {
-        const { start, end } = dateBounds(range.from, range.to);
-        return { from: start, to: end };
-      })(),
-    ),
-  ]);
+  const stats = await getRepStats(range, view);
 
   const isr = tenant.vocabulary.isr;
   const csr = tenant.vocabulary.csr;
   const booking = tenant.vocabulary.booking;
   const roleNoun = view === 'isr' ? isr : csr;
 
+  // Everything except the role, so switching role keeps the chosen dates.
   const params = new URLSearchParams();
-  const preset = single(searchParams['preset']);
-  if (preset) params.set('preset', preset);
+  for (const key of ['preset', 'from', 'to']) {
+    const value = single(searchParams[key]);
+    if (value) params.set(key, value);
+  }
 
   return (
     <>
       <PageHeader
-        title="Call centre"
+        eyebrow="Call centre"
+        title="Role efficiency"
         description={`${roleNoun.plural} · ${range.label}`}
         actions={<DateRangePicker />}
       />
@@ -154,8 +106,8 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
             'The calls sync has run and holds 7,139 calls, but none is ' +
             'attributed to a person: GoHighLevel names a user on 2.4% of them ' +
             'because inbound forwards off-platform, and no profile has ' +
-            'crm_user_id set to match those. Bookings ARE attributed — see ' +
-            'below.'
+            'crm_user_id set to match those. Bookings ARE attributed — see the ' +
+            'Bookings section.'
           }
           icon={<PhoneCall size={22} />}
         />
@@ -254,14 +206,6 @@ export default async function CallCenterPage({ searchParams }: PageProps) {
           call is not a badly handled one.
         </p>
       ) : null}
-
-      <CallCentreBoard board={centreBoard} />
-
-      <CallSummaries data={calls} />
-
-      <CommissionBoard agents={commission} />
-
-      <BookingScoreboard board={board} />
     </>
   );
 }

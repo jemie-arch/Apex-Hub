@@ -2,6 +2,7 @@ import { PhoneCall } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { CallCentreNav } from '@/components/callcenter/CallCentreNav';
 import { Logo } from '@/components/shell/Logo';
 import { PortalSwitcher } from '@/components/shell/PortalSwitcher';
 import { currentCaller } from '@/lib/supabase/server';
@@ -53,9 +54,20 @@ export default async function CallCenterLayout({
         <PortalSwitcher />
       </header>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1600px] px-8 py-8">{children}</div>
-      </main>
+      {/*
+        Sections beside the content rather than stacked inside it. Everything
+        here was one page five panels deep, and reaching commission meant
+        scrolling past three unrelated tables. The menu is a scrolling strip on
+        narrow screens and a rail from large up, so an agent on a laptop keeps
+        the full width for the tables.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <CallCentreNav />
+
+        <main className="min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1600px] px-8 py-8">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
