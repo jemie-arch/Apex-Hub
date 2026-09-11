@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 
 import { CreativeLeaderboard } from '@/components/ads/CreativeLeaderboard';
+import { CreativeSpread } from '@/components/ads/CreativeSpread';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -86,7 +87,10 @@ export default async function CreativePage({ searchParams }: PageProps) {
           icon={<Sparkles size={22} />}
         />
       ) : (
-        <CreativeLeaderboard board={board} currency={tenant.defaultCurrency} />
+        <>
+          <CreativeLeaderboard board={board} currency={tenant.defaultCurrency} />
+          <CreativeSpread spread={board.spread} />
+        </>
       )}
     </>
   );

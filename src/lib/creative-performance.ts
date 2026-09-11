@@ -78,6 +78,39 @@ export interface CreativeRow {
   reason: string;
 }
 
+/** One practice's result on a creative that several practices ran. */
+export interface PracticeSplit {
+  clientName: string;
+  impressions: number;
+  ctr: number | null;
+}
+
+/**
+ * The same creative, run by several practices, compared like for like.
+ *
+ * This is the most useful thing in the dataset and the one an ad-spy product
+ * could never produce, because it needs many accounts running one creative and
+ * honest numbers from all of them.
+ *
+ * With the creative held constant, any gap between practices is not the
+ * creative. "TT Style" runs at 13 practices and its click-through ranges from
+ * 0.72% to 1.47% — the same file, twice the result. That points at audience,
+ * location, offer or targeting, and it means a creative is not a thing that can
+ * simply be rolled out to a practice on the strength of winning at another.
+ */
+export interface SpreadRow {
+  name: string;
+  practices: number;
+  impressions: number;
+  best: PracticeSplit;
+  worst: PracticeSplit;
+  /** best CTR over worst CTR. 2.04 means twice the result from one creative. */
+  spread: number;
+  /** Whether the gap is bigger than sampling noise at these volumes. */
+  notable: boolean;
+  splits: PracticeSplit[];
+}
+
 export interface CreativeBoard {
   rows: CreativeRow[];
   /** The median CTR every verdict is judged against. */
@@ -86,7 +119,29 @@ export interface CreativeBoard {
   belowFloor: number;
   belowFloorSpendCents: number;
   latestDay: string | null;
+  /** Creatives run by two or more practices, widest gap first. */
+  spread: SpreadRow[];
 }
+
+/**
+ * Per practice, per creative, for the like-for-like comparison. Lower than
+ * MIN_IMPRESSIONS because the comparison holds the creative constant, so it
+ * needs enough practices to be worth drawing — but 2,000 impressions at a
+ * typical 1.3% still means roughly 26 clicks, which is a rate with real slack
+ * in it.
+ */
+const MIN_SPLIT_IMPRESSIONS = 2_000;
+
+/**
+ * How far apart two practices must be before the gap is worth acting on.
+ *
+ * At the volumes above, a rate built on ~26 clicks carries roughly a fifth of
+ * itself in sampling error, so a 1.2x gap is indistinguishable from luck. 1.4x
+ * is not. Below the line the creative is reported as travelling consistently
+ * rather than flagged, because "these two practices differ by 18%" is an
+ * invitation to go and find a cause that is not there.
+ */
+const NOTABLE_SPREAD = 1.4;
 
 interface Bucket {
   name: string;
@@ -127,7 +182,9 @@ export async function getCreativeBoard(range: {
 
   const { data, error } = await db
     .from('v_ad_creative_daily')
-    .select('day, ad_id, ad_name, client_id, spend_cents, impressions, clicks')
+    .select(
+      'day, ad_id, ad_name, client_id, client_name, spend_cents, impressions, clicks',
+    )
     .gte('day', range.from)
     .lte('day', range.to);
 
@@ -152,9 +209,32 @@ export async function getCreativeBoard(range: {
 
   const buckets = new Map<string, Bucket>();
 
+  /*
+   * creative + practice, accumulated in the same pass. The like-for-like
+   * comparison needs no second query — it is the same rows grouped one level
+   * finer.
+   */
+  const splits = new Map<
+    string,
+    { name: string; clientName: string; impressions: number; clicks: number }
+  >();
+
   for (const row of data ?? []) {
     const name = row.ad_name;
     if (!name) continue;
+
+    if (row.client_name) {
+      const splitKey = `${name}::${row.client_name}`;
+      const split = splits.get(splitKey) ?? {
+        name,
+        clientName: row.client_name,
+        impressions: 0,
+        clicks: 0,
+      };
+      split.impressions += row.impressions ?? 0;
+      split.clicks += row.clicks ?? 0;
+      splits.set(splitKey, split);
+    }
 
     let bucket = buckets.get(name);
     if (!bucket) {
@@ -270,11 +350,56 @@ export async function getCreativeBoard(range: {
     })
     .sort((a, b) => (b.ctr ?? 0) - (a.ctr ?? 0));
 
+  /*
+   * The like-for-like comparison. Grouped by creative, then each practice that
+   * ran it with enough volume to carry a rate.
+   */
+  const byCreative = new Map<string, PracticeSplit[]>();
+
+  for (const split of splits.values()) {
+    if (split.impressions < MIN_SPLIT_IMPRESSIONS) continue;
+    const list = byCreative.get(split.name) ?? [];
+    list.push({
+      clientName: split.clientName,
+      impressions: split.impressions,
+      ctr: rate(split.clicks, split.impressions),
+    });
+    byCreative.set(split.name, list);
+  }
+
+  const spread: SpreadRow[] = [...byCreative.entries()]
+    .filter(([, list]) => list.length >= 2)
+    .map(([name, list]): SpreadRow | null => {
+      const ranked = [...list]
+        .filter((item): item is PracticeSplit & { ctr: number } => item.ctr !== null)
+        .sort((a, b) => b.ctr - a.ctr);
+
+      const best = ranked[0];
+      const worst = ranked[ranked.length - 1];
+      if (!best || !worst || worst.ctr === 0) return null;
+
+      const ratio = best.ctr / worst.ctr;
+
+      return {
+        name,
+        practices: ranked.length,
+        impressions: ranked.reduce((sum, item) => sum + item.impressions, 0),
+        best,
+        worst,
+        spread: ratio,
+        notable: ratio >= NOTABLE_SPREAD,
+        splits: ranked,
+      };
+    })
+    .filter((row): row is SpreadRow => row !== null)
+    .sort((a, b) => b.spread - a.spread);
+
   return {
     rows,
     medianCtr,
     belowFloor: belowFloorBuckets.length,
     belowFloorSpendCents: belowFloorBuckets.reduce((sum, b) => sum + b.spendCents, 0),
     latestDay,
+    spread,
   };
 }
