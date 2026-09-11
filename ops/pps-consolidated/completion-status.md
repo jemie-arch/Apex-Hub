@@ -195,8 +195,22 @@ Confirmed from both ends in Make:
 - Dental Illusions' own scenario 5970597 last ran on 1 September at 18:30 and
   has been silent for ten days.
 
-Neither the old path nor the new one is receiving. Ten days of that practice's
-bookings have not reached its stat sheet.
+Neither the old path nor the new one is receiving.
+
+**But nothing was lost.** The Hub settles it independently of Make, because it
+reads appointments from the GoHighLevel API rather than from any scenario:
+Dental Illusions has **two appointments in total**, booked 4 and 12 August, and
+none since. Its stat sheet holds two rows. They match.
+
+So the half-edit broke a pipe that nothing has flowed through since 12 August.
+An earlier version of this section said ten days of bookings had not reached the
+sheet. That was an inference from the scenario being silent, and the silence was
+absence of traffic, not lost traffic.
+
+That has a consequence for proving the fix: there is no organic booking to wait
+for. At roughly two a month, confirming the new path works needs a deliberate
+test booking rather than patience — and the low volume that made this a safe
+pilot is exactly what makes it a slow one to verify.
 
 **It is isolated.** City Dental Centers' equivalent scenario fired on 10, 8, 7,
 3 and 1 September, all clean, so the fleet is healthy. This is one half-finished
