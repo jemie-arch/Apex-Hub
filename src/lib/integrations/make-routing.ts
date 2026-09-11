@@ -167,9 +167,18 @@ export async function putRecord(
         practice_name: record.practice,
         spreadsheet_id: record.spreadsheetId,
         sheet_tab: record.sheetTab ?? existing?.sheetTab ?? 'MASTER',
-        treatment: record.treatment ?? existing?.treatment ?? 'both',
-        active: record.active ?? existing?.active ?? true,
-        note: record.note ?? existing?.note ?? null,
+        treatment: existing?.treatment ?? record.treatment ?? 'both',
+        active: existing?.active ?? record.active ?? true,
+        /*
+         * EXISTING WINS, deliberately, and this ordering is the point of the
+         * parameter. These three are not the Hub's to own: somebody wrote the
+         * notes against these rows by hand, and they record things no table
+         * here holds - a stored sample containing a patient SSN, a sibling
+         * account writing into the wrong sheet. A reconcile must be able to
+         * correct which spreadsheet a clinic routes to WITHOUT touching them.
+         * The Hub value is a fallback for a row being created, nothing more.
+         */
+        note: existing?.note ?? record.note ?? null,
       },
       overwrite: true,
     },
