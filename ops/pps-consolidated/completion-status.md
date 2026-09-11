@@ -171,6 +171,78 @@ plainly — nothing reaches it until a row is verified — and routing a real
 patient's booking into another practice's sheet is the exact failure the whole
 exercise exists to prevent. Publishing it belongs to the sync, once it can run.
 
+## The pilot found a live outage, and the cutover mechanism
+
+Attempting the pilot on Dental Illusions turned up two things neither the plan
+nor I had right.
+
+### Dental Illusions has been dark since 1 September
+
+Its GoHighLevel workflow — `001. New Appointment → Make → Send Email Form -
+PPS v6.1`, published, two triggers — has one webhook action, named
+`01 PPS Make [TO CHANGE]`. Its URL field reads:
+
+    https://hook.us2.make.com/<consolidated hook>{{custom_values.01__pps__new_appointment_booked__update_sheet}}
+
+Somebody pasted the consolidated hook in FRONT of the existing merge token
+rather than replacing what the token resolves to. At runtime that concatenates
+two URLs into one malformed string, so the POST reaches nothing.
+
+Confirmed from both ends in Make:
+
+- the consolidated scenario 6046761 has no execution since 1 September, and
+  those were three manual tests by the person editing it;
+- Dental Illusions' own scenario 5970597 last ran on 1 September at 18:30 and
+  has been silent for ten days.
+
+Neither the old path nor the new one is receiving. Ten days of that practice's
+bookings have not reached its stat sheet.
+
+**It is isolated.** City Dental Centers' equivalent scenario fired on 10, 8, 7,
+3 and 1 September, all clean, so the fleet is healthy. This is one half-finished
+edit on the one clinic somebody chose to pilot — the same clinic the routing
+store nominates, for the same reason: small enough that a mistake is cheap.
+
+### The per-practice hook lives in a custom value, not in the workflow
+
+This is the more useful discovery. The workflow action does not contain a URL.
+It contains a merge token, and the practice's own hook is held in a GoHighLevel
+custom value:
+
+| | |
+|---|---|
+| Folder | `PPS-System` |
+| Name | `01 - PPS - New Appointment Booked -> Update sheet` |
+| Key | `{{custom_values.01__pps__new_appointment_booked__update_sheet}}` |
+
+So the cutover is **not** 56 workflow edits. It is **one custom-value edit per
+practice** — change what that key resolves to, and every workflow in that
+sub-account referencing it follows. Rollback is the same single field.
+
+That also means the brief I wrote was wrong in a way that mattered: it told the
+agent to record the URL in the action as the rollback and then replace it. The
+action holds a half-edited string, not the old hook, so following it would have
+destroyed the only in-workflow reference to where bookings currently go. The
+agent stopped instead of proceeding, which is the reason this is a finding
+rather than an incident.
+
+### Restoring Dental Illusions
+
+Two edits, in this order:
+
+1. Set the custom value to the consolidated hook.
+2. Strip the pasted literal out of the workflow action so the field is the token
+   alone.
+
+Doing only (1) leaves the action concatenating the consolidated hook with
+itself — still malformed. Doing only (2) restores the practice to its old
+working path, which is a valid rollback if the cutover is deferred.
+
+**Record the current custom-value contents before touching it.** It is the only
+copy of where that practice's bookings used to go, and it belongs in a password
+manager rather than in this repository — a Make webhook URL is a write
+capability, and anyone holding it can post bookings into a practice's sheet.
+
 ## What actually remains
 
 1. **Activate the 5 consolidated scenarios.** Built, tested, still INACTIVE.
