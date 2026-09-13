@@ -185,11 +185,23 @@ export function firstAllowedRoute(granted: readonly string[]): string | null {
 
 /** The key a path requires, or null if no rule covers it. */
 export function permissionForPath(pathname: string): PermissionKey | null {
+  /*
+   * Query and hash are stripped before matching.
+   *
+   * Middleware passes a bare pathname, but the sidebar passes its own hrefs,
+   * and some of those point at a tab rather than a route — /dashboard?tab=
+   * tracker being the one that matters. Without this, that href matched no
+   * prefix, resolved to null, and null means admin-only: the Client Fulfilment
+   * Tracker would have been invisible to every non-admin, which is exactly the
+   * bug this is being added to fix.
+   */
+  const path = pathname.split(/[?#]/)[0] ?? pathname;
+
   let bestPrefix = '';
   let bestKey: PermissionKey | null = null;
 
   for (const [prefix, key] of ROUTE_PERMISSIONS) {
-    const matches = pathname === prefix || pathname.startsWith(`${prefix}/`);
+    const matches = path === prefix || path.startsWith(`${prefix}/`);
     if (matches && prefix.length > bestPrefix.length) {
       bestPrefix = prefix;
       bestKey = key;

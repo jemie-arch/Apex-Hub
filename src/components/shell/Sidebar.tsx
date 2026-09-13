@@ -106,7 +106,29 @@ const SECTIONS: NavSection[] = [
     // The work done for clients.
     heading: 'Clients',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      {
+        href: '/dashboard',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        /*
+         * The tracker is a TAB on the dashboard, not a route, and it had no
+         * menu entry at all. It was shipped, populated and live - 51 clients,
+         * 4,610 rows - and the CEO logged in, could not find it, and concluded
+         * it had not been built. The one menu item whose name looked close
+         * enough to guess at, Fulfilment, is a different page answering a
+         * different question.
+         *
+         * A thing nobody can find is not shipped. Listed by its full name so
+         * it matches what people call it in Slack.
+         */
+        children: [
+          {
+            href: '/dashboard?tab=tracker',
+            label: 'Client Fulfilment Tracker',
+            icon: BarChart3,
+          },
+        ],
+      },
       {
         href: '/onboarding',
         label: 'Onboarding',
