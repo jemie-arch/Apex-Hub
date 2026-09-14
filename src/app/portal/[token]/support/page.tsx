@@ -6,6 +6,7 @@ import {
   type SupportTicket,
 } from '@/components/portal/SupportThread';
 import { resolvePortal } from '@/lib/portal';
+import { attachmentsFor } from '@/lib/tickets/attachments';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
@@ -93,6 +94,12 @@ export default async function PortalSupportPage({ params }: PageProps) {
     byTicket.set(comment.ticket_id, list);
   }
 
+  /*
+   * Signed per render, like everywhere else these are shown. One round trip
+   * for the whole page rather than one per file.
+   */
+  const files = await attachmentsFor(rows.map((row) => row.id));
+
   const threads: SupportTicket[] = rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -101,6 +108,7 @@ export default async function PortalSupportPage({ params }: PageProps) {
     createdAt: row.created_at,
     resolution: row.resolution,
     comments: byTicket.get(row.id) ?? [],
+    attachments: files.get(row.id) ?? [],
   }));
 
   return (

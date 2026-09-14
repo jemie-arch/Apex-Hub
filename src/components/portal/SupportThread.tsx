@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { Paperclip } from 'lucide-react';
+import { useRef, useState, useTransition } from 'react';
 
 import {
+  attachToSupportTicket,
   raiseSupportTicket,
   replyToSupportTicket,
   type PortalResult,
@@ -23,6 +25,14 @@ export interface SupportComment {
   fromPractice: boolean;
 }
 
+export interface SupportAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string | null;
+}
+
 export interface SupportTicket {
   id: string;
   title: string;
@@ -31,6 +41,7 @@ export interface SupportTicket {
   createdAt: string;
   resolution: string | null;
   comments: SupportComment[];
+  attachments: SupportAttachment[];
 }
 
 function statusTone(status: string): Tone {
@@ -194,6 +205,128 @@ function Reply({ token, ticketId }: { token: string; ticketId: string }) {
   );
 }
 
+function bytes(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Screenshots from the practice.
+ *
+ * This is the side of the feature that matters most: they are the ones looking
+ * at the broken screen, and a picture of it saves a paragraph of description
+ * that we then have to interpret.
+ *
+ * Links are signed and short-lived, so they are generated when the page renders
+ * rather than stored. A thumbnail that has expired says so instead of showing a
+ * broken image icon, because the second reads as "we lost your file".
+ */
+function Attachments({
+  token,
+  ticketId,
+  attachments,
+  canAdd,
+}: {
+  token: string;
+  ticketId: string;
+  attachments: SupportAttachment[];
+  canAdd: boolean;
+}) {
+  const [result, setResult] = useState<PortalResult | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const input = useRef<HTMLInputElement>(null);
+
+  if (!canAdd && attachments.length === 0) return null;
+
+  return (
+    <div className="border-t border-line px-4 py-3">
+      {result ? (
+        <p
+          className={cn(
+            'mb-2 rounded-md px-3 py-2 text-xs',
+            result.ok
+              ? 'bg-positive-subtle text-positive'
+              : 'bg-negative-subtle text-negative',
+          )}
+        >
+          {result.message}
+        </p>
+      ) : null}
+
+      {attachments.length > 0 ? (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {attachments.map((item) =>
+            item.url && item.mimeType.startsWith('image/') ? (
+              <a
+                key={item.id}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block overflow-hidden rounded border border-line"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.url}
+                  alt={item.fileName}
+                  className="h-24 w-24 bg-surface-sunken object-cover"
+                />
+              </a>
+            ) : (
+              <span
+                key={item.id}
+                className="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-xs text-fg-muted"
+              >
+                <Paperclip size={12} />
+                {item.url ? (
+                  <a href={item.url} target="_blank" rel="noreferrer" className="hover:underline">
+                    {item.fileName}
+                  </a>
+                ) : (
+                  <span className="text-fg-subtle">{item.fileName} — reload to view</span>
+                )}
+                <span className="numeric text-fg-subtle">{bytes(item.sizeBytes)}</span>
+              </span>
+            ),
+          )}
+        </div>
+      ) : null}
+
+      {canAdd ? (
+        <>
+          <input
+            ref={input}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              const data = new FormData();
+              data.set('ticket_id', ticketId);
+              data.set('file', file);
+              startTransition(async () => {
+                const outcome = await attachToSupportTicket(token, data);
+                setResult(outcome);
+                if (outcome.ok && input.current) input.current.value = '';
+              });
+            }}
+          />
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => input.current?.click()}
+            className="inline-flex items-center gap-1.5 text-xs text-fg-muted hover:text-accent disabled:opacity-60"
+          >
+            <Paperclip size={12} />
+            {isPending ? 'Uploading…' : 'Add a screenshot'}
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Ticket({ token, ticket }: { token: string; ticket: SupportTicket }) {
   const settled = ticket.status === 'resolved' || ticket.status === 'closed';
 
@@ -251,6 +384,13 @@ function Ticket({ token, ticket }: { token: string; ticket: SupportTicket }) {
         adding to a closed conversation means a message that nobody is watching
         for — raising a new one puts it back in the queue where it is seen.
       */}
+      <Attachments
+        token={token}
+        ticketId={ticket.id}
+        attachments={ticket.attachments}
+        canAdd={!settled}
+      />
+
       {settled ? null : <Reply token={token} ticketId={ticket.id} />}
     </article>
   );

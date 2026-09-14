@@ -14,6 +14,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { resolvePortal, type PortalContext } from '@/lib/portal';
+import { attachToTicket } from '@/lib/tickets/attachments';
 import { serviceClient } from '@/lib/supabase/service';
 import { applyPrecedence } from '@/lib/outcomes/precedence';
 import type { Database } from '@/types/database';
@@ -422,6 +423,56 @@ export async function replyToSupportTicket(
   revalidatePath(`/portal/${token}/support`);
 
   return { ok: true, message: 'Sent.' };
+}
+
+/**
+ * A screenshot on a ticket the practice raised.
+ *
+ * The same reason it exists on our side: a practice describing a broken screen
+ * in words is doing work a picture does better. This is the side that matters
+ * more, because they are the ones looking at the screen.
+ *
+ * The ticket id arrives in a POST anybody could forge, so ownership is proved
+ * against the token's group before a byte is stored — otherwise a guessed id
+ * would let somebody put a file on another practice's ticket.
+ */
+export async function attachToSupportTicket(
+  token: string,
+  formData: FormData,
+): Promise<PortalResult> {
+  const portal = await requireGroup(token);
+  if (!portal) return NO_ACCESS;
+
+  const ticketId = clean(formData.get('ticket_id'));
+  const file = formData.get('file');
+
+  if (ticketId === null) return { ok: false, message: 'No ticket given.' };
+  if (!(file instanceof File)) return { ok: false, message: 'Choose a file first.' };
+
+  const db = serviceClient();
+
+  const ticket = await db
+    .from('tech_tickets')
+    .select('id')
+    .eq('id', ticketId)
+    .eq('client_group_id', portal.group.id)
+    .maybeSingle();
+
+  if (ticket.error || !ticket.data) {
+    return { ok: false, message: 'That conversation is no longer available.' };
+  }
+
+  const outcome = await attachToTicket({
+    ticketId: ticket.data.id,
+    file,
+    // A practice is not a Hub user. The name carries who it was.
+    uploadedBy: null,
+    uploadedByName: clean(formData.get('uploaded_by_name')) ?? portal.group.name,
+  });
+
+  if (outcome.ok) revalidatePath(`/portal/${token}/support`);
+
+  return { ok: outcome.ok, message: outcome.message };
 }
 
 /**
