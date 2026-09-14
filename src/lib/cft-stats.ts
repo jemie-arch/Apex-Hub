@@ -55,6 +55,12 @@ export interface DashboardRow {
   leads: number;
 
   apptsCreated: number;
+  /*
+   * Appointments from the tracker feed, which is where the leads come from.
+   * Schedule %% divides by leads and needs a numerator drawn from the same
+   * population - see migration 0075.
+   */
+  apptsTracker: number;
   apptsToBeTaken: number;
   lastApptDate: string | null;
   shows: number;
@@ -148,7 +154,16 @@ export function derive(row: DashboardRow): Derived {
 
   return {
     cpl: costRatio(pounds, row.leads),
-    schedulePct: ratio(row.apptsCreated, row.leads),
+    /*
+     * Tracker appointments over leads, not all appointments over leads.
+     *
+     * This read apptsCreated and showed 121.3% - more bookings than leads,
+     * which is not a rate. 1,420 of the 2,693 appointments come from the CRM
+     * ledger rather than the tracker sheet: they carry no campaign, no spend
+     * and no lead on their row, so counting them against leads divided two
+     * different questions. Matched, the fleet reads 57.3%. See 0075.
+     */
+    schedulePct: ratio(row.apptsTracker, row.leads),
     dqPct: ratio(row.dqs, row.apptsCreated),
     cancelPct: ratio(row.cancels, row.apptsCreated),
     showPct: ratio(row.shows, row.apptsCreated),
@@ -251,6 +266,7 @@ export interface StatsViewRow {
   spend_cents: number | null;
   leads_best: number | null;
   appts_created: number | null;
+  appts_tracker: number | null;
   appts_to_be_taken: number | null;
   last_appt_date: string | null;
   shows: number | null;
@@ -343,7 +359,7 @@ export async function loadStatsDashboard(
       db
         .from('v_cft_stats_dashboard')
         .select(
-          'client_id, group_id, client_name, status, campaign_name, campaign_id_external, offer_name, spend_cents, leads_best, appts_created, appts_to_be_taken, last_appt_date, shows, no_shows, cancels, dqs, closes',
+          'client_id, group_id, client_name, status, campaign_name, campaign_id_external, offer_name, spend_cents, leads_best, appts_created, appts_tracker, appts_to_be_taken, last_appt_date, shows, no_shows, cancels, dqs, closes',
         )
         .gte('day', from)
         .lte('day', to)
@@ -445,6 +461,7 @@ export function aggregate(
         spendCents: 0,
         leads: 0,
         apptsCreated: 0,
+        apptsTracker: 0,
         apptsToBeTaken: 0,
         lastApptDate: null,
         shows: 0,
@@ -457,6 +474,7 @@ export function aggregate(
     held.spendCents += n(row.spend_cents);
     held.leads += n(row.leads_best);
     held.apptsCreated += n(row.appts_created);
+    held.apptsTracker += n(row.appts_tracker);
     held.apptsToBeTaken += n(row.appts_to_be_taken);
     held.shows += n(row.shows);
     held.noShows += n(row.no_shows);
@@ -493,6 +511,7 @@ export function aggregate(
         spendCents: 0,
         leads: 0,
         apptsCreated: 0,
+        apptsTracker: 0,
         apptsToBeTaken: 0,
         lastApptDate: null,
         shows: 0,
@@ -519,6 +538,7 @@ export function aggregate(
     spendCents: 0,
     leads: 0,
     apptsCreated: 0,
+    apptsTracker: 0,
     apptsToBeTaken: 0,
     lastApptDate: null,
     shows: 0,
@@ -533,6 +553,7 @@ export function aggregate(
     totals.spendCents += row.spendCents;
     totals.leads += row.leads;
     totals.apptsCreated += row.apptsCreated;
+    totals.apptsTracker += row.apptsTracker;
     totals.apptsToBeTaken += row.apptsToBeTaken;
     totals.shows += row.shows;
     totals.noShows += row.noShows;

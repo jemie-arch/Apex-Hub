@@ -56,6 +56,7 @@ function stat(over: Partial<StatsViewRow> = {}): StatsViewRow {
     spend_cents: 0,
     leads_best: 0,
     appts_created: 0,
+    appts_tracker: 0,
     appts_to_be_taken: 0,
     last_appt_date: null,
     shows: 0,
@@ -137,6 +138,30 @@ const d = derive(spendNoLeads.rows[0]!);
 
 check('CPL with no leads', d.cpl, null);
 check('Schedule % with no leads', d.schedulePct, null);
+
+/*
+ * Schedule % must divide the TRACKER appointments by leads, not all of them.
+ *
+ * There was no positive assertion on this column - only the null-denominator
+ * case above - which is how it shipped reading 121.3% across the fleet. Ledger
+ * appointments carry no campaign, no spend and no lead, so counting them here
+ * divides two different questions. See migration 0075.
+ */
+const mixedAppts = aggregate(
+  [stat({ leads_best: 20, appts_created: 10, appts_tracker: 6 })],
+  [],
+  campaign,
+);
+check(
+  'Schedule % counts tracker appointments only',
+  derive(mixedAppts.rows[0]!).schedulePct,
+  6 / 20,
+);
+check(
+  'and Show % still divides by every appointment',
+  derive(aggregate([stat({ appts_created: 10, appts_tracker: 6, shows: 5 })], [], campaign).rows[0]!).showPct,
+  5 / 10,
+);
 check('Show % with no appointments', d.showPct, null);
 check('Close % with no shows', d.closePct, null);
 check('Cost Per Show with no shows', d.costPerShow, null);
