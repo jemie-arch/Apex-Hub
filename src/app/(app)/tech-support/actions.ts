@@ -10,6 +10,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { ASSIGNABLE_ROLES } from '@/config/roles';
+import { postThreadReply } from '@/lib/slack/api';
 import { notifyUsers } from '@/lib/notify/inbox';
 import { requirePermission } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
@@ -309,7 +310,9 @@ export async function addTicketComment(input: {
 
   const ticket = await db
     .from('tech_tickets')
-    .select('id, title, assigned_to')
+    .select(
+      'id, title, assigned_to, slack_channel_id, slack_thread_ts, slack_message_ts',
+    )
     .eq('id', input.ticketId)
     .maybeSingle();
 
@@ -366,6 +369,38 @@ export async function addTicketComment(input: {
     body: body.length > 160 ? `${body.slice(0, 157)}…` : body,
     href: `/tech-support/${input.ticketId}`,
   });
+
+  /*
+   * Mirror it into the Slack thread the ticket came from.
+   *
+   * Last, and deliberately unawaited for its result: the comment is already
+   * saved and the people who needed telling are already told. Slack being slow,
+   * rate limited or missing a scope must not turn a saved comment into an error
+   * message — the reader would retype it and post twice.
+   *
+   * Only for tickets that HAVE a thread. A ticket raised from the client portal
+   * has no Slack message to reply to, and inventing one would put a client's
+   * words into a channel chosen at random.
+   */
+  if (ticket.data.slack_channel_id) {
+    const threadTs = ticket.data.slack_thread_ts ?? ticket.data.slack_message_ts;
+
+    if (threadTs) {
+      try {
+        await postThreadReply(
+          ticket.data.slack_channel_id,
+          threadTs,
+          `*${authorName}* commented on the Hub:\n${body}`,
+        );
+      } catch (error) {
+        // Recorded, not raised. See above.
+        console.error(
+          '[tech-support] mirroring a comment to Slack failed:',
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+  }
 
   revalidatePath('/tech-support');
   revalidatePath(`/tech-support/${input.ticketId}`);

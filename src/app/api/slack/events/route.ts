@@ -647,6 +647,59 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  /*
+   * A mention inside a thread that already has a ticket adds to it.
+   *
+   * The unique index is on (channel, message_ts) — the individual message — so
+   * it stops Slack's retries filing the same message twice and does nothing
+   * about a SECOND mention further down the same thread. That produced a new
+   * ticket every time somebody tagged the bot again to add a detail, which is
+   * how one problem ended up spread across several tickets.
+   *
+   * threadTs is the first message in the thread, so a reply has a threadTs that
+   * differs from its own messageTs. A top-level mention has them equal and
+   * still opens a ticket, which is what it should do.
+   */
+  if (threadTs !== messageTs) {
+    const existing = await db
+      .from('tech_tickets')
+      .select('id, title')
+      .eq('slack_channel_id', channelId)
+      .eq('slack_thread_ts', threadTs)
+      .maybeSingle();
+
+    if (existing.data) {
+      const added = await db.from('tech_ticket_comments').insert({
+        ticket_id: existing.data.id,
+        // Slack people are not always Hub people. The name always resolves;
+        // the id only does when they have an account, and a comment credited
+        // to nobody is better than one credited to the wrong person.
+        author_id: raisedBy,
+        author_name: raiser?.name ?? event.user ?? 'Slack',
+        body: draft.body ?? firstPass.title ?? '',
+      });
+
+      if (added.error) {
+        console.error(
+          '[slack] appending to an existing ticket failed:',
+          added.error.message,
+        );
+      } else {
+        await postThreadReply(
+          channelId,
+          threadTs,
+          `Added that to the existing ticket — ${hubUrl(`/tech-support/${existing.data.id}`)}`,
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        filed: false,
+        appendedTo: existing.data.id,
+      });
+    }
+  }
+
   const inserted = await db
     .from('tech_tickets')
     .insert({

@@ -10,6 +10,7 @@ import {
   type Person,
 } from '@/components/tech/TicketControls';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { slackMessageUrl } from '@/lib/slack/link';
 import { StatusPill, type Tone } from '@/components/ui/StatusPill';
 import { ASSIGNABLE_ROLES } from '@/config/roles';
 import { tenant } from '@/config/tenant.config';
@@ -64,7 +65,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
     db
       .from('tech_tickets')
       .select(
-        'id, client_group_id, title, body, status, priority, assigned_to, raised_by_name, source, slack_channel_name, slack_permalink, resolution, resolved_at, created_at',
+        'id, client_group_id, title, body, status, priority, assigned_to, raised_by_name, source, slack_team_id, slack_channel_id, slack_channel_name, slack_message_ts, slack_thread_ts, slack_permalink, resolution, resolved_at, created_at',
       )
       .eq('id', params.id)
       .maybeSingle(),
@@ -114,6 +115,21 @@ export default async function TicketPage({ params }: { params: { id: string } })
     when: formatDateTimeInZone(comment.created_at, zone, 'd MMM, HH:mm'),
     isOwn: comment.author_id !== null && comment.author_id === caller?.id,
   }));
+
+  /*
+   * The stored permalink wins when there is one, but there never is — the
+   * column is null on every ticket ever filed. So the link is built from the
+   * team, channel and thread ids that ARE stored, which also makes it work for
+   * tickets raised before anybody thought to save a permalink.
+   */
+  const threadUrl =
+    row.slack_permalink ??
+    slackMessageUrl({
+      teamId: row.slack_team_id,
+      channelId: row.slack_channel_id,
+      threadTs: row.slack_thread_ts,
+      messageTs: row.slack_message_ts,
+    });
 
   return (
     <>
@@ -167,9 +183,9 @@ export default async function TicketPage({ params }: { params: { id: string } })
             </Link>
           ) : null}
 
-          {row.slack_permalink ? (
+          {threadUrl ? (
             <a
-              href={row.slack_permalink}
+              href={threadUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-xs text-fg-subtle hover:text-accent"
