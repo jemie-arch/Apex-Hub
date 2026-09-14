@@ -131,7 +131,70 @@ export function userIdsIn(text: string): string[] {
  * by then the whole message is stored in the body regardless — so a trimmed
  * title costs nothing, which was not true before.
  */
+/**
+ * Opening pleasantries, which are not what the ticket is about.
+ *
+ * "Hi team! Happy Friyay! HP is duplicating leads into a paused account."
+ * titled itself "Hi team! Happy Friyay!" — a greeting is the first sentence and
+ * says nothing. Kept deliberately narrow: an explicit list of openers, each
+ * anchored to the start and length-capped, so a real sentence that happens to
+ * begin "Happy to..." survives.
+ */
+const GREETING =
+  /^(hi|hey|hello|yo|good (?:morning|afternoon|evening)|happy [a-z!]+|thanks|thank you|team)\b[^.!?,]{0,30}[.!?,]+\s*/i;
+
+/**
+ * Emoji shortcodes at the very start, which are decoration rather than subject.
+ *
+ * Dropping the greeting out of ":tada: Hi team! HP is duplicating leads" leaves
+ * the confetti behind, and a ticket titled ":tada: HP is duplicating…" is worse
+ * than one titled without it. Only leading ones go; an emoji inside a sentence
+ * is someone making a point.
+ */
+const LEADING_EMOJI = /^(?::[a-z0-9_+-]+:\s*)+/i;
+
+function dropGreetings(line: string): string {
+  let text = line.replace(LEADING_EMOJI, '');
+
+  // Bounded rather than while(true): two greetings is a lot, three is a loop.
+  for (let pass = 0; pass < 3; pass += 1) {
+    const without = text.replace(GREETING, '').replace(LEADING_EMOJI, '');
+    if (without === text || without.trim() === '') break;
+    text = without.trimStart();
+  }
+
+  return text;
+}
+
+/**
+ * Tidy what removing a mention leaves behind.
+ *
+ * "please tag <@U0BOT>." becomes "please tag ." — the bot's tag was the object
+ * of the sentence, and taking it out strands the punctuation. A title reading
+ * "for any tech support, please tag ." looks like a bug because it is one.
+ */
+function tidy(text: string): string {
+  return (
+    text
+      /*
+       * Colons are deliberately untouched throughout. Slack writes emoji as
+       * :tada: and a doubled colon is two emoji sitting together, so collapsing
+       * repeats or eating the space before one corrupts them — ":heart_hands::tada:"
+       * became ":heart_hands:tada:", which renders as one emoji and a word.
+       */
+      .replace(/\s+([.,!?;])/g, '$1')
+      .replace(/([.,;])\1+/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  );
+}
+
 function headlineFrom(line: string): string {
+  const withoutGreeting = tidy(dropGreetings(line));
+  if (withoutGreeting === '') return tidy(line);
+
+  line = withoutGreeting;
+
   if (line.length <= TITLE_LIMIT) return line;
 
   /*
@@ -211,7 +274,9 @@ export function parseMention(rawText: string, options: ParseOptions = {}): Menti
 
   const headline = lines[0] ?? '';
   const title = headlineFrom(headline);
-  const whole = lines.join('\n');
+  // Tidied the same way as the title, so a stranded full stop does not survive
+  // in one and not the other.
+  const whole = tidy(lines.join('\n'));
 
   return {
     title,

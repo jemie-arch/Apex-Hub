@@ -303,6 +303,62 @@ section('Priority comes from a tag, never from tone');
   );
 }
 
+section('Greetings are not the subject');
+{
+  const friyay = parseMention(
+    `<@${BOT}> Hi team! Happy Friyay! :heart_hands::tada: HP is duplicating Fiesta leads into a paused account.`,
+    { botUserId: BOT },
+  );
+
+  check(
+    'a greeting does not become the title',
+    friyay.title,
+    'HP is duplicating Fiesta leads into a paused account.',
+  );
+
+  check(
+    'and the emoji that came with it do not either',
+    friyay.title!.includes(':tada:'),
+    false,
+  );
+
+  check(
+    'but the greeting survives in the body',
+    friyay.body?.includes('Happy Friyay'),
+    true,
+  );
+
+  /*
+   * Slack writes emoji as :tada:, so two together are "::". Collapsing
+   * repeated punctuation turned that into one colon and rendered the pair as
+   * one emoji and a word.
+   */
+  check(
+    'emoji shortcodes are not corrupted by tidying',
+    friyay.body?.includes(':heart_hands::tada:'),
+    true,
+  );
+
+  check(
+    'a comma greeting goes too',
+    parseMention(`<@${BOT}> Hi, the calendar sync is down.`, { botUserId: BOT })
+      .title,
+    'the calendar sync is down.',
+  );
+
+  /*
+   * Removing the bot's tag strands the punctuation it was the object of:
+   * "please tag @Apex." must not become "please tag .".
+   */
+  check(
+    'punctuation left by a removed mention is closed up',
+    parseMention(`for any tech support, please tag <@${BOT}>.`, {
+      botUserId: BOT,
+    }).title,
+    'for any tech support, please tag.',
+  );
+}
+
 section('Headline and detail');
 {
   const multi = parseMention(
