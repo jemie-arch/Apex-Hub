@@ -326,12 +326,46 @@ are one stale feed, and the line says which.
 
 Almost always a missing `ad_account_id`. See §5.
 
-### One practice shows spend but no impressions
+### Spend with no impressions: 15 July to 6 August
 
-Three do today — Team Dental Swedesboro ($1,267), Diamond Dental ($682), Plano
-Top Dental ($418). They carry insight rows with spend and zero delivery, and
-none of them has an ad account mapped, so the rows predate or bypass the normal
-Windsor path. **Unexplained — under investigation.**
+**Resolved 14 September.** This is not three practices, it is 34, and it is not
+a handful of rows — it is **3,777 rows and $43,562 of spend**, which is 42% of
+all spend the Hub has ever recorded.
+
+Every day from **15 July to 6 August 2026** carries spend with impressions,
+clicks and reach at exactly zero. Impressions begin on 7 August and are healthy
+from then on. The same boundary appears in `ad_snapshots`, so it is the source
+of the data rather than one table.
+
+**The cause is ours, not Windsor's.** The Hub only started syncing on 21 August;
+everything older arrived in a one-off backfill on 4 September, and that backfill
+brought spend without delivery. Asking Windsor for those same July dates today
+returns impressions in full — Ultra Smiles' account returns 15–22 July with
+6,000–8,000 impressions a day.
+
+Availability varies by ad account rather than by a single global cutoff: one
+account returned nothing before 12 August while another returned all of July. So
+expect a repair to fill most of the gap, not all of it.
+
+**To repair it:**
+
+```
+GET /api/sync/windsor-ads?days=65
+```
+
+`days` is capped at 400 and ignored unless it is a positive integer. The run
+logs the widened window and records it on the `sync_runs` row, so the repair is
+visible afterwards. Nothing needs setting back — the parameter lives in the
+request, not the environment.
+
+**Until it is run**, anything built on impressions or clicks is wrong for that
+period: the Impressions and Clicks columns here, and CTR and CPC on Creative
+Performance. Creative Performance excludes anything under 5,000 impressions, so
+affected creatives drop out of the ranking rather than ranking falsely — but
+their spend still shows in the held-back total.
+
+**A standing lesson worth keeping:** a feed that fails quietly is only
+repairable while the source still holds the data. Check the freshness line.
 
 ### Everything is empty for every practice
 
