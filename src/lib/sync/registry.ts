@@ -13,6 +13,7 @@ import { syncCommissionInputs } from '@/lib/sync/commission-inputs';
 import { syncCallSummaries } from '@/lib/sync/call-summaries';
 import { syncCrmLeads } from '@/lib/sync/crm-leads';
 import { syncFulfilmentLeads } from '@/lib/sync/fulfilment-leads';
+import { syncStatSheets } from '@/lib/sync/stat-sheets';
 import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
@@ -52,6 +53,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
     description:
       'GoHighLevel conversation calls into the call-centre leaderboard',
     run: syncCrmCalls,
+  },
+  'stat-sheets': {
+    name: 'stat-sheets',
+    description:
+      'Every practice stat sheet into stat_sheet_appointments — reads the sheet ' +
+      'ids from pps_clinic_routing, so no Drive access is needed',
+    run: syncStatSheets,
   },
   'fulfilment-tracker': {
     name: 'fulfilment-tracker',

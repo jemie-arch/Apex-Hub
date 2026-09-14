@@ -4091,6 +4091,152 @@ export type Database = {
         }
         Relationships: []
       }
+      stat_sheet_appointments: {
+        Row: {
+          appointment_at: string | null
+          appointment_external_id: string | null
+          appointment_on: string | null
+          booked_on: string | null
+          cc_on_file: string | null
+          charged: string | null
+          client_id: string
+          confirmed: string | null
+          converted_to_patient: string | null
+          credit_plan_approved: string | null
+          date_added: string | null
+          first_consultation_show: string | null
+          id: string
+          lead_source: string | null
+          location_external_id: string | null
+          location_name: string | null
+          notes: string | null
+          offer_name: string | null
+          patient_email: string | null
+          patient_name: string | null
+          patient_phone: string | null
+          second_consultation_show: string | null
+          source_row: number
+          spreadsheet_id: string
+          synced_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          appointment_at?: string | null
+          appointment_external_id?: string | null
+          appointment_on?: string | null
+          booked_on?: string | null
+          cc_on_file?: string | null
+          charged?: string | null
+          client_id: string
+          confirmed?: string | null
+          converted_to_patient?: string | null
+          credit_plan_approved?: string | null
+          date_added?: string | null
+          first_consultation_show?: string | null
+          id?: string
+          lead_source?: string | null
+          location_external_id?: string | null
+          location_name?: string | null
+          notes?: string | null
+          offer_name?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          second_consultation_show?: string | null
+          source_row: number
+          spreadsheet_id: string
+          synced_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          appointment_at?: string | null
+          appointment_external_id?: string | null
+          appointment_on?: string | null
+          booked_on?: string | null
+          cc_on_file?: string | null
+          charged?: string | null
+          client_id?: string
+          confirmed?: string | null
+          converted_to_patient?: string | null
+          credit_plan_approved?: string | null
+          date_added?: string | null
+          first_consultation_show?: string | null
+          id?: string
+          lead_source?: string | null
+          location_external_id?: string | null
+          location_name?: string | null
+          notes?: string | null
+          offer_name?: string | null
+          patient_email?: string | null
+          patient_name?: string | null
+          patient_phone?: string | null
+          second_consultation_show?: string | null
+          source_row?: number
+          spreadsheet_id?: string
+          synced_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "stat_sheet_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       sync_runs: {
         Row: {
           client_id: string | null
