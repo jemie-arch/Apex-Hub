@@ -248,10 +248,10 @@ export async function TrackerTab({
    * 98.4% pickup rate on outbound cold calls, which nobody would believe and
    * anybody might act on. 1,299 of them had no talk time at all.
    *
-   * answeredOutbound requires talk time, and gives 41.1%. The tracker's own
-   * Pickup % column still mirrors the sheet's definition — see migration 0043
-   * for why that is deliberately left alone — so this card is named for what
-   * it measures rather than borrowing that column's label.
+   * answeredOutbound requires talk time, and gives 41.1%. As of 14 September
+   * the tracker's Pickup % column reads the same counter, so this card and that
+   * column now agree — see the note under the table for why that diverges from
+   * the sheet on purpose.
    */
   const answeredPct = callRatio(calls.answeredOutbound, calls.dialed);
   const conversationPct = callRatio(calls.calls2min, calls.dialed);
@@ -420,6 +420,25 @@ export async function TrackerTab({
             sortHrefs={COLUMNS.map((_column, index) => hrefForSort(index))}
             clientViewHref={href({ bd: 'client' })}
           />
+
+          {/*
+            Said on the page, not only in a commit. This column used to mirror
+            the sheet exactly; it no longer does, and a reader comparing the two
+            deserves to know which one moved and why rather than discovering a
+            gap and trusting neither.
+          */}
+          <p className="mt-3 max-w-3xl text-xs text-fg-subtle">
+            <strong className="text-fg-muted">Pickup % is measured on talk
+            time</strong> — an outbound call where somebody was actually on the
+            line. It will read lower than the same column in the spreadsheet,
+            which counts GoHighLevel&rsquo;s &ldquo;connected&rdquo;. That flag
+            is set when a call attempt finishes at the carrier, not when a
+            person answers, and{' '}
+            {formatCount(calls.connectedButSilent)} calls in this window carry
+            it with no talk time at all. Counting those put every practice
+            between 98% and 100%, which is why the column could not tell any of
+            them apart.
+          </p>
 
         </>
       )}

@@ -74,6 +74,7 @@ function call(over: Partial<CallViewRow> = {}): CallViewRow {
     client_name: 'Bright Smile',
     dialed_calls: 0,
     calls_2min: 0,
+    calls_2min_outbound: 0,
     connected_outbound: 0,
     answered_outbound: 0,
     connected_but_silent: 0,
@@ -191,7 +192,18 @@ const callsAtCampaign = aggregate(
 );
 const callsAtClient = aggregate(
   [stat({ campaign_id_external: '111' }), stat({ campaign_id_external: '222' })],
-  [call({ dialed_calls: 80, calls_2min: 8, connected_outbound: 79 })],
+  [
+    call({
+      dialed_calls: 80,
+      calls_2min: 8,
+      // Six of the eight long calls were ours; two were inbound.
+      calls_2min_outbound: 6,
+      connected_outbound: 79,
+      // Talk time on 40 of the 80. The gap from connected_outbound is the
+      // point: 39 of those 79 'connected' calls had nobody on the line.
+      answered_outbound: 40,
+    }),
+  ],
   client,
 );
 
@@ -296,16 +308,37 @@ const byClient = aggregate(
     stat({ campaign_id_external: '111', spend_cents: 1000, leads_best: 10 }),
     stat({ campaign_id_external: '222', spend_cents: 1000, leads_best: 10 }),
   ],
-  [call({ dialed_calls: 80, calls_2min: 8, connected_outbound: 79 })],
+  [
+    call({
+      dialed_calls: 80,
+      calls_2min: 8,
+      // Six of the eight long calls were ours; two were inbound.
+      calls_2min_outbound: 6,
+      connected_outbound: 79,
+      // Talk time on 40 of the 80. The gap from connected_outbound is the
+      // point: 39 of those 79 'connected' calls had nobody on the line.
+      answered_outbound: 40,
+    }),
+  ],
   client,
 );
 
 check('the client breakdown is one row', byClient.rows.length, 1);
 check('and it carries the calls once', byClient.rows[0]!.calls?.dialed, 80);
+/*
+ * Talk time, not GoHighLevel's status word. Asserting the OLD definition here
+ * is what caught the change, which is the test doing its job - so this asserts
+ * the new one explicitly rather than being loosened.
+ */
 check(
-  'Pickup % is connected outbound over dialed',
+  'Pickup % is answered outbound over dialed, not connected',
   derive(byClient.rows[0]!).pickupPct,
-  79 / 80,
+  40 / 80,
+);
+check(
+  'Conversation % counts only outbound long calls',
+  derive(byClient.rows[0]!).conversationPct,
+  6 / 80,
 );
 check(
   'Dials per Lead spans both campaigns of that client',
@@ -470,11 +503,30 @@ check(
   SECTIONS.map((s) => s.label),
   ['', 'CAMPAIGN INFORMATION', '1. AD DATA', '2. CALL DATA', '3. APPOINTMENT DATA', '4. DEALS', '5. KPI METRICS'],
 );
-// Columns J to O are the call block, and the only ones hatched at campaign grain.
+/*
+ * Two separate reasons, one hatching.
+ *
+ * J to O are the call block: the calls table carries no campaign reference at
+ * all, so those figures cannot be known per campaign.
+ *
+ * H, I, P to AB and AE to AG come from the tracker sheet, which DOES carry a
+ * campaign id per row and gets it wrong - every campaign id is cited by leads
+ * from 3 to 29 different practices. Those columns are real at client grain and
+ * meaningless at campaign grain.
+ *
+ * This assertion had not been updated when the second group was blocked, so it
+ * had been failing quietly ever since. Listed in full rather than counted, so
+ * the next person to block or unblock a column has to say so here.
+ */
 check(
-  'exactly the call columns are blocked in a campaign breakdown',
+  'the call block and the campaign-id columns are blocked in a campaign breakdown',
   COLUMNS.filter((c) => c.blockedAt?.('campaign')).map((c) => c.letter),
-  ['J', 'K', 'L', 'M', 'N', 'O'],
+  [
+    'H', 'I',
+    'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB',
+    'AE', 'AF', 'AG',
+  ],
 );
 check(
   'and none of them are blocked at client grain',

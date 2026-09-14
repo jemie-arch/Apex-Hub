@@ -81,6 +81,11 @@ export interface CallCounters {
    */
   connectedOutbound: number;
   /*
+   * Long calls WE made. calls2min counts both directions; this one matches the
+   * denominator Conversation % divides by, which is outbound dials.
+   */
+  calls2minOutbound: number;
+  /*
    * Outbound calls that had talk time, which is the weakest claim that is
    * still true: somebody was on the line. 934 of the same 2,270, so 41.1%.
    * Use this for anything a person will act on.
@@ -152,8 +157,48 @@ export function derive(row: DashboardRow): Derived {
     costPerShow: costRatio(pounds, row.shows),
     costPerClose: costRatio(pounds, row.closes),
     speedToLead: calls ? ratio(calls.speedToLeadSum, calls.speedToLeadN) : null,
-    pickupPct: calls ? ratio(calls.connectedOutbound, calls.dialed) : null,
-    conversationPct: calls ? ratio(calls.calls2min, calls.dialed) : null,
+    /*
+     * Talk time, not GoHighLevel's "connected".
+     *
+     * This read connectedOutbound until 14 September and showed a 97.8% pickup
+     * rate across the fleet, which is not a thing that happens on cold dental
+     * leads. GoHighLevel stamps 'connected' when a call attempt completes at
+     * the carrier, not when a person answers: 3,292 of 6,691 outbound calls —
+     * 49% — carry that flag with zero seconds of audio.
+     *
+     * The damage was worse than the inflation. Every practice landed between
+     * 97.6% and 100%, so the column could not tell any of them apart. Measured
+     * on talk time they run from 2.3% to 62.9%: DNA Dental Studio showed 99.7%
+     * and is really 5.3%, Glamorous Smile showed 100% and is really 2.3%. The
+     * column existed to surface exactly that problem and was concealing it.
+     *
+     * answeredOutbound is the weakest claim that is still true — somebody was
+     * on the line. It was already loaded, summed and documented here with a
+     * note saying to use it for anything a person will act on; the column was
+     * simply never switched over.
+     *
+     * OVERRULES MIGRATION 0043, which added answered_outbound and deliberately
+     * did NOT repoint this column. Its reasoning was that the tab mirrors
+     * Joshua's STATS DASHBOARD column for column, nobody had confirmed which
+     * definition his sheet used, and redefining a mirrored column would make
+     * the two disagree without either being marked as changed.
+     *
+     * The first half of that is now settled: Joshua asked for the statistics to
+     * be correct and named the pickup rate specifically. The second half still
+     * stands, so the answer is not to keep a wrong number — it is to make the
+     * divergence loud. The tracker now says on screen that this column is
+     * measured on talk time and will not match the sheet. Silent was the thing
+     * 0043 was actually guarding against.
+     */
+    pickupPct: calls ? ratio(calls.answeredOutbound, calls.dialed) : null,
+    /*
+     * Outbound numerator against an outbound denominator. This divided
+     * calls2min - which counts BOTH directions - by dialed, so 50 inbound
+     * calls were inflating the fleet rate from 8.3% to 9.1%. Inbound callers
+     * rang us and are far likelier to talk for two minutes, so the error ran
+     * in the flattering direction. See migration 0074.
+     */
+    conversationPct: calls ? ratio(calls.calls2minOutbound, calls.dialed) : null,
     dialsPerLead: calls ? ratio(calls.dialed, row.leads) : null,
   };
 }
@@ -221,6 +266,7 @@ export interface CallViewRow {
   client_name: string | null;
   dialed_calls: number | null;
   calls_2min: number | null;
+  calls_2min_outbound: number | null;
   connected_outbound: number | null;
   answered_outbound: number | null;
   connected_but_silent: number | null;
@@ -235,6 +281,7 @@ function emptyCalls(): CallCounters {
   return {
     dialed: 0,
     calls2min: 0,
+    calls2minOutbound: 0,
     connectedOutbound: 0,
     answeredOutbound: 0,
     connectedButSilent: 0,
@@ -306,7 +353,7 @@ export async function loadStatsDashboard(
       db
         .from('v_cft_call_daily')
         .select(
-          'client_id, group_id, client_name, dialed_calls, calls_2min, connected_outbound, answered_outbound, connected_but_silent, speed_to_lead_min_sum, speed_to_lead_n, speed_to_lead_over_24h',
+          'client_id, group_id, client_name, dialed_calls, calls_2min, calls_2min_outbound, connected_outbound, answered_outbound, connected_but_silent, speed_to_lead_min_sum, speed_to_lead_n, speed_to_lead_over_24h',
         )
         .gte('day', from)
         .lte('day', to)
@@ -352,6 +399,7 @@ export function aggregate(
     const held = callsByClient.get(row.client_id) ?? emptyCalls();
     held.dialed += n(row.dialed_calls);
     held.calls2min += n(row.calls_2min);
+    held.calls2minOutbound += n(row.calls_2min_outbound);
     held.connectedOutbound += n(row.connected_outbound);
     held.answeredOutbound += n(row.answered_outbound);
     held.connectedButSilent += n(row.connected_but_silent);
@@ -497,6 +545,7 @@ export function aggregate(
     if (totals.calls && row.calls) {
       totals.calls.dialed += row.calls.dialed;
       totals.calls.calls2min += row.calls.calls2min;
+      totals.calls.calls2minOutbound += row.calls.calls2minOutbound;
       totals.calls.connectedOutbound += row.calls.connectedOutbound;
       totals.calls.answeredOutbound += row.calls.answeredOutbound;
       totals.calls.connectedButSilent += row.calls.connectedButSilent;
@@ -515,6 +564,7 @@ export function aggregate(
   for (const counters of callsByClient.values()) {
     callTotals.dialed += counters.dialed;
     callTotals.calls2min += counters.calls2min;
+    callTotals.calls2minOutbound += counters.calls2minOutbound;
     callTotals.connectedOutbound += counters.connectedOutbound;
     callTotals.answeredOutbound += counters.answeredOutbound;
     callTotals.connectedButSilent += counters.connectedButSilent;
