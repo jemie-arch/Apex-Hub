@@ -40,7 +40,20 @@ export async function GET(
   }
 
   try {
-    const result = await runSync(definition.name, 'cron', definition.run);
+    /*
+     * ?days=N widens the history a sync rewrites, for a one-off repair. Capped
+     * at 400 and ignored unless it parses to a positive integer, so a typo runs
+     * the normal window rather than something enormous.
+     */
+    const requested = Number(request.nextUrl.searchParams.get('days'));
+    const windowDays =
+      Number.isInteger(requested) && requested > 0 && requested <= 400
+        ? requested
+        : undefined;
+
+    const result = await runSync(definition.name, 'cron', definition.run, {
+      ...(windowDays === undefined ? {} : { windowDays }),
+    });
 
     // A failed sync returns 500 so the platform's cron log shows red. The
     // sync_runs row is already written either way.

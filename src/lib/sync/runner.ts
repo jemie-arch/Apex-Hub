@@ -22,6 +22,17 @@ export interface SyncCounts {
 
 export interface SyncContext {
   runId: string;
+  /*
+   * How many days of history to rewrite, when the caller wants something other
+   * than the sync default.
+   *
+   * Only windsor-ads reads it today. It exists because repairing history used
+   * to mean editing a Vercel environment variable, redeploying, running the
+   * sync, then putting the variable back and redeploying again - four steps,
+   * two of them deploys, and a window left wide open if anyone forgot the last
+   * one. A query parameter is one call and cannot be left switched on.
+   */
+  windowDays?: number;
   counts: SyncCounts;
   /** Non-fatal problems. One bad record must not lose the other 500. */
   recordError(message: string, context?: Record<string, unknown>): void;
@@ -122,7 +133,7 @@ export async function runSync(
   name: string,
   trigger: SyncTrigger,
   fn: SyncFn,
-  options: { clientId?: string } = {},
+  options: { clientId?: string; windowDays?: number } = {},
 ): Promise<SyncResult> {
   const db = serviceClient();
   const startedAt = Date.now();
@@ -181,6 +192,7 @@ export async function runSync(
   const ctx: SyncContext = {
     runId,
     counts,
+    windowDays: options.windowDays,
     recordError(message, context) {
       errors.push(context ? { message, context } : { message });
       console.error(`[${name}] ${message}`, context ?? '');

@@ -136,7 +136,27 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
   }
 
   const dateTo = isoDate(new Date());
-  const dateFrom = isoDate(new Date(Date.now() - (WINDOW_DAYS - 1) * 86_400_000));
+  /*
+   * The caller's window wins over the environment's.
+   *
+   * Windsor still holds the history we are missing. Impressions and clicks
+   * are absent from 15 July to 6 August across 34 practices and $43,562 of
+   * spend, and asking Windsor for those same July dates today returns them
+   * in full - so the gap is ours, not theirs, and it is repairable.
+   *
+   * Repairing it used to mean editing a Vercel environment variable,
+   * redeploying, running the sync, then putting the variable back and
+   * redeploying again. Four steps, two of them deploys, and a window left
+   * wide open if anyone forgot the last one. Now it is one call with ?days=N,
+   * which cannot be left switched on by accident.
+   */
+  const windowDays = ctx.windowDays ?? WINDOW_DAYS;
+  if (ctx.windowDays) {
+    ctx.log(`rewriting ${windowDays} days of history, not the usual ${WINDOW_DAYS}`);
+    ctx.note('window_days', windowDays);
+  }
+
+  const dateFrom = isoDate(new Date(Date.now() - (windowDays - 1) * 86_400_000));
   ctx.log(`window ${dateFrom} to ${dateTo} across ${clientByAccount.size} account(s)`);
 
   // Accumulated across every batch, then written once per table.
