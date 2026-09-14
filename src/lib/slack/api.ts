@@ -18,7 +18,7 @@
  * The functions return null rather than throwing, and the route decides what a
  * null means for the reply it sends.
  */
-import { slackBotToken } from '@/lib/env';
+import { slackBotToken, slackUserToken } from '@/lib/env';
 
 const API_BASE = 'https://slack.com/api';
 
@@ -26,6 +26,33 @@ interface SlackResponse {
   ok: boolean;
   error?: string;
   [key: string]: unknown;
+}
+
+/**
+ * Which credential a call uses.
+ *
+ * 'bot' is everything. 'user' exists solely because Slack shows a DM only to
+ * its two participants — see SLACK_USER_TOKEN in lib/env for what that token
+ * carries and why it is kept to this one job.
+ */
+export type Speaker = 'bot' | 'user';
+
+/**
+ * A DM channel, by id.
+ *
+ * Slack ids carry their type in the first character: C is a public channel, G
+ * a private one, D a direct message. Deciding by id rather than by
+ * configuration is deliberate — it means the user token cannot be pointed at a
+ * regular channel by editing a settings row. Widening it takes a code change
+ * and a review.
+ */
+export function isDirectMessage(channelId: string): boolean {
+  return channelId.startsWith('D');
+}
+
+/** The credential a channel requires. DMs need the user token; nothing else does. */
+export function speakerFor(channelId: string): Speaker {
+  return isDirectMessage(channelId) ? 'user' : 'bot';
 }
 
 /**
@@ -38,13 +65,16 @@ interface SlackResponse {
 async function call(
   method: string,
   body: Record<string, unknown>,
+  speaker: Speaker = 'bot',
 ): Promise<SlackResponse | null> {
   let token: string;
   try {
-    token = slackBotToken();
+    token = speaker === 'user' ? slackUserToken() : slackBotToken();
   } catch (error) {
+    // Logged with the speaker, because "not configured" means two entirely
+    // different fixes depending on which token was wanted.
     console.error(
-      `[slack] ${method} skipped:`,
+      `[slack] ${method} skipped (${speaker} token):`,
       error instanceof Error ? error.message : error,
     );
     return null;
@@ -176,12 +206,13 @@ export async function messagePermalink(
 export async function humanRepliedInThread(
   channelId: string,
   threadTs: string,
+  speaker: Speaker = speakerFor(channelId),
 ): Promise<boolean | null> {
-  const payload = await call('conversations.replies', {
-    channel: channelId,
-    ts: threadTs,
-    limit: 50,
-  });
+  const payload = await call(
+    'conversations.replies',
+    { channel: channelId, ts: threadTs, limit: 50 },
+    speaker,
+  );
   if (!payload) return null;
 
   const messages = payload.messages as
@@ -199,6 +230,72 @@ export async function humanRepliedInThread(
 }
 
 /**
+ * Has anybody answered this DM yet?
+ *
+ * A SEPARATE QUESTION FROM humanRepliedInThread, AND IT HAS TO BE.
+ *
+ * In a channel, an answer is a reply in the thread. In a direct message it
+ * almost never is — people just send the next message. Asking
+ * conversations.replies about a DM would nearly always come back empty, the
+ * sweeper would conclude nobody had answered, and it would acknowledge a
+ * message that had already been dealt with minutes ago. That is the single
+ * most likely way this feature could embarrass somebody.
+ *
+ * So a DM is answered when anyone other than the person who wrote it has
+ * spoken since — thread reply or not. `oldest` is exclusive of nothing, so the
+ * original message comes back too and is filtered out by ts.
+ *
+ * Same null contract as its sibling: could-not-ask means do not speak.
+ */
+export async function humanRepliedAfterInDm(
+  channelId: string,
+  messageTs: string,
+  authorSlackId: string | null,
+): Promise<boolean | null> {
+  const payload = await call(
+    'conversations.history',
+    { channel: channelId, oldest: messageTs, limit: 50, inclusive: true },
+    'user',
+  );
+  if (!payload) return null;
+
+  const messages = payload.messages as
+    | { ts?: string; user?: string; bot_id?: string; subtype?: string }[]
+    | undefined;
+  if (!Array.isArray(messages)) return null;
+
+  return messages.some(
+    (message) =>
+      message.ts !== messageTs &&
+      !message.bot_id &&
+      message.subtype === undefined &&
+      typeof message.user === 'string' &&
+      // Joshua sending three messages in a row has not answered himself.
+      message.user !== authorSlackId,
+  );
+}
+
+/**
+ * Posts into a conversation without threading.
+ *
+ * For DMs. A threaded reply in a direct message is a shape almost nobody uses,
+ * and it hides the acknowledgement behind a "1 reply" line that the recipient
+ * has to click — which defeats the point of answering within two minutes.
+ */
+export async function postMessage(
+  channelId: string,
+  text: string,
+  speaker: Speaker = speakerFor(channelId),
+): Promise<boolean> {
+  const payload = await call(
+    'chat.postMessage',
+    { channel: channelId, text, unfurl_links: false, unfurl_media: false },
+    speaker,
+  );
+  return payload !== null;
+}
+
+/**
  * Replies in the thread of the message that tagged the bot.
  *
  * `thread_ts` is always the mention's own ts when the mention was a top-level
@@ -210,6 +307,7 @@ export async function postThreadReply(
   channelId: string,
   threadTs: string,
   text: string,
+  speaker: Speaker = speakerFor(channelId),
 ): Promise<boolean> {
   const payload = await call('chat.postMessage', {
     channel: channelId,
@@ -219,7 +317,7 @@ export async function postThreadReply(
     // tagged the bot is already in the thread.
     unfurl_links: false,
     unfurl_media: false,
-  });
+  }, speaker);
   return payload !== null;
 }
 
@@ -240,4 +338,52 @@ export async function addReaction(
     name,
   });
   return payload !== null;
+}
+
+/**
+ * The bot's own user id, so a message can be re-parsed the way it was parsed
+ * when it arrived.
+ *
+ * At ingest the id comes free on the event's `authorizations`. Reading an old
+ * message back has no event, and without the id parseMention leaves the bot's
+ * own tag in the text — so every backfilled title would begin "@U0BOT…".
+ *
+ * One call for a whole backfill, so it is fetched rather than configured.
+ */
+export async function botUserId(speaker: Speaker = 'bot'): Promise<string | null> {
+  const payload = await call('auth.test', {}, speaker);
+  const id = payload?.['user_id'];
+  return typeof id === 'string' ? id : null;
+}
+
+/**
+ * The original text of one message.
+ *
+ * conversations.replies with the message's own ts returns that message first,
+ * whether or not it ever grew a thread — so this works for a ticket raised by a
+ * top-level mention as well as one raised inside a thread.
+ *
+ * Returns null when Slack could not be asked or the message is gone. A caller
+ * repairing old rows must leave them alone in that case rather than writing an
+ * empty body over a truncated title, which would lose the little that survived.
+ */
+export async function fetchMessageText(
+  channelId: string,
+  messageTs: string,
+  speaker: Speaker = speakerFor(channelId),
+): Promise<string | null> {
+  const payload = await call(
+    'conversations.replies',
+    { channel: channelId, ts: messageTs, limit: 1 },
+    speaker,
+  );
+  if (!payload) return null;
+
+  const messages = payload.messages as { ts?: string; text?: string }[] | undefined;
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+
+  const root = messages.find((message) => message.ts === messageTs) ?? messages[0];
+  const text = root?.text;
+
+  return typeof text === 'string' && text.trim() !== '' ? text : null;
 }
