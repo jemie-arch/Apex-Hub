@@ -128,6 +128,13 @@ export type Database = {
             foreignKeyName: "ad_level_insights_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_level_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -207,6 +214,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -312,6 +326,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -522,6 +543,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -743,6 +771,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -1137,6 +1172,13 @@ export type Database = {
             foreignKeyName: "billing_charges_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -1214,6 +1256,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -1619,6 +1668,13 @@ export type Database = {
             foreignKeyName: "callcentre_requests_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -1719,6 +1775,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -1827,6 +1890,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -2255,6 +2325,13 @@ export type Database = {
             foreignKeyName: "creative_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -2358,6 +2435,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -2513,6 +2597,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -2727,6 +2818,13 @@ export type Database = {
             foreignKeyName: "excluded_calendars_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "excluded_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -2899,6 +2997,13 @@ export type Database = {
             foreignKeyName: "form_submissions_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "form_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -2977,6 +3082,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "included_calendars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -3142,6 +3254,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -3432,6 +3551,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pps_clinic_routing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -3769,6 +3895,13 @@ export type Database = {
             foreignKeyName: "raw_call_rows_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "raw_call_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -4050,6 +4183,13 @@ export type Database = {
             foreignKeyName: "sync_runs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -4154,6 +4294,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tech_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -4567,6 +4714,13 @@ export type Database = {
             foreignKeyName: "tracker_appointments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -4664,6 +4818,13 @@ export type Database = {
             foreignKeyName: "tracker_leads_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -4722,6 +4883,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_practice_aliases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -4864,6 +5032,13 @@ export type Database = {
             foreignKeyName: "appointment_ledger_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -4929,6 +5104,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -5035,6 +5217,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -5164,6 +5353,13 @@ export type Database = {
             foreignKeyName: "appointment_ledger_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -5213,6 +5409,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "appointment_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -5272,6 +5475,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -5474,6 +5684,13 @@ export type Database = {
             foreignKeyName: "callcentre_requests_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "callcentre_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "v_recruitment_ads"
             referencedColumns: ["client_id"]
           },
@@ -5483,6 +5700,7 @@ export type Database = {
         Row: {
           answered_outbound: number | null
           calls_2min: number | null
+          calls_2min_outbound: number | null
           calls_total: number | null
           client_id: string | null
           client_name: string | null
@@ -5531,6 +5749,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {
@@ -5611,11 +5836,33 @@ export type Database = {
           },
         ]
       }
+      v_cft_sheet_coverage: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          coverage: number | null
+          group_id: string | null
+          in_sheet: number | null
+          is_active: boolean | null
+          missing_from_sheet: number | null
+          true_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_cft_stats_dashboard: {
         Row: {
           appts_created: number | null
           appts_not_in_ledger: number | null
           appts_to_be_taken: number | null
+          appts_tracker: number | null
           campaign_id_external: string | null
           campaign_name: string | null
           campaign_status: string | null
@@ -5834,6 +6081,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "tracker_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
             referencedColumns: ["client_id"]
           },
           {

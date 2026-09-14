@@ -263,6 +263,39 @@ feed the leads come from, it reads **57.3%**.
 `Appointments Created` still counts all 2,693, because those CRM bookings are
 real appointments that real practices really took.
 
+### Settled: Cost Per Booking
+
+Joshua, 14 September: **"Cost per booking we got is the metric we are to use."**
+
+That is what the column already does — spend divided by every appointment,
+including the ones no ad paid for. No change was needed. Recorded here so the
+question is not reopened.
+
+### The sheet holds 47% of the appointments
+
+Also Joshua, 14 September: *"The appts in GHL are more accurate than the ones in
+the sheet."* Measured, and by a wider margin than assumed.
+
+GoHighLevel carries 2,693 appointments. The tracker sheet carries 1,273 of them.
+**1,420 exist only in the CRM, and six practices have nothing in the sheet at
+all** — Limestone Hills 0 of 55, Metro Dental 0 of 46.
+
+The relationship is one-directional: not one practice has an appointment in the
+sheet that the CRM lacks. So nothing in the sheet needs correcting — things need
+**adding**.
+
+The tracker shows the per-practice gap under **What the sheet is missing**,
+ordered by how many are absent, so it doubles as the worklist and shows when it
+is finished.
+
+The Hub cannot fix this itself. The Google scope is `spreadsheets.readonly` on
+purpose, so a bug here can never write to the thing everybody trusts.
+
+**What it affects:** Schedule % divides sheet appointments by sheet leads —
+consistent, but both sides undercounted, so it reports the sheet's view of the
+world rather than the world. Appointments Created, Shows, and the rates built on
+them already count both sources and are unaffected.
+
 ### Open question for whoever owns the sheet
 
 **Cost Per Booking divides spend by ALL appointments**, including the 1,420 that
