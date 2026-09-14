@@ -5,7 +5,10 @@ import { formatCount, formatPercent } from '@/lib/format';
 export interface CoverageRow {
   clientName: string;
   inSheet: number;
-  missingFromSheet: number;
+  /** Has a patient name, so somebody could actually add it to the sheet. */
+  missingNamed: number;
+  /** No patient name. A real CRM record, but nothing anyone can type in. */
+  missingUnnamed: number;
   trueTotal: number;
   coverage: number | null;
 }
@@ -14,8 +17,17 @@ export interface CoverageRow {
  * How much of the appointment truth the tracker sheet actually holds.
  *
  * Joshua's words: the appointments in GoHighLevel are more accurate than the
- * ones in the sheet. Measured, he is right — the sheet carries 1,273 of 2,693,
- * and six practices have nothing in it at all.
+ * ones in the sheet. He is right, though the first version of this panel
+ * overstated it twice over and he caught both.
+ *
+ * It counted churned practices with no tracking sheet — Limestone Hills and
+ * Metro Dental read as 55 and 46 "missing" when there is no sheet for them to
+ * be missing from. Scoped now to practices that have one.
+ *
+ * And it counted appointments with no patient name. 626 of them fleet-wide are
+ * real CRM records with an id and a booked-at, and nothing anybody can go and
+ * type into a sheet. Those are shown separately rather than dropped, because
+ * 626 nameless appointments is itself worth someone looking at.
  *
  * This sits on the tracker rather than on a page of its own because the tracker
  * is where somebody notices a number looks low and starts doubting the whole
@@ -28,13 +40,13 @@ export interface CoverageRow {
  * percentage — the list is a worklist, so it is ordered by work.
  */
 export function SheetCoverage({ rows }: { rows: CoverageRow[] }) {
-  const behind = rows.filter((row) => row.missingFromSheet > 0);
+  const behind = rows.filter((row) => row.missingNamed > 0);
   if (behind.length === 0) return null;
 
-  const missing = behind.reduce((sum, row) => sum + row.missingFromSheet, 0);
+  const missing = behind.reduce((sum, row) => sum + row.missingNamed, 0);
+  const unnamed = rows.reduce((sum, row) => sum + row.missingUnnamed, 0);
   const total = rows.reduce((sum, row) => sum + row.trueTotal, 0);
   const held = rows.reduce((sum, row) => sum + row.inSheet, 0);
-  const empty = behind.filter((row) => row.inSheet === 0);
 
   return (
     <section className="mt-10">
@@ -55,14 +67,15 @@ export function SheetCoverage({ rows }: { rows: CoverageRow[] }) {
         <span className="numeric">{formatCount(held)}</span> of them. The
         relationship is one-directional — no practice has an appointment in the
         sheet that the CRM lacks — so nothing here needs correcting, only{' '}
-        <strong className="text-fg-muted">adding</strong>.
-        {empty.length > 0 ? (
+        <strong className="text-fg-muted">adding</strong>. Only practices with a
+        tracking sheet are counted.
+        {unnamed > 0 ? (
           <>
             {' '}
-            <span className="text-warning">
-              {formatCount(empty.length)}{' '}
-              {empty.length === 1 ? 'practice has' : 'practices have'} nothing in
-              the sheet at all.
+            <span className="text-fg-muted">
+              A further <span className="numeric">{formatCount(unnamed)}</span>{' '}
+              CRM appointments carry no patient name and are not counted above —
+              real records, but nothing anybody can type into a sheet.
             </span>
           </>
         ) : null}
@@ -73,7 +86,7 @@ export function SheetCoverage({ rows }: { rows: CoverageRow[] }) {
           <thead>
             <tr className="border-b border-line bg-surface text-left text-xs text-fg-muted">
               <th className="px-4 py-2 font-medium">Practice</th>
-              <th className="px-4 py-2 text-right font-medium">Missing</th>
+              <th className="px-4 py-2 text-right font-medium">To add</th>
               <th className="px-4 py-2 text-right font-medium">In sheet</th>
               <th className="px-4 py-2 text-right font-medium">In GoHighLevel</th>
               <th className="px-4 py-2 text-right font-medium">Coverage</th>
@@ -87,7 +100,7 @@ export function SheetCoverage({ rows }: { rows: CoverageRow[] }) {
               >
                 <td className="px-4 py-2 font-medium text-fg">{row.clientName}</td>
                 <td className="numeric px-4 py-2 text-right font-medium text-warning">
-                  {formatCount(row.missingFromSheet)}
+                  {formatCount(row.missingNamed)}
                 </td>
                 <td className="numeric px-4 py-2 text-right text-fg-subtle">
                   {row.inSheet === 0 ? (

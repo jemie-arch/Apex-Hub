@@ -209,8 +209,10 @@ export async function TrackerTab({
      */
     db
       .from('v_cft_sheet_coverage')
-      .select('client_name, in_sheet, missing_from_sheet, true_total, coverage')
-      .order('missing_from_sheet', { ascending: false }),
+      .select(
+        'client_name, in_sheet, missing_named, missing_unnamed, true_total, coverage',
+      )
+      .order('missing_named', { ascending: false }),
     feedFreshness(db),
   ]);
 
@@ -221,7 +223,8 @@ export async function TrackerTab({
   const coverageRows: CoverageRow[] = (coverage.data ?? []).map((row) => ({
     clientName: row.client_name ?? '—',
     inSheet: Number(row.in_sheet ?? 0),
-    missingFromSheet: Number(row.missing_from_sheet ?? 0),
+    missingNamed: Number(row.missing_named ?? 0),
+    missingUnnamed: Number(row.missing_unnamed ?? 0),
     trueTotal: Number(row.true_total ?? 0),
     coverage: row.coverage === null ? null : Number(row.coverage),
   }));

@@ -5844,7 +5844,8 @@ export type Database = {
           group_id: string | null
           in_sheet: number | null
           is_active: boolean | null
-          missing_from_sheet: number | null
+          missing_named: number | null
+          missing_unnamed: number | null
           true_total: number | null
         }
         Relationships: [
