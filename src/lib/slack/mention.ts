@@ -120,6 +120,31 @@ export function userIdsIn(text: string): string[] {
 }
 
 /**
+ * The headline for a ticket, from the first line of the message.
+ *
+ * Prefers a whole sentence. People write "The calendar sync is down. It started
+ * around 9am and three practices are affected." as one line, and cutting that
+ * at 120 characters produced a title that stopped mid-thought. The first
+ * sentence is a real headline; the rest is detail and is kept in the body.
+ *
+ * Only when that sentence is itself too long does it fall back to cutting, and
+ * by then the whole message is stored in the body regardless — so a trimmed
+ * title costs nothing, which was not true before.
+ */
+function headlineFrom(line: string): string {
+  if (line.length <= TITLE_LIMIT) return line;
+
+  /*
+   * A sentence ending inside the limit, and at least a few words in. The lower
+   * bound stops "Hi." or "Urgent!" becoming the entire title of a long report.
+   */
+  const sentence = line.slice(0, TITLE_LIMIT).match(/^(.{20,}?[.!?])(?:\s|$)/);
+  if (sentence?.[1]) return sentence[1];
+
+  return trimTitle(line);
+}
+
+/**
  * Cuts a title at a word boundary rather than mid-word.
  *
  * Falls back to a hard cut when the first "word" is longer than the limit,
@@ -185,13 +210,28 @@ export function parseMention(rawText: string, options: ParseOptions = {}): Menti
   }
 
   const headline = lines[0] ?? '';
-  const title = trimTitle(headline);
+  const title = headlineFrom(headline);
   const whole = lines.join('\n');
 
   return {
     title,
-    // Only worth storing when it says more than the title already does.
-    body: whole === headline ? null : whole,
+    /*
+     * Null ONLY when the title is already the entire message, character for
+     * character.
+     *
+     * This used to compare the whole message against the untrimmed headline,
+     * which is the same thing right up until the headline is too long — and
+     * then the title was cut and the body was still dropped as a duplicate. The
+     * rest of the message was stored nowhere. Ten of the twenty-two tickets
+     * filed so far are in that state: a sentence that stops mid-word and no
+     * detail anywhere, so the only way to find out what was asked is to go and
+     * read Slack.
+     *
+     * Comparing against the TITLE rather than the headline closes it. A short
+     * one-liner still stores no duplicate; anything the title does not contain
+     * in full is kept.
+     */
+    body: title === whole ? null : whole,
     priority: withPriority.priority,
     mentionedUserIds,
   };

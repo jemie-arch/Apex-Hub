@@ -326,6 +326,45 @@ section('Headline and detail');
   const long = parseMention(`<@${BOT}> ${'word '.repeat(60)}`, { botUserId: BOT });
   check('a long title is cut to fit', long.title!.length <= 121, true);
   check('and cut at a word boundary', long.title!.endsWith('…'), true);
+
+  /*
+   * The bug this pair exists to stop coming back.
+   *
+   * A long single-line message had its title cut and its body dropped as a
+   * "duplicate" of the untrimmed headline. Ten of the first twenty-two tickets
+   * were filed that way: a sentence stopping mid-word, and the rest of the
+   * request stored nowhere but Slack.
+   */
+  check(
+    'a long one-liner keeps the whole message in the body',
+    long.body,
+    ('word '.repeat(60)).trim(),
+  );
+  check(
+    'and the body is not the truncated title',
+    long.body === long.title,
+    false,
+  );
+
+  /*
+   * A better headline. Cutting this at the limit stopped mid-sentence; the
+   * first sentence is a title somebody can read in a list.
+   */
+  const runOn = parseMention(
+    `<@${BOT}> The calendar sync is down. It started around 9am and three practices are affected, so we are booking into a stale calendar.`,
+    { botUserId: BOT },
+  );
+
+  check(
+    'a run-on line is titled with its first sentence',
+    runOn.title,
+    'The calendar sync is down.',
+  );
+  check(
+    'and the rest survives in the body',
+    runOn.body?.includes('three practices are affected'),
+    true,
+  );
 }
 
 section('Silence does not become a ticket');
