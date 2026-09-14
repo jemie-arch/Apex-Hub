@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache';
 
 import { ASSIGNABLE_ROLES } from '@/config/roles';
 import { postThreadReply } from '@/lib/slack/api';
+import { attachToTicket } from '@/lib/tickets/attachments';
 import { notifyUsers } from '@/lib/notify/inbox';
 import { requirePermission } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
@@ -406,4 +407,66 @@ export async function addTicketComment(input: {
   revalidatePath(`/tech-support/${input.ticketId}`);
 
   return { ok: true, message: 'Added.', notified };
+}
+
+/**
+ * Attach a screenshot or document to a ticket.
+ *
+ * Takes FormData rather than a File argument because a file only crosses a
+ * server-action boundary inside one. The permission check is the same as every
+ * other write here, and it runs before the file is touched at all.
+ */
+export async function attachScreenshot(
+  formData: FormData,
+): Promise<{ ok: boolean; message: string }> {
+  const caller = await requirePermission('tech_support');
+
+  const ticketId = formData.get('ticket_id');
+  const file = formData.get('file');
+
+  if (typeof ticketId !== 'string' || ticketId === '') {
+    return { ok: false, message: 'No ticket given.' };
+  }
+
+  if (!(file instanceof File)) {
+    return { ok: false, message: 'Choose a file first.' };
+  }
+
+  const db = serviceClient();
+
+  /*
+   * Proved to exist before anything is uploaded. A file uploaded against a
+   * ticket id that is wrong or deleted is an object nobody can ever see and
+   * nobody can ever remove through the app.
+   */
+  const ticket = await db
+    .from('tech_tickets')
+    .select('id')
+    .eq('id', ticketId)
+    .maybeSingle();
+
+  if (ticket.error || !ticket.data) {
+    return { ok: false, message: 'That ticket no longer exists.' };
+  }
+
+  const author = await db
+    .from('user_profiles')
+    .select('full_name, email')
+    .eq('id', caller.id)
+    .maybeSingle();
+
+  const outcome = await attachToTicket({
+    ticketId,
+    file,
+    uploadedBy: caller.id,
+    uploadedByName:
+      author.data?.full_name?.trim() || author.data?.email || 'Somebody',
+  });
+
+  if (outcome.ok) {
+    revalidatePath('/tech-support');
+    revalidatePath(`/tech-support/${ticketId}`);
+  }
+
+  return { ok: outcome.ok, message: outcome.message };
 }

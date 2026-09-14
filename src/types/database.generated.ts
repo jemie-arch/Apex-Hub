@@ -4319,6 +4319,67 @@ export type Database = {
           },
         ]
       }
+      tech_ticket_attachments: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          file_name: string
+          id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          ticket_id: string
+          uploaded_by: string | null
+          uploaded_by_name: string | null
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          ticket_id: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          mime_type?: string
+          size_bytes?: number
+          storage_path?: string
+          ticket_id?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tech_ticket_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "tech_ticket_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tech_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tech_ticket_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tech_ticket_candidates: {
         Row: {
           also_notify: string[]

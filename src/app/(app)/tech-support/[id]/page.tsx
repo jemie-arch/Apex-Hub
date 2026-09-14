@@ -10,7 +10,9 @@ import {
   type Person,
 } from '@/components/tech/TicketControls';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { TicketAttachments } from '@/components/techsupport/TicketAttachments';
 import { slackMessageUrl } from '@/lib/slack/link';
+import { attachmentsFor } from '@/lib/tickets/attachments';
 import { StatusPill, type Tone } from '@/components/ui/StatusPill';
 import { ASSIGNABLE_ROLES } from '@/config/roles';
 import { tenant } from '@/config/tenant.config';
@@ -117,6 +119,12 @@ export default async function TicketPage({ params }: { params: { id: string } })
   }));
 
   /*
+   * Signed per render, so a link cannot be stored and later fail. One round
+   * trip for the whole ticket rather than one per file.
+   */
+  const attachments = (await attachmentsFor([row.id])).get(row.id) ?? [];
+
+  /*
    * The stored permalink wins when there is one, but there never is — the
    * column is null on every ticket ever filed. So the link is built from the
    * team, channel and thread ids that ARE stored, which also makes it work for
@@ -203,6 +211,12 @@ export default async function TicketPage({ params }: { params: { id: string } })
             No detail beyond the title — the whole request was one line.
           </p>
         )}
+
+        <TicketAttachments
+          ticketId={row.id}
+          attachments={attachments}
+          canUpload
+        />
 
         {row.resolution ? (
           <p className="mt-4 rounded-md bg-positive-subtle px-3 py-2 text-sm text-positive">
