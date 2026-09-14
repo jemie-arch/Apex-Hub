@@ -12,6 +12,7 @@ import { tenant, titleCase } from '@/config/tenant.config';
 import { chunk, ID_LOOKUP_BATCH } from '@/lib/chunk';
 import { formatDateTimeInZone, formatMoney } from '@/lib/format';
 import { resolvePortal } from '@/lib/portal';
+import { bounds, resolveRange } from '@/lib/range';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,22 @@ export default async function PortalAppointmentsPage({
 
   const onlyPending = searchParams['show'] === 'pending';
 
+  /*
+   * The same range the rest of the portal uses, read from the URL the shared
+   * picker writes. Defaults to this month when nothing is chosen, so a first
+   * visit sees a sensible window rather than every appointment ever taken.
+   */
+  const single = (value: string | string[] | undefined): string | undefined =>
+    Array.isArray(value) ? value[0] : value;
+
+  const range = resolveRange({
+    preset: single(searchParams['preset']),
+    from: single(searchParams['from']),
+    to: single(searchParams['to']),
+  });
+
+  const window = bounds(range.from, range.to);
+
   const db = serviceClient();
   const rows: Array<{
     id: string;
@@ -61,6 +78,8 @@ export default async function PortalAppointmentsPage({
       )
       .in('client_id', ids)
       .eq('funnel', 'b2c')
+      .gte('scheduled_at', window.start)
+      .lte('scheduled_at', window.end)
       .order('scheduled_at', { ascending: false })
       .limit(500);
 

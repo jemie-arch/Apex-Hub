@@ -9,6 +9,7 @@ import {
 import { tenant } from '@/config/tenant.config';
 import { formatDateTimeInZone } from '@/lib/format';
 import { resolvePortal } from '@/lib/portal';
+import { bounds, resolveRange } from '@/lib/range';
 import { serviceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export const metadata = {
 
 interface PageProps {
   params: { token: string };
+  searchParams: Record<string, string | string[] | undefined>;
 }
 
 interface Row {
@@ -37,9 +39,26 @@ interface Row {
  */
 export default async function PortalAgencyAppointmentsPage({
   params,
+  searchParams,
 }: PageProps) {
   const portal = await resolvePortal(params.token);
   if (!portal) notFound();
+
+  /*
+   * The portal's shared range. Both feeds on this page are dated, so both are
+   * filtered — a picker that moved one list and not the other would be worse
+   * than none, because the page would look inconsistent rather than filtered.
+   */
+  const single = (value: string | string[] | undefined): string | undefined =>
+    Array.isArray(value) ? value[0] : value;
+
+  const range = resolveRange({
+    preset: single(searchParams['preset']),
+    from: single(searchParams['from']),
+    to: single(searchParams['to']),
+  });
+
+  const window = bounds(range.from, range.to);
 
   const db = serviceClient();
 
@@ -49,6 +68,8 @@ export default async function PortalAgencyAppointmentsPage({
       .from('tech_calls')
       .select('id, topic, scheduled_at, requested_at, status')
       .eq('client_group_id', portal.group.id)
+      .gte('requested_at', window.start)
+      .lte('requested_at', window.end)
       .order('requested_at', { ascending: false })
       .limit(100),
   ]);
@@ -65,6 +86,8 @@ export default async function PortalAgencyAppointmentsPage({
       .from('sales_calls')
       .select('id, scheduled_at, status, outcome')
       .in('deal_id', dealIds)
+      .gte('scheduled_at', window.start)
+      .lte('scheduled_at', window.end)
       .order('scheduled_at', { ascending: false })
       .limit(100);
 

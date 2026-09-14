@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+
+import { PortalRange } from '@/components/portal/PortalRange';
 import type { ReactNode } from 'react';
 
 import { PortalNav } from '@/components/portal/PortalNav';
@@ -47,6 +49,8 @@ export default async function PortalLayout({
         </header>
 
         <PortalNav token={params.token} />
+
+        <PortalRange token={params.token} />
 
         {children}
 
