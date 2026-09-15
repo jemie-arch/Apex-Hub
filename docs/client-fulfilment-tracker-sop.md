@@ -203,12 +203,13 @@ the identifiers below.
 5. **Verify** by opening the tracker at Client breakdown, 30 days, and picking
    the practice. Spend, leads and appointments should all be non-zero.
 
-### 14 active practices have no ad account mapped
+### 13 active practices have no ad account mapped
 
 They can show appointments but never spend or CPL. This is the single biggest
 cause of a row looking broken. As of 15 September, after mapping every practice
 on Joshua's campaign list and every name that matches Jemie's Business Manager
-list (migrations 0083 to 0086):
+list, and reading the ad copy behind every unnamed account (migrations 0083
+to 0087):
 
 **Have a stat sheet, so bookings show against no spend:** Snyder Dental Group
 (22 appts) · Royal Dentistry Studio (10) · Glamorous Smile Dental Spa (7) ·
@@ -222,8 +223,8 @@ they still show bookings against zero spend. Connecting them in Windsor is the
 only remaining step; nothing in the Hub needs to change.
 
 **No stat sheet either, so nothing can land:** Evergreen Dental and
-Orthodontics · Firewheel Smiles · Habib Dental Implants · Natalie Yang
-Orthodontics · Skyline Implants & Periodontics.
+Orthodontics · Firewheel Smiles · Habib Dental Implants · Skyline Implants &
+Periodontics.
 
 **Churned per Joshua but still marked active in the Hub:** Limestone Hills
 Orthodontics (55 appts) · Metro Dental & Implant Studio (46). Their group status
@@ -232,9 +233,37 @@ should be set to churned so they drop out of coverage counts.
 **"Great Smiles of La Mesa (Dont use)"** is a duplicate client row and should be
 deactivated rather than mapped.
 
-None of the fourteen is on Joshua's campaign list or in the Business Manager
-list under a matching name, so none can be mapped from evidence the Hub holds.
-Each needs its ad account id from whoever runs its ads.
+None of the thirteen is on Joshua's campaign list, in the Business Manager list
+under a matching name, or named in the copy of any ad Windsor returned in the
+last year. Each needs its ad account id from whoever runs its ads. Two Business
+Manager accounts remain unassigned for the same reason: Stephen Tran DDS ran no
+ad in a year, and Wagner Orthodontics A is not connected to Windsor.
+
+### When the account name lies
+
+Meta's account names are whatever the media buyer typed. Four accounts were
+identified only by reading their ad copy: **NYO** is Natalie Yang
+Orthodontics ("Dr. Natalie Yang", Vacaville); **Buena Park Dental Center** is
+Anaheim Smile Center's second location ("Dr. Zakhary has 2 locations");
+**AC - Select Dental Implants** is Diamond Dental's implant brand; and
+**All Dental of Menifee (Apex)** ran nothing but Apex hiring campaigns all
+year, so the internal hiring client owns it and its spend reaches the
+Recruitment page, not a practice row.
+
+### When a campaign is in the wrong account
+
+Media buyers open a campaign in whichever account is handy. In the last year
+Ad Account 10 (TMJ Williston) carried two Team Dental campaigns, Ad Account 7
+(Wilmington) carried two for Smile Orthodontics, and Ad Account 6 (Singleton)
+carried $37.7k for NK Orthodontics in Atlanta, which is not a client.
+
+The Windsor sync therefore consults the campaign map before the account owner.
+A campaign the map assigns to exactly one client lands on that client whatever
+account it arrived in. A campaign the map names for a practice that is not a
+Hub client is dropped rather than given to the account owner. A campaign the
+map lists for several clients (the three TMJ doors) falls back to the account
+owner. To move a campaign, add a row to the campaign map in the database; no
+code change is needed.
 
 ### Shared accounts: one owner, others linked
 

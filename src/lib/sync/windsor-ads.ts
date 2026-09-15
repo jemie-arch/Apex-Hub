@@ -129,6 +129,73 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
     clientByAccount.set(bare, { id: client.id, name: client.name });
   }
 
+  /*
+   * Campaigns that belong to someone other than the account's owner.
+   *
+   * Found by reading the ad copy behind every campaign Windsor returned over a
+   * year: Ad Account 10 (TMJ Williston) carried two Team Dental campaigns, Ad
+   * Account 7 (Wilmington) carried two for Smile Orthodontics, Ad Account 6
+   * (Singleton) carried $37k for NK Orthodontics in Atlanta. Meta puts the
+   * campaign wherever the media buyer had an account open; the account owner
+   * is the right default and the wrong answer for those rows.
+   *
+   * campaign_practice_map already records campaign -> practice from Joshua's
+   * sheet. Where it names exactly one client for a campaign, that client gets
+   * the rows regardless of which account they arrived in. Where it names a
+   * practice the Hub does not have (client_id null) the rows are dropped,
+   * because giving them to the account owner is the misattribution this
+   * exists to stop. Where several clients share the campaign (the three TMJ
+   * doors) the map is silent and the account owner stands, as before.
+   */
+  const campaignOverride = new Map<string, { id: string; name: string } | null>();
+  {
+    const mapRows = await db
+      .from('campaign_practice_map')
+      .select('campaign_external_id, client_id, practice_name');
+    if (mapRows.error) throw mapRows.error;
+
+    const byCampaign = new Map<string, Set<string | null>>();
+    for (const row of mapRows.data ?? []) {
+      const set = byCampaign.get(row.campaign_external_id) ?? new Set();
+      set.add(row.client_id);
+      byCampaign.set(row.campaign_external_id, set);
+    }
+
+    const wanted = new Set<string>();
+    for (const set of byCampaign.values()) {
+      const named = [...set].filter((id): id is string => id !== null);
+      const only = named[0];
+      if (named.length === 1 && only) wanted.add(only);
+    }
+
+    const overrideClients = wanted.size
+      ? await db
+          .from('clients')
+          .select('id, name, group_id, is_active')
+          .in('id', [...wanted])
+      : { data: [], error: null };
+    if (overrideClients.error) throw overrideClients.error;
+    const clientById = new Map(
+      (overrideClients.data ?? [])
+        .filter((c) => c.is_active && !churned.has(c.group_id))
+        .map((c) => [c.id, { id: c.id, name: c.name }] as const),
+    );
+
+    for (const [campaignId, set] of byCampaign) {
+      const named = [...set].filter((id): id is string => id !== null);
+      if (named.length > 1) continue; // shared campaign: the account owner stands
+      if (named.length === 0) {
+        campaignOverride.set(campaignId, null); // practice known, not a client
+        continue;
+      }
+      const only = named[0];
+      const client = only ? clientById.get(only) : undefined;
+      if (client) campaignOverride.set(campaignId, client);
+    }
+  }
+  let reattributed = 0;
+  let droppedForeign = 0;
+
   if (clientByAccount.size === 0) {
     /*
      * Recorded as a problem, not merely logged.
@@ -251,7 +318,22 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
     ctx.counts.read += rows.length;
 
     for (const row of rows) {
-      const client = clientByAccount.get(row.accountId);
+      let client = clientByAccount.get(row.accountId);
+
+      if (row.campaignExternalId && campaignOverride.has(row.campaignExternalId)) {
+        const override = campaignOverride.get(row.campaignExternalId);
+        accountsWithData.add(row.accountId);
+        if (override === null) {
+          // A practice that is not a Hub client. The account had data, so it is
+          // not silent; the money just is not anyone's here.
+          droppedForeign += 1;
+          ctx.counts.skipped += 1;
+          continue;
+        }
+        if (override && (!client || override.id !== client.id)) reattributed += 1;
+        client = override;
+      }
+
       if (!client) {
         // Windsor returned an account we did not ask for; never guess an owner.
         ctx.counts.skipped += 1;
@@ -458,6 +540,13 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
     );
     if (written.error) throw written.error;
     ctx.counts.updated += snapshots.size;
+  }
+
+  if (reattributed > 0 || droppedForeign > 0) {
+    ctx.log(
+      `campaign map moved ${reattributed} row(s) off their account owner and ` +
+        `dropped ${droppedForeign} row(s) belonging to practices that are not clients`,
+    );
   }
 
   // Silence here would read as "no spend". Name the accounts that returned
