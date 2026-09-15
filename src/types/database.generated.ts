@@ -5924,6 +5924,33 @@ export type Database = {
           },
         ]
       }
+      v_campaign_economics: {
+        Row: {
+          bookings: number | null
+          bookings_with_a_value: number | null
+          campaign_external_id: string | null
+          campaign_name: string | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          converted: number | null
+          day: string | null
+          group_id: string | null
+          impressions: number | null
+          shows: number | null
+          spend_cents: number | null
+          treatment_value_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "client_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_cft_call_daily: {
         Row: {
           answered_outbound: number | null
