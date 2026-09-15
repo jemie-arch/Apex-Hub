@@ -13,13 +13,26 @@
  * GoHighLevel field. Reading by position would bake that in; reading by header
  * means a sheet that differs is reported rather than silently misparsed.
  *
- * WHAT THE FIRST RUN IS FOR. Nobody has read one of these sheets. The column
- * map below is inferred from the PPS Make scenarios that write them, so the
- * unmatched-header report is how it gets corrected — and the utm_content
- * sample is how one open question gets answered: those cells are labelled
- * "Ad ID" and filled from utm_content, which is a real Meta ad id only if the
- * campaigns were built to put one there. The sync counts what it sees rather
- * than assuming either way.
+ * ALL 49 SHEETS WERE AUDITED ON 14 SEPTEMBER, and the two things that matter
+ * are settled.
+ *
+ * Ad ID is empty on 41 of 46 audited. Five carry anything at all and only four
+ * hold real Meta ad ids — 22 rows across roughly 1,113. Singleton Smile has 13
+ * and is the only practice with enough distinct ads to compare two creatives.
+ * So a booking cannot be traced to an ad, fleet-wide, and the ~250 ads planned
+ * for October cannot be measured on bookings unless utm_content starts
+ * carrying the ad id BEFORE they run.
+ *
+ * Campaign ID is populated 121 times and Treatment Value 308 — nearly four and
+ * ten times the ad column. Campaign grain and case value work where ad grain
+ * does not.
+ *
+ * NINE SHEETS USE AN OLDER LAYOUT, which is why this file reads by header and
+ * not by column letter. On those, W is "Make Remarks" rather than Date Booked,
+ * and everything after shifts one left: Ad ID sits at Z, AB holds "First
+ * Called", and AC/AD do not exist. Reading by position would have pulled a
+ * call timestamp into the ad column for a fifth of the fleet and reported it
+ * as attribution.
  */
 import { findHeaderRow } from '@/lib/sheet-headers';
 import { readSheet } from '@/lib/integrations/google-sheets';
@@ -116,7 +129,21 @@ function asCents(value: string | undefined): number | null {
 }
 
 /** Known and deliberately not imported, so the unmatched list stays readable. */
-const IGNORED = new Set(['month', 'utm parameters', ''].map(normalise));
+const IGNORED = new Set(
+  [
+    'month',
+    'utm parameters',
+    /*
+     * The nine older sheets carry these two instead of Date Booked and the
+     * AC/AD pair. Listed so they are silently skipped rather than filling the
+     * unmatched report with a known difference on every run — which would bury
+     * a genuinely new column.
+     */
+    'make remarks',
+    'first called',
+    '',
+  ].map(normalise),
+);
 
 const text = (value: string | undefined): string | null => {
   const trimmed = (value ?? '').trim();
@@ -221,6 +248,7 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
   let adCellsPopulated = 0;
   let adCellsLookingLikeMetaIds = 0;
   let campaignCellsPopulated = 0;
+  let campaignCellsNotLookingLikeIds = 0;
   let treatmentValuesPopulated = 0;
 
   for (const target of targets) {
@@ -305,7 +333,18 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
         if (looksLikeMetaId(adCell)) adCellsLookingLikeMetaIds += 1;
       }
 
-      if (text(at(row, 'campaign_external_id')) !== null) campaignCellsPopulated += 1;
+      const campaignCell = text(at(row, 'campaign_external_id'));
+      if (campaignCell !== null) {
+        campaignCellsPopulated += 1;
+        /*
+         * Integrity Dental's Campaign ID column holds a 14-digit number and its
+         * Ad Set ID column holds "Apex | $3679 For Invisalign" — the columns
+         * are mismapped at source on that sheet. Counted rather than filtered,
+         * because the fix belongs in the sheet and silently dropping the rows
+         * would hide that it needs one.
+         */
+        if (!looksLikeMetaId(campaignCell)) campaignCellsNotLookingLikeIds += 1;
+      }
       if (asCents(at(row, 'treatment_value')) !== null) treatmentValuesPopulated += 1;
 
       records.push({
@@ -396,5 +435,6 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
    * ever be reported.
    */
   ctx.note('campaign_column_populated', campaignCellsPopulated);
+  ctx.note('campaign_column_not_an_id', campaignCellsNotLookingLikeIds);
   ctx.note('treatment_value_populated', treatmentValuesPopulated);
 }
