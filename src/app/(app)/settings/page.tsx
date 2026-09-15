@@ -337,7 +337,16 @@ export default async function SettingsPage() {
                         : `last ran ${last.ago} ago`}
                   </p>
                 </div>
-                <RunSyncButton name={definition.name} label="Run now" />
+                <div className="flex flex-col items-end gap-1.5">
+                  <RunSyncButton name={definition.name} label="Run now" />
+                  {definition.name === 'windsor-ads' ? (
+                    <RunSyncButton
+                      name={definition.name}
+                      label="Backfill 65 days"
+                      days={65}
+                    />
+                  ) : null}
+                </div>
               </div>
             );
           })}

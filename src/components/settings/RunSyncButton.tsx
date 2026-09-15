@@ -10,9 +10,12 @@ import { cn } from '@/lib/cn';
 export function RunSyncButton({
   name,
   label,
+  days,
 }: {
   name: string;
   label: string;
+  /* Lookback for this run, in days. Only windsor-ads honours it. */
+  days?: number;
 }) {
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState<RunSyncState | null>(null);
@@ -27,7 +30,7 @@ export function RunSyncButton({
           startTransition(async () => {
             setState(null);
             try {
-              setState(await runSyncNow(name));
+              setState(await runSyncNow(name, days));
             } catch (error) {
               setState({
                 ok: false,

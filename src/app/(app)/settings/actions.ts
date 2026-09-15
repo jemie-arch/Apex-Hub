@@ -15,7 +15,13 @@ export interface RunSyncState {
   message: string;
 }
 
-export async function runSyncNow(name: string): Promise<RunSyncState> {
+/*
+ * days widens the sync's lookback for this one run. Only windsor-ads reads it
+ * (as ctx.windowDays); every other sync ignores it. It exists so a backfill
+ * after re-mapping ad accounts is a button, not a curl with the cron secret -
+ * which on Windows PowerShell does not even parse as intended.
+ */
+export async function runSyncNow(name: string, days?: number): Promise<RunSyncState> {
   /*
    * Checked here, not in the component that renders the button — and answered
    * rather than thrown.
@@ -50,7 +56,12 @@ export async function runSyncNow(name: string): Promise<RunSyncState> {
     return { ok: false, message: `Unknown sync "${name}".` };
   }
 
-  const result = await runSync(definition.name, 'manual', definition.run);
+  const windowDays =
+    typeof days === 'number' && Number.isFinite(days)
+      ? Math.min(400, Math.max(1, Math.floor(days)))
+      : undefined;
+
+  const result = await runSync(definition.name, 'manual', definition.run, { windowDays });
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
