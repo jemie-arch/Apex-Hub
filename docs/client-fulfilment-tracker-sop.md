@@ -203,27 +203,49 @@ the identifiers below.
 5. **Verify** by opening the tracker at Client breakdown, 30 days, and picking
    the practice. Spend, leads and appointments should all be non-zero.
 
-### 27 active practices have no ad account mapped
+### 16 active practices have no ad account mapped
 
 They can show appointments but never spend or CPL. This is the single biggest
-cause of a row looking broken. As of 14 September:
+cause of a row looking broken. As of 15 September, after mapping every practice
+on Joshua's campaign list (migrations 0083 to 0085):
 
-All Dental of Menifee · Dental Design Studios · Diamond Dental · DNA Dental
-Studio · Eagle Creek Dentistry · Evergreen Dental and Orthodontics · Firewheel
-Smiles · Glamorous Smile Dental Spa · Great Smiles of La Mesa (×2) · Habib
-Dental Implants · Integrity Dental · Limestone Hills Orthodontics · Metro Dental
-& Implant Studio · Natalie Yang Orthodontics · Plano Top Dental · Royal
-Dentistry Studio · Skyline Implants & Periodontics · Smile Now Align · Snyder
-Dental Group · Stanton Dental Care · Team Dental N. Liberties · Team Dental
-Swedesboro · TMJ Sleep Airway Orthodontics (Gainesville, New York, Ponte Vedra)
-· Village Dental of New England (General Dentistry)
+**Have a stat sheet, so bookings show against no spend:** Snyder Dental Group
+(22 appts) · Dental Design Studios (12) · Royal Dentistry Studio (10) ·
+Glamorous Smile Dental Spa (7) · Eagle Creek Dentistry (5) · Smile Now Align
+(2) · Stanton Dental Care (1) · TMJ Sleep Airway Orthodontics - Ponte Vedra (0).
 
-Several already carry appointments — DNA Dental Studio has 40, Village Dental 28,
-Snyder 21 — so those rows show bookings against no spend, which makes the
-practice look infinitely efficient.
+Eagle Creek and Dental Design Studio(s) have ad accounts in Business Manager
+(`1954291958818137`, `689259685445341`) that are **not connected to Windsor**.
+Mapping them does nothing until someone connects them in Windsor.
+
+**No stat sheet either, so nothing can land:** Evergreen Dental and
+Orthodontics · Firewheel Smiles · Habib Dental Implants · Natalie Yang
+Orthodontics · Skyline Implants & Periodontics.
+
+**Churned per Joshua but still marked active in the Hub:** Limestone Hills
+Orthodontics (55 appts) · Metro Dental & Implant Studio (46). Their group status
+should be set to churned so they drop out of coverage counts.
 
 **"Great Smiles of La Mesa (Dont use)"** is a duplicate client row and should be
 deactivated rather than mapped.
+
+None of the sixteen is on Joshua's campaign list, so none can be mapped from
+Windsor evidence. Each needs its ad account id from whoever runs its ads.
+
+### Shared accounts: one owner, others linked
+
+Meta cannot split one campaign between two doors. Where locations share a
+campaign, one client **owns** the spend and the others are **linked** in
+Settings → Ad accounts, so the relationship is visible without double counting:
+
+| Account | Owns the spend | Linked |
+|---|---|---|
+| `1364841078777057` Ad Account 10 | TMJ Williston | TMJ Gainesville, TMJ New York |
+| `1307464760364126` Village Dental of New England | Village Dental | Village Dental (General Dentistry) |
+| `2448322745599201` Ad Account 12 | Team Dental N. Liberties | Team Dental Swedesboro |
+
+SMYLE Dental Centers owns two accounts (`827429053287394`, `1189070893015233`);
+both land on its row.
 
 ---
 
