@@ -90,7 +90,13 @@ const HEADER_TO_FIELD = new Map<string, string>([
    */
   ['treatment value (only input if new patient)', 'treatment_value'],
   [
-    "notes (feedback on appointment or additional info on why they didn't convert)",
+    /*
+     * No apostrophe. normalise() strips it from the sheet's header, and these
+     * keys are compared against the normalised form - so a key that keeps its
+     * punctuation can never match. The first run reported this column as
+     * unmatched, which is what the unmatched report is for.
+     */
+    "notes (feedback on appointment or additional info on why they didnt convert)",
     'outcome_notes',
   ],
   /*
