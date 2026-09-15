@@ -141,18 +141,28 @@ gate and a base wage.** These are two different schemes, and the Hub currently
 encodes the one people are being paid on, not the one Joshua describes as the
 rule. Which is authoritative is his call, not a data question.
 
-### The change Joshua is open to
+### The rule is pay-on-show. The fallbacks were conditional, and the condition is false.
 
-Paying on shows has a real problem he named: an ISR who books a patient for a
-month out cannot be paid until then, which *"fucks up the tier system for them"*
-and discourages booking. He said, verbatim, he is *"completely fine"* with:
-- paying **monthly**, or
-- paying on **booking** with a hard rule and coaching to book patients soon,
+Read carefully, Joshua did not offer a choice. He stated the rule — *"our
+current system is like, they only get paid after they show up"* — and then
+offered pay-on-booking or monthly payout **only** *"if that's too difficult to
+automate."*
 
-if paying-on-show is too hard to automate. **It is not too hard to automate.**
-The Hub already knows shows per agent per day. The question is which he wants,
-and the trade is: pay-on-show is accurate but delayed; pay-on-booking is prompt
-but pays for no-shows. This should be his decision, made once.
+It is not difficult to automate. The Hub already knows, per agent per day,
+which bookings showed (`first_consultation_show`, `appointment_ledger.outcome`)
+and when. So the condition for the fallback is not met, and **the rule to build
+is pay-on-show**, exactly as he described it.
+
+The problem he named is real and is handled by design, not by changing the
+rule: a booking made today for a consultation a month out earns its commission
+when the patient shows, so **a payout run must look back at shows that occurred
+in the period, whatever period the booking was made in.** That is a query
+window, not a policy change. The ISR is paid for every show, just sometimes a
+period late — which is what "paid after they show up" means.
+
+What still needs the sheet: the per-show **rate** for each tier and the
+**monthly appointment thresholds** that select the tier. Those are numbers, not
+decisions, and they are in the commission sheet the brief below asks for.
 
 ### Qualification — the deduction that is not yet buildable
 

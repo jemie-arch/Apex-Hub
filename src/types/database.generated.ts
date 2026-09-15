@@ -3290,6 +3290,33 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_ad_accounts: {
+        Row: {
+          ad_account_id: string
+          business_manager: string
+          connected_to_windsor: boolean
+          listed_at: string
+          meta_name: string
+          note: string | null
+        }
+        Insert: {
+          ad_account_id: string
+          business_manager?: string
+          connected_to_windsor?: boolean
+          listed_at?: string
+          meta_name: string
+          note?: string | null
+        }
+        Update: {
+          ad_account_id?: string
+          business_manager?: string
+          connected_to_windsor?: boolean
+          listed_at?: string
+          meta_name?: string
+          note?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
