@@ -94,28 +94,38 @@ interface DayMetrics {
 export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
   const db = serviceClient();
 
-  // Active sub-accounts with an ad account, whose business has not churned.
-  const [clientRows, churnedGroups] = await Promise.all([
+  /*
+   * Which client each ad account's spend belongs to.
+   *
+   * Read from client_ad_accounts, owners only, rather than clients.ad_account_id.
+   * The column is singular and reality is not: SMYLE runs two accounts, and the
+   * three TMJ locations share one. With the singular column this Map was keyed
+   * by account and the last client loaded for a shared account won silently -
+   * the others got nothing, and which one won depended on row order.
+   *
+   * owns_spend has a partial unique index, so exactly one client per account
+   * reaches this Map by construction. A linked non-owner is visible in the
+   * table and gets none of the money, which is the honest position when Meta
+   * cannot split a campaign between the locations it serves.
+   */
+  const [ownerRows, churnedGroups] = await Promise.all([
     db
-      .from('clients')
-      .select('id, name, group_id, ad_account_id')
-      .not('ad_account_id', 'is', null)
-      .eq('is_active', true),
+      .from('client_ad_accounts')
+      .select('ad_account_id, client:clients!inner(id, name, group_id, is_active)')
+      .eq('owns_spend', true),
     db.from('client_groups').select('id').eq('status', 'churned'),
   ]);
-  if (clientRows.error) throw clientRows.error;
+  if (ownerRows.error) throw ownerRows.error;
   if (churnedGroups.error) throw churnedGroups.error;
 
   const churned = new Set((churnedGroups.data ?? []).map((row) => row.id));
-  const clients = {
-    data: (clientRows.data ?? []).filter((row) => !churned.has(row.group_id)),
-  };
 
   // Windsor reports account ids bare; tolerate an act_ prefix in our column.
   const clientByAccount = new Map<string, { id: string; name: string }>();
-  for (const client of clients.data ?? []) {
-    if (!client.ad_account_id) continue;
-    const bare = client.ad_account_id.replace(/^act_/, '');
+  for (const row of ownerRows.data ?? []) {
+    const client = row.client;
+    if (!client || !client.is_active || churned.has(client.group_id)) continue;
+    const bare = row.ad_account_id.replace(/^act_/, '');
     clientByAccount.set(bare, { id: client.id, name: client.name });
   }
 
@@ -129,8 +139,8 @@ export async function syncWindsorAds(ctx: SyncContext): Promise<void> {
      * to look different from a working one, or it stays unconfigured.
      */
     ctx.recordError(
-      'no client has an ad_account_id set, so no ad data can be pulled — map ' +
-        'Windsor account ids onto clients first',
+      'no client owns an ad account in client_ad_accounts, so no ad data can ' +
+        'be pulled — map Windsor account ids onto clients first',
     );
     return;
   }

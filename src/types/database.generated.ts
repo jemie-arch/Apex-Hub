@@ -1807,6 +1807,83 @@ export type Database = {
           },
         ]
       }
+      campaign_practice_map: {
+        Row: {
+          campaign_external_id: string
+          client_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          practice_name: string
+        }
+        Insert: {
+          campaign_external_id: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          practice_name: string
+        }
+        Update: {
+          campaign_external_id?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          practice_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_practice_map_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           client_id: string
@@ -1901,6 +1978,86 @@ export type Database = {
           },
           {
             foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_recruitment_ads"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      client_ad_accounts: {
+        Row: {
+          account_name: string | null
+          ad_account_id: string
+          client_id: string
+          created_at: string
+          id: string
+          note: string | null
+          owns_spend: boolean
+        }
+        Insert: {
+          account_name?: string | null
+          ad_account_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          owns_spend?: boolean
+        }
+        Update: {
+          account_name?: string | null
+          ad_account_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          owns_spend?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_list_conflicts"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_candidates"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_gaps"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "pps_routing_internal_excluded"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_cft_sheet_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_recruitment_ads"
