@@ -72,16 +72,48 @@ const HEADER_TO_FIELD = new Map<string, string>([
   ['location id', 'location_external_id'],
   ['offer name', 'offer_name'],
   /*
-   * The four that lie. Mapped to what actually fills them rather than to what
-   * they are called — see the file header and migration 0079.
+   * Read on 14 September, so these are the sheets' real headings rather than
+   * the inference this file shipped with. Two were missing entirely.
    */
-  ['campaign id', 'utm_campaign_id'],
+  ['treatment value (only input if new patient)', 'treatment_value'],
+  [
+    "notes (feedback on appointment or additional info on why they didn't convert)",
+    'outcome_notes',
+  ],
+  /*
+   * The ad columns. Campaign ID is a real Meta campaign id and resolves to the
+   * right practice — checked for City Dental, Bespoke and Fiesta. Ad ID is
+   * empty in every sheet read, because the ads do not set utm_content; it is
+   * mapped anyway so it fills by itself the day that is configured.
+   */
+  ['campaign id', 'campaign_external_id'],
   ['campaign name', 'utm_campaign'],
-  ['ad set id', 'utm_term'],
-  ['ad set name', 'utm_medium'],
-  ['ad id', 'utm_content'],
-  ['ad name', 'utm_content_name'],
+  ['ad set id', 'adset_external_id'],
+  ['ad set name', 'adset_name'],
+  ['ad id', 'ad_external_id'],
+  ['ad name', 'ad_name'],
 ]);
+
+/**
+ * A money cell as integer cents.
+ *
+ * Treatment Value is the only case value recorded anywhere in the business, so
+ * it is worth parsing carefully rather than coercing. Anything that is not a
+ * number is null, never zero: "no value entered" and "the case was worth
+ * nothing" are different facts and one of them is common.
+ */
+function asCents(value: string | undefined): number | null {
+  const raw = text(value);
+  if (raw === null) return null;
+
+  const cleaned = raw.replace(/[^0-9.\-]/g, '');
+  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+
+  const amount = Number.parseFloat(cleaned);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+
+  return Math.round(amount * 100);
+}
 
 /** Known and deliberately not imported, so the unmatched list stays readable. */
 const IGNORED = new Set(['month', 'utm parameters', ''].map(normalise));
@@ -188,6 +220,8 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
   /* The open question, answered by counting rather than by assertion. */
   let adCellsPopulated = 0;
   let adCellsLookingLikeMetaIds = 0;
+  let campaignCellsPopulated = 0;
+  let treatmentValuesPopulated = 0;
 
   for (const target of targets) {
     let rows: string[][];
@@ -257,11 +291,22 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
        */
       if (name === null && external === null) return;
 
-      const adCell = text(at(row, 'utm_content'));
+      /*
+       * Two of the three sheets carry a row reading "DON'T DELETE THIS ROW" in
+       * column A, directly under the headers. It is a guard somebody added so
+       * an automation appending rows cannot land on the header, and it is not
+       * an appointment.
+       */
+      if (name !== null && /don'?t delete this row/i.test(name)) return;
+
+      const adCell = text(at(row, 'ad_external_id'));
       if (adCell !== null) {
         adCellsPopulated += 1;
         if (looksLikeMetaId(adCell)) adCellsLookingLikeMetaIds += 1;
       }
+
+      if (text(at(row, 'campaign_external_id')) !== null) campaignCellsPopulated += 1;
+      if (asCents(at(row, 'treatment_value')) !== null) treatmentValuesPopulated += 1;
 
       records.push({
         client_id: target.clientId,
@@ -290,10 +335,14 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
         notes: text(at(row, 'notes')),
         location_name: text(at(row, 'location_name')),
         location_external_id: text(at(row, 'location_external_id')),
+        campaign_external_id: text(at(row, 'campaign_external_id')),
+        adset_external_id: text(at(row, 'adset_external_id')),
+        adset_name: text(at(row, 'adset_name')),
+        ad_external_id: adCell,
+        ad_name: text(at(row, 'ad_name')),
         utm_campaign: text(at(row, 'utm_campaign')),
-        utm_term: text(at(row, 'utm_term')),
-        utm_medium: text(at(row, 'utm_medium')),
-        utm_content: adCell,
+        treatment_value_cents: asCents(at(row, 'treatment_value')),
+        outcome_notes: text(at(row, 'outcome_notes')),
         synced_at: new Date().toISOString(),
       });
     });
@@ -340,4 +389,12 @@ export async function syncStatSheets(ctx: SyncContext): Promise<void> {
    */
   ctx.note('ad_column_populated', adCellsPopulated);
   ctx.note('ad_column_looks_like_meta_id', adCellsLookingLikeMetaIds);
+  /*
+   * Campaign is the column that actually works today, so its coverage is the
+   * number worth watching. Treatment value is the only case value recorded
+   * anywhere in the business, and how sparse it is decides whether revenue can
+   * ever be reported.
+   */
+  ctx.note('campaign_column_populated', campaignCellsPopulated);
+  ctx.note('treatment_value_populated', treatmentValuesPopulated);
 }

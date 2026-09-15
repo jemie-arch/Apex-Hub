@@ -4093,10 +4093,15 @@ export type Database = {
       }
       stat_sheet_appointments: {
         Row: {
+          ad_external_id: string | null
+          ad_name: string | null
+          adset_external_id: string | null
+          adset_name: string | null
           appointment_at: string | null
           appointment_external_id: string | null
           appointment_on: string | null
           booked_on: string | null
+          campaign_external_id: string | null
           cc_on_file: string | null
           charged: string | null
           client_id: string
@@ -4111,6 +4116,7 @@ export type Database = {
           location_name: string | null
           notes: string | null
           offer_name: string | null
+          outcome_notes: string | null
           patient_email: string | null
           patient_name: string | null
           patient_phone: string | null
@@ -4118,16 +4124,22 @@ export type Database = {
           source_row: number
           spreadsheet_id: string
           synced_at: string
+          treatment_value_cents: number | null
           utm_campaign: string | null
           utm_content: string | null
           utm_medium: string | null
           utm_term: string | null
         }
         Insert: {
+          ad_external_id?: string | null
+          ad_name?: string | null
+          adset_external_id?: string | null
+          adset_name?: string | null
           appointment_at?: string | null
           appointment_external_id?: string | null
           appointment_on?: string | null
           booked_on?: string | null
+          campaign_external_id?: string | null
           cc_on_file?: string | null
           charged?: string | null
           client_id: string
@@ -4142,6 +4154,7 @@ export type Database = {
           location_name?: string | null
           notes?: string | null
           offer_name?: string | null
+          outcome_notes?: string | null
           patient_email?: string | null
           patient_name?: string | null
           patient_phone?: string | null
@@ -4149,16 +4162,22 @@ export type Database = {
           source_row: number
           spreadsheet_id: string
           synced_at?: string
+          treatment_value_cents?: number | null
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
           utm_term?: string | null
         }
         Update: {
+          ad_external_id?: string | null
+          ad_name?: string | null
+          adset_external_id?: string | null
+          adset_name?: string | null
           appointment_at?: string | null
           appointment_external_id?: string | null
           appointment_on?: string | null
           booked_on?: string | null
+          campaign_external_id?: string | null
           cc_on_file?: string | null
           charged?: string | null
           client_id?: string
@@ -4173,6 +4192,7 @@ export type Database = {
           location_name?: string | null
           notes?: string | null
           offer_name?: string | null
+          outcome_notes?: string | null
           patient_email?: string | null
           patient_name?: string | null
           patient_phone?: string | null
@@ -4180,6 +4200,7 @@ export type Database = {
           source_row?: number
           spreadsheet_id?: string
           synced_at?: string
+          treatment_value_cents?: number | null
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
