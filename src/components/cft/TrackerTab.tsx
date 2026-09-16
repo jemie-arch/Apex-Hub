@@ -1,5 +1,6 @@
 import { ClientPicker } from '@/components/cft/ClientPicker';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
+import { resolveRange } from '@/lib/range';
 import { StatsDashboard } from '@/components/cft/StatsDashboard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FilterPillLinks } from '@/components/ui/FilterPills';
@@ -169,22 +170,33 @@ export async function TrackerTab({
   const days = (WINDOWS.find((option) => String(option) === single('win')) ??
     30) as WindowDays;
   /*
-   * A custom range, if the shared DateRangePicker has written one.
+   * The date the shared DateRangePicker has chosen, if any.
    *
-   * It writes ?from and ?to as ISO dates, the same params every other page in
-   * the Hub reads, so a range chosen here means the same thing it means on the
-   * dashboard. Only accepted when both ends parse — a half-written range should
-   * fall back to the preset rather than silently querying from the epoch.
+   * It writes ?preset (this_month, last_month, last_90 ...) or, for a custom
+   * range, ?preset=custom with ?from and ?to as ISO dates - the same params
+   * every other page in the Hub reads. Resolved by the same resolveRange the
+   * dashboard uses, so "This month" here is the month the dashboard means.
+   *
+   * This used to accept only ?from and ?to, tested with a regex whose
+   * backslashes had been lost - it read /^d{4}-d{2}-d{2}$/ and so matched no
+   * date ever written. The picker sat on the page and changed nothing, which
+   * is how a control teaches people not to trust the table. Presets were never
+   * read at all. Both fixed here; the 3/7/30 pills remain the default and win
+   * when no picker parameter is present.
    */
-  const isDay = (value: string | undefined): value is string =>
-    typeof value === 'string' && /^d{4}-d{2}-d{2}$/.test(value);
-
+  const preset = single('preset');
   const customFrom = single('from');
   const customTo = single('to');
-  const range =
-    isDay(customFrom) && isDay(customTo) && customFrom <= customTo
-      ? { from: customFrom, to: customTo }
-      : undefined;
+  const range = (() => {
+    if (!preset && !(customFrom && customTo)) return undefined;
+    const resolved = resolveRange({
+      preset: preset ?? 'custom',
+      from: customFrom,
+      to: customTo,
+    });
+    const iso = (value: Date): string => value.toISOString().slice(0, 10);
+    return { from: iso(resolved.from), to: iso(resolved.to) };
+  })();
 
   const breakdown: Breakdown = single('bd') === 'client' ? 'client' : 'campaign';
   const clientId = single('client') !== '' ? single('client') : undefined;
