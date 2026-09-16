@@ -7,6 +7,17 @@
  *
  * Nothing has ever read the output. This config is the Hub reading it.
  *
+ * RECONNECTED 16 SEPTEMBER 2026. Read the history below as history. The
+ * coaching chain (relabel, categorise, summary, sales audit, 1-10 grade, row
+ * to CALL SUMMARIES) now hangs off a router after the live Whisper transcript
+ * in the connected flow, remapped onto the webhook fields. Column J carries
+ * the audit TEXT (it used to carry the number twice); column L (process
+ * followed) is written blank until Josh supplies the process rules - its old
+ * prompt still had template placeholders. The Slack bad-call alerts are not
+ * reconnected for the same reason. The HotProspector/AssemblyAI chain and its
+ * plaintext API key are gone from the blueprint. Expect the 216th row on the
+ * next call over two minutes that is not a voicemail.
+ *
  * THE CHAIN THAT WRITES THIS TAB IS ORPHANED. Read this before trusting the
  * tab to grow.
  *
