@@ -27,27 +27,44 @@ import { serviceClient } from '@/lib/supabase/service';
  */
 
 /** How stale each feed is, measured rather than written down. */
+/*
+ * When each feed last delivered, read from the feed tables themselves.
+ *
+ * These used to ask the tracker view for its latest day with spend, leads
+ * and appointments - three full computations of the view for three dates,
+ * on every page load, on top of the table's own reads. With the view at four
+ * to six seconds that was most of why a window change came back empty. The
+ * tables know the same dates in milliseconds.
+ */
 async function feedFreshness(db: ReturnType<typeof serviceClient>) {
-  const latest = async (
-    view: 'v_cft_stats_dashboard' | 'v_cft_call_daily',
+  const newest = async (
+    table: 'ad_level_insights' | 'tracker_leads' | 'tracker_appointments' | 'appointments',
     column: string,
+    filter?: { column: string; gt: number },
   ): Promise<string | null> => {
-    const { data } = await db
-      .from(view)
-      .select('day')
-      .gt(column, 0)
-      .order('day', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    return (data as { day: string } | null)?.day ?? null;
+    let query = db.from(table).select(column).not(column, 'is', null);
+    if (filter) query = query.gt(filter.column, filter.gt);
+    const { data } = await query.order(column, { ascending: false }).limit(1).maybeSingle();
+    const value = (data as Record<string, string> | null)?.[column] ?? null;
+    return value ? value.slice(0, 10) : null;
   };
 
-  const [spend, leads, appts, calls] = await Promise.all([
-    latest('v_cft_stats_dashboard', 'spend_cents'),
-    latest('v_cft_stats_dashboard', 'leads_best'),
-    latest('v_cft_stats_dashboard', 'appts_created'),
-    latest('v_cft_call_daily', 'dialed_calls'),
+  const [spend, leads, sheetAppts, crmAppts, callRow] = await Promise.all([
+    newest('ad_level_insights', 'insight_on', { column: 'spend_cents', gt: 0 }),
+    newest('tracker_leads', 'received_on'),
+    newest('tracker_appointments', 'created_on'),
+    newest('appointments', 'booked_at'),
+    db
+      .from('v_cft_call_daily')
+      .select('day')
+      .gt('dialed_calls', 0)
+      .order('day', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  const appts = [sheetAppts, crmAppts].filter((d): d is string => d !== null).sort().at(-1) ?? null;
+  const calls = (callRow.data as { day: string } | null)?.day ?? null;
 
   return { spend, leads, appts, calls };
 }
