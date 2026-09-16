@@ -33,12 +33,14 @@ export function isWindow(value: unknown): value is WindowDays {
 /**
  * Counters as summed over the window, before anything is divided.
  *
- * Call counters are optional because they have no campaign grain: the calls
- * table carries no campaign reference and calls.deal_id is null on every row.
- * In a campaign breakdown they are absent rather than zero, which is the
- * difference between "no calls" and "cannot be known" — and the reason the six
- * call columns render blank there rather than repeating the client total on
- * every campaign row, which would be double counting.
+ * Call counters are optional only for a row that has none at all. At client
+ * grain they are the practice's calls. At campaign grain they are the
+ * practice's calls apportioned across its campaign rows by each row's share
+ * of the practice's leads (spend if it has no leads, equal if it has neither),
+ * with largest-remainder rounding so the rows sum back to the real total.
+ * The calls table carries no campaign, so this is an estimate: a dial follows
+ * a lead, and the leads are known per campaign. The rates on each row equal
+ * the practice's rates by construction.
  */
 export interface DashboardRow {
   key: string;
@@ -69,7 +71,7 @@ export interface DashboardRow {
   dqs: number;
   closes: number;
 
-  /** Present only at client grain. */
+  /** The practice's calls, or at campaign grain its apportioned share of them. */
   calls?: CallCounters;
 }
 
@@ -307,6 +309,46 @@ function emptyCalls(): CallCounters {
   };
 }
 
+/**
+ * Split one set of counters across rows in proportion to weights.
+ *
+ * Integer counters use largest-remainder rounding so the pieces sum to the
+ * whole. speedToLeadSum is a sum of minutes, not a count, and is split as a
+ * plain proportion so the per-row average equals the practice's average.
+ */
+export function apportion(total: CallCounters, weights: number[]): CallCounters[] {
+  const count = weights.length;
+  const sum = weights.reduce((acc, w) => acc + w, 0);
+  const shares = sum > 0 ? weights.map((w) => w / sum) : weights.map(() => 1 / count);
+  const pieces = shares.map(() => emptyCalls());
+
+  for (const key of Object.keys(total) as Array<keyof CallCounters>) {
+    const value = total[key];
+    if (key === 'speedToLeadSum') {
+      shares.forEach((share, index) => {
+        const piece = pieces[index];
+        if (piece) piece[key] = value * share;
+      });
+      continue;
+    }
+    const floors = shares.map((share) => Math.floor(value * share));
+    let remainder = value - floors.reduce((acc, f) => acc + f, 0);
+    const byFraction = shares
+      .map((share, index) => ({ index, fraction: value * share - (floors[index] ?? 0) }))
+      .sort((a, b) => b.fraction - a.fraction);
+    for (const { index } of byFraction) {
+      if (remainder <= 0) break;
+      floors[index] = (floors[index] ?? 0) + 1;
+      remainder -= 1;
+    }
+    floors.forEach((piece, index) => {
+      const target = pieces[index];
+      if (target) target[key] = piece;
+    });
+  }
+  return pieces;
+}
+
 export interface DashboardResult {
   rows: DashboardRow[];
   totals: DashboardRow;
@@ -524,6 +566,61 @@ export function aggregate(
     }
   }
 
+  if (options.breakdown === 'campaign') {
+    /*
+     * Spread each practice's calls over its campaign rows.
+     *
+     * Weighted by leads because a dial is a response to a lead and leads are
+     * known per campaign; by spend when a practice has calls but no leads in
+     * the window; equally when it has neither. Largest-remainder rounding so
+     * the practice's rows add up to exactly its call total.
+     */
+    const rowsByClient = new Map<string, DashboardRow[]>();
+    for (const row of byKey.values()) {
+      if (!row.clientId) continue;
+      const list = rowsByClient.get(row.clientId) ?? [];
+      list.push(row);
+      rowsByClient.set(row.clientId, list);
+    }
+    for (const [clientId, counters] of callsByClient) {
+      const list = rowsByClient.get(clientId);
+      if (!list || list.length === 0) {
+        // Calls with no ad or appointment row: a call-only practice. One row
+        // for it, as at client grain, so the calls are not lost.
+        byKey.set(clientId, {
+          key: clientId,
+          clientId,
+          groupId: null,
+          status: null,
+          clientName: clientNames.get(clientId) ?? '—',
+          campaignName: null,
+          campaignId: null,
+          offerName: null,
+          spendCents: 0,
+          leads: 0,
+          apptsCreated: 0,
+          apptsTracker: 0,
+          apptsToBeTaken: 0,
+          lastApptDate: null,
+          shows: 0,
+          noShows: 0,
+          cancels: 0,
+          dqs: 0,
+          closes: 0,
+          calls: counters,
+        });
+        continue;
+      }
+      let weights = list.map((row) => row.leads);
+      if (weights.every((w) => w === 0)) weights = list.map((row) => row.spendCents);
+      if (weights.every((w) => w === 0)) weights = list.map(() => 1);
+      const shares = apportion(counters, weights);
+      list.forEach((row, index) => {
+        row.calls = shares[index];
+      });
+    }
+  }
+
   const rows = [...byKey.values()].sort((a, b) => b.spendCents - a.spendCents);
 
   const totals: DashboardRow = {
@@ -546,7 +643,7 @@ export function aggregate(
     cancels: 0,
     dqs: 0,
     closes: 0,
-    ...(options.breakdown === 'client' ? { calls: emptyCalls() } : {}),
+    calls: emptyCalls(),
   };
 
   for (const row of rows) {

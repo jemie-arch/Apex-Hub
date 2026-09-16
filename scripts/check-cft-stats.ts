@@ -168,7 +168,7 @@ check('Cost Per Show with no shows', d.costPerShow, null);
 // The spend is real and still shown; only the ratios are unknowable.
 check('the spend itself is kept', spendNoLeads.rows[0]!.spendCents, 50_000);
 
-section('Call data has no campaign grain');
+section('Call data is apportioned across a practice\'s campaigns by lead share');
 
 const withCalls = aggregate(
   [
@@ -181,19 +181,34 @@ const withCalls = aggregate(
 
 check('two campaigns for one client stay two rows', withCalls.rows.length, 2);
 /*
- * Absent, not zero. Repeating the client's 80 dials on both campaign rows would
- * report 160 dials for 80 calls; showing 0 would claim the campaigns made no
- * calls, which is also false. The only true answer at this grain is "unknown".
+ * Apportioned, not repeated and not absent. Repeating the client's 80 dials
+ * on both rows would report 160 dials for 80 calls; hatching them out left a
+ * tracker with no call data on its default view. Two campaigns with ten
+ * leads each split the 80 dials 40 and 40, and the rows sum to the truth.
  */
 check(
-  'neither campaign row carries call counters',
-  withCalls.rows.map((row) => row.calls === undefined),
-  [true, true],
+  'each campaign row carries its lead-share of the calls',
+  withCalls.rows.map((row) => row.calls?.dialed),
+  [40, 40],
 );
 check(
-  'so the call-derived figures are blank',
-  withCalls.rows.map((row) => derive(row).pickupPct),
-  [null, null],
+  'so Dials per Lead is the practice\'s own figure on every row',
+  withCalls.rows.map((row) => derive(row).dialsPerLead),
+  [4, 4],
+);
+check('and the rows sum back to the real total', withCalls.totals.calls?.dialed, 80);
+const unevenCalls = aggregate(
+  [
+    stat({ campaign_id_external: '111', spend_cents: 1000, leads_best: 7 }),
+    stat({ campaign_id_external: '222', spend_cents: 1000, leads_best: 3 }),
+  ],
+  [call({ dialed_calls: 11 })],
+  campaign,
+);
+check(
+  'largest-remainder rounding: 11 dials over 7:3 leads is 8 and 3',
+  unevenCalls.rows.map((row) => row.calls?.dialed),
+  [8, 3],
 );
 
 section('But the window total is answerable at either breakdown');
@@ -544,14 +559,9 @@ check(
  * the next person to block or unblock a column has to say so here.
  */
 check(
-  'the call block and the campaign-id columns are blocked in a campaign breakdown',
+  'nothing is blocked in a campaign breakdown any more (0088 and lead-share calls)',
   COLUMNS.filter((c) => c.blockedAt?.('campaign')).map((c) => c.letter),
-  [
-    'H', 'I',
-    'J', 'K', 'L', 'M', 'N', 'O',
-    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB',
-    'AE', 'AF', 'AG',
-  ],
+  [],
 );
 check(
   'and none of them are blocked at client grain',

@@ -288,6 +288,34 @@ both land on its row.
 
 ---
 
+## 5b. How every column fills at campaign grain (16 September 2026)
+
+Until 16 September the campaign view hatched out Leads, CPL, every appointment
+column and every call column, because the sheet's campaign id was wrong row by
+row and calls carry no campaign at all. Both are now handled at the source and
+every column shows a number.
+
+**Leads and appointments.** The tracker view places each lead and booking by
+one rule. If the row cites a campaign that belongs to its own practice, that
+campaign is kept. Otherwise it goes on the practice's own campaign with the
+most spend in the 30 days up to that day. A practice with no campaign keeps
+"(no campaign)". Measured the day this shipped, 1,072 of 1,176 leads already
+cited their own campaign; 78 of 88 sheet appointments cited another
+practice's and are corrected. For the 35 practices running one campaign the
+rule is exact. For SMYLE, Kind Dental and Village Dental, which run more than
+one, an unattributed booking lands on the campaign that was spending most that
+month, which is an estimate. Totals never change; only the row a lead or
+booking sits on.
+
+**Calls.** A call carries no campaign, so a campaign row shows the practice's
+calls apportioned by that row's share of the practice's leads in the window
+(by spend if it has no leads, equally if it has neither), rounded so the
+practice's rows add back to its true total. Pickup %, Conversation %, Speed to
+Lead and Dials per Lead on a campaign row are therefore the practice's own
+rates. This is the one place the campaign view shows an estimate rather than
+a measurement, and it is the same estimate the spreadsheet makes when it
+copies a practice's call figures onto each campaign row.
+
 ## 6. Two places the Hub deliberately disagrees with the spreadsheet
 
 Both are recorded here so nobody "fixes" them back.
