@@ -134,8 +134,27 @@ export async function syncCrmAppointments(ctx: SyncContext): Promise<void> {
     data: (clientRows.data ?? []).filter((row) => !churned.has(row.group_id)),
   };
 
-  const from = new Date(HISTORY_BEGINS_AT);
+  /*
+   * Two kinds of run share this code.
+   *
+   * The full pass reads from HISTORY_BEGINS_AT, for the reasons above, and runs
+   * once a day. The live pass runs every hour and is asked only for events that
+   * START from a few days ago onward. That still catches every new booking,
+   * because a booking made this morning for November has a November start and
+   * sits inside the window; what it deliberately does not re-read is the
+   * outcome of an appointment that happened last month, which the full pass
+   * covers. Requests per run are the same either way - one per calendar - so
+   * the saving is response size, and with it the time this takes.
+   */
+  const from =
+    ctx.windowDays === undefined
+      ? new Date(HISTORY_BEGINS_AT)
+      : new Date(Date.now() - ctx.windowDays * 86_400_000);
   const to = new Date(Date.now() + LOOKAHEAD_DAYS * 86_400_000);
+  if (ctx.windowDays !== undefined) {
+    ctx.log(`live pass: events starting from ${ctx.windowDays} day(s) ago, not the whole record`);
+    ctx.note('window_days', ctx.windowDays);
+  }
   ctx.note('window', {
     from: from.toISOString().slice(0, 10),
     to: to.toISOString().slice(0, 10),

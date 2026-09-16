@@ -199,7 +199,13 @@ the identifiers below.
 3. **Check the practice's name in the tracker sheet matches** the client name in
    the Hub. Leads and appointments are matched on the location name the sheet
    carries. A rename on one side and not the other silently orphans the rows.
-4. **Wait for the 6am sync**, or trigger it. Data appears the following morning.
+4. **Wait for the next cycle**, or trigger it from Settings. Since 16 September
+   the tracker refreshes on its own: the ISR sheet, every stat sheet and the
+   ledger every 15 minutes; Windsor spend every hour on the hour; new
+   GoHighLevel bookings every hour at half past. The full daily passes (06:00
+   sync-all, 18:00 full crm-appointments) still run and are what corrects
+   history. Spend can lag the others by a few hours because Windsor refreshes
+   its copy of Meta on its own schedule.
 5. **Verify** by opening the tracker at Client breakdown, 30 days, and picking
    the practice. Spend, leads and appointments should all be non-zero.
 
