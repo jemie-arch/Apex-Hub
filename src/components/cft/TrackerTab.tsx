@@ -1,6 +1,5 @@
 import { ClientPicker } from '@/components/cft/ClientPicker';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
-import { SheetCoverage, type CoverageRow } from '@/components/cft/SheetCoverage';
 import { StatsDashboard } from '@/components/cft/StatsDashboard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FilterPillLinks } from '@/components/ui/FilterPills';
@@ -199,35 +198,17 @@ export async function TrackerTab({
 
   const db = serviceClient();
 
-  const [result, coverage, freshness] = await Promise.all([
+  /*
+   * The "What the sheet is missing" coverage panel used to load and render
+   * here. Removed 16 September 2026 at Jemie's instruction: the tracker is for
+   * reading the numbers, not for a to-do list about the sheet. The view
+   * v_cft_sheet_coverage and the SheetCoverage component stay in the repo for
+   * anyone who wants the report somewhere else.
+   */
+  const [result, freshness] = await Promise.all([
     loadStatsDashboard(db, { days, range, breakdown, clientId }),
-    /*
-     * Deliberately unscoped by date or client. The gap is a standing property
-     * of the sheet rather than something that happened in the last 30 days, and
-     * filtering it to the window on screen would make it look like a small
-     * problem in a short one.
-     */
-    db
-      .from('v_cft_sheet_coverage')
-      .select(
-        'client_name, in_sheet, missing_named, missing_unnamed, true_total, coverage',
-      )
-      .order('missing_named', { ascending: false }),
     feedFreshness(db),
   ]);
-
-  /*
-   * Degrades to no panel rather than throwing. A gap report failing must not
-   * take down the tracker it is reporting on.
-   */
-  const coverageRows: CoverageRow[] = (coverage.data ?? []).map((row) => ({
-    clientName: row.client_name ?? '—',
-    inSheet: Number(row.in_sheet ?? 0),
-    missingNamed: Number(row.missing_named ?? 0),
-    missingUnnamed: Number(row.missing_unnamed ?? 0),
-    trueTotal: Number(row.true_total ?? 0),
-    coverage: row.coverage === null ? null : Number(row.coverage),
-  }));
 
   // Clicking the sorted column flips it; clicking another starts descending,
   // which is what somebody scanning for the biggest number expects.
@@ -436,8 +417,6 @@ export async function TrackerTab({
               noteTone={calls.speedToLeadOver24h > 0 ? 'warning' : 'neutral'}
             />
           </div>
-
-          <SheetCoverage rows={coverageRows} />
 
           <StatsDashboard
             rows={rows}
