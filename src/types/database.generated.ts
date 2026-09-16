@@ -1985,6 +1985,30 @@ export type Database = {
           },
         ]
       }
+      cft_sheet_mirror: {
+        Row: {
+          cells: string[]
+          id: string
+          imported_at: string
+          row_number: number
+          tab: string
+        }
+        Insert: {
+          cells: string[]
+          id?: string
+          imported_at?: string
+          row_number: number
+          tab: string
+        }
+        Update: {
+          cells?: string[]
+          id?: string
+          imported_at?: string
+          row_number?: number
+          tab?: string
+        }
+        Relationships: []
+      }
       client_ad_accounts: {
         Row: {
           account_name: string | null

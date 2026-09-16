@@ -15,6 +15,7 @@ import { syncCrmLeads } from '@/lib/sync/crm-leads';
 import { syncFulfilmentLeads } from '@/lib/sync/fulfilment-leads';
 import { syncStatSheets } from '@/lib/sync/stat-sheets';
 import { syncFulfilmentTracker } from '@/lib/sync/fulfilment-tracker';
+import { syncTrackerDashboardMirror } from '@/lib/sync/tracker-dashboard-mirror';
 import { syncOnboardingCalls } from '@/lib/sync/onboarding-calls';
 import { syncPayoutHours } from '@/lib/sync/payout-hours';
 import { syncProvisionPending } from '@/lib/sync/provision-pending';
@@ -60,6 +61,13 @@ export const SYNCS: Record<string, SyncDefinition> = {
       'Every practice stat sheet into stat_sheet_appointments — reads the sheet ' +
       'ids from pps_clinic_routing, so no Drive access is needed',
     run: syncStatSheets,
+  },
+  'tracker-dashboard-mirror': {
+    name: 'tracker-dashboard-mirror',
+    description:
+      'The computed tabs of the tracker workbook (STATS DASHBOARD, Client Results) ' +
+      'copied cell for cell into cft_sheet_mirror, so the Hub can be diffed against the sheet in SQL',
+    run: syncTrackerDashboardMirror,
   },
   'fulfilment-tracker': {
     name: 'fulfilment-tracker',
